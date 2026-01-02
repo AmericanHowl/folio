@@ -46,7 +46,7 @@ class CalibreService:
         Returns:
             List of book dictionaries with metadata
         """
-        args = ['list', '--for-machine', '--fields', 'id,title,authors,cover,path,formats,tags,series,series_index,publisher,pubdate,isbn,comments']
+        args = ['list', '--for-machine', '--fields', 'id,title,authors,formats,tags,series,series_index,publisher,pubdate,isbn,comments']
 
         if limit:
             args.extend(['--limit', str(limit)])
@@ -69,7 +69,7 @@ class CalibreService:
         Returns:
             Book dictionary with metadata or None if not found
         """
-        args = ['list', '--for-machine', '--fields', 'id,title,authors,cover,path,formats,tags,series,series_index,publisher,pubdate,isbn,comments', '--search', f'id:{book_id}']
+        args = ['list', '--for-machine', '--fields', 'id,title,authors,formats,tags,series,series_index,publisher,pubdate,isbn,comments', '--search', f'id:{book_id}']
         output = self._run_calibredb(args)
         books = json.loads(output) if output else []
 
@@ -84,9 +84,28 @@ class CalibreService:
         Returns:
             List of matching books
         """
-        args = ['list', '--for-machine', '--fields', 'id,title,authors,cover,path,formats,tags,series,series_index,publisher,pubdate,isbn,comments', '--search', query]
+        args = ['list', '--for-machine', '--fields', 'id,title,authors,formats,tags,series,series_index,publisher,pubdate,isbn,comments', '--search', query]
         output = self._run_calibredb(args)
         return json.loads(output) if output else []
+
+    def get_book_path(self, book_id: int) -> Optional[str]:
+        """Get the library path for a specific book.
+
+        Args:
+            book_id: Calibre book ID
+
+        Returns:
+            Relative path to book directory or None if not found
+        """
+        # Use calibredb list without field restrictions to get default fields including path
+        args = ['list', '--for-machine', '--search', f'id:{book_id}']
+        output = self._run_calibredb(args)
+        books = json.loads(output) if output else []
+
+        if books and 'path' in books[0]:
+            return books[0]['path']
+
+        return None
 
     def get_cover_path(self, book_id: int) -> Optional[str]:
         """Get the file path to a book's cover image.
@@ -97,13 +116,12 @@ class CalibreService:
         Returns:
             Absolute path to cover.jpg or None if not found
         """
-        book = self.get_book(book_id)
-        if not book or 'path' not in book:
+        book_path = self.get_book_path(book_id)
+        if not book_path:
             return None
 
         # Calibre stores covers as cover.jpg in the book's directory
-        book_dir = os.path.join(self.library_path, book['path'])
-        cover_path = os.path.join(book_dir, 'cover.jpg')
+        cover_path = os.path.join(self.library_path, book_path, 'cover.jpg')
 
         if os.path.isfile(cover_path):
             return cover_path
