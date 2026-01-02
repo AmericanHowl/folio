@@ -62,15 +62,36 @@ def book_cover(book_id):
     """Serve book cover image."""
     try:
         calibre = CalibreService()
-        cover_path = calibre.get_cover_path(book_id)
 
-        if not cover_path:
-            # Return a placeholder image (you could create a default cover)
+        # Debug: Get book path
+        book_path = calibre.get_book_path(book_id)
+        if not book_path:
+            print(f"No book path found for book {book_id}")
             return '', 404
 
-        return send_file(cover_path, mimetype='image/jpeg')
+        print(f"Book {book_id} path: {book_path}")
+
+        cover_path = calibre.get_cover_path(book_id)
+        if not cover_path:
+            print(f"No cover found for book {book_id} at path {book_path}")
+            return '', 404
+
+        print(f"Serving cover: {cover_path}")
+
+        # Determine mimetype based on file extension
+        if cover_path.endswith('.png'):
+            mimetype = 'image/png'
+        elif cover_path.endswith('.jpeg'):
+            mimetype = 'image/jpeg'
+        else:
+            mimetype = 'image/jpeg'
+
+        return send_file(cover_path, mimetype=mimetype)
 
     except Exception as e:
+        print(f"Error serving cover for book {book_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return '', 404
 
 

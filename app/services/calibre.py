@@ -114,17 +114,20 @@ class CalibreService:
             book_id: Calibre book ID
 
         Returns:
-            Absolute path to cover.jpg or None if not found
+            Absolute path to cover image or None if not found
         """
         book_path = self.get_book_path(book_id)
         if not book_path:
             return None
 
-        # Calibre stores covers as cover.jpg in the book's directory
-        cover_path = os.path.join(self.library_path, book_path, 'cover.jpg')
+        # Calibre stores covers in the book's directory
+        # Try multiple formats in order of preference
+        book_dir = os.path.join(self.library_path, book_path)
 
-        if os.path.isfile(cover_path):
-            return cover_path
+        for cover_name in ['cover.jpg', 'cover.jpeg', 'cover.png']:
+            cover_path = os.path.join(book_dir, cover_name)
+            if os.path.isfile(cover_path):
+                return cover_path
 
         return None
 
