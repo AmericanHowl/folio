@@ -79,7 +79,7 @@ folio/
 
 3. **Open browser**:
    ```
-   http://localhost:5000
+   http://localhost:9099
    ```
 
 4. **Initial Setup**:
@@ -104,7 +104,7 @@ folio/
 
 3. **Access**:
    ```
-   http://localhost:5000
+   http://localhost:9099
    ```
 
 ## 🛠️ Tech Stack
