@@ -84,8 +84,8 @@ folio/
 
 4. **Initial Setup**:
    - You'll be redirected to the setup page
-   - Enter your Calibre library path (e.g., `/Users/mykie/Calibre Library/`)
-   - Enter your calibredb path (e.g., `/Applications/calibre.app/Contents/MacOS/calibredb`)
+   - Enter your Calibre library path (e.g., `/home/user/Calibre Library/`)
+   - Enter your calibredb path (e.g., `/usr/bin/calibredb` on Linux, `/Applications/calibre.app/Contents/MacOS/calibredb` on Mac)
    - Click "Continue"
 
 ### Docker Deployment
@@ -94,7 +94,7 @@ folio/
    ```yaml
    volumes:
      # Update this path to your Calibre library
-     - /Users/mykie/Calibre Library:/calibre-library:ro
+     - /path/to/your/calibre-library:/calibre-library:ro
    ```
 
 2. **Build and run**:
