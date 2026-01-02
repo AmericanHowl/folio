@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  folio:
+    build: .
+    container_name: folio
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount your Calibre library (adjust path as needed)
+      - /path/to/your/calibre-library:/calibre-library:ro
+      # Persist configuration database
+      - ./instance:/app/instance
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+    restart: unless-stopped

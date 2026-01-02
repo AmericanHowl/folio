@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% set hide_navbar = true %}
+
+{% block title %}Initial Setup - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h1 class="text-center text-4xl font-bold text-indigo-600 mb-2">📚 {{ app_name }}</h1>
+            <h2 class="text-center text-3xl font-extrabold text-gray-900">
+                Welcome!
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Let's get you set up. We need to know where your Calibre library is located.
+            </p>
+        </div>
+
+        <form class="mt-8 space-y-6" action="{{ url_for('setup.configure') }}" method="POST">
+            <div class="rounded-md shadow-sm space-y-4">
+                <div>
+                    <label for="calibre_library_path" class="block text-sm font-medium text-gray-700 mb-1">
+                        Calibre Library Path
+                    </label>
+                    <input id="calibre_library_path"
+                           name="calibre_library_path"
+                           type="text"
+                           required
+                           value="{{ calibre_library_path or '' }}"
+                           placeholder="/Users/mykie/Calibre Library/"
+                           class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm">
+                    <p class="mt-1 text-xs text-gray-500">
+                        The directory where your Calibre library is stored (contains metadata.db)
+                    </p>
+                </div>
+
+                <div>
+                    <label for="calibredb_path" class="block text-sm font-medium text-gray-700 mb-1">
+                        calibredb Executable Path
+                    </label>
+                    <input id="calibredb_path"
+                           name="calibredb_path"
+                           type="text"
+                           required
+                           value="{{ calibredb_path or '' }}"
+                           placeholder="/Applications/calibre.app/Contents/MacOS/calibredb"
+                           class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Path to the calibredb command-line tool
+                    </p>
+                </div>
+            </div>
+
+            <div>
+                <button type="submit"
+                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Continue
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+            <h3 class="text-sm font-medium text-blue-800 mb-2">💡 Need help?</h3>
+            <ul class="text-xs text-blue-700 space-y-1 list-disc list-inside">
+                <li><strong>Mac:</strong> Library is usually in ~/Calibre Library/</li>
+                <li><strong>Mac calibredb:</strong> /Applications/calibre.app/Contents/MacOS/calibredb</li>
+                <li><strong>Linux:</strong> Library might be in ~/calibre-library/</li>
+                <li><strong>Linux calibredb:</strong> Usually in /usr/bin/calibredb or /opt/calibre/calibredb</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

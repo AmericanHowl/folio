@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Requests - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="py-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="md:flex md:items-center md:justify-between mb-8">
+            <div class="flex-1 min-w-0">
+                <h1 class="text-3xl font-bold leading-tight text-gray-900">📝 Requests</h1>
+                <p class="mt-1 text-sm text-gray-500">Shared queue for book requests</p>
+            </div>
+        </div>
+
+        <!-- Coming Soon -->
+        <div class="text-center py-12 bg-white rounded-lg shadow">
+            <div class="text-6xl mb-4">🚧</div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Coming in Phase 2</h2>
+            <p class="text-gray-600 max-w-md mx-auto">
+                This feature will allow you to request books from Hardcover/Prowlarr/MAM.
+                Requests will be tagged by requester and show statuses: Requested, Searching, or Ready.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
