@@ -27,7 +27,7 @@
                            type="text"
                            required
                            value="{{ calibre_library_path or '' }}"
-                           placeholder="/Users/mykie/Calibre Library/"
+                           placeholder="/home/user/Calibre Library"
                            class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm">
                     <p class="mt-1 text-xs text-gray-500">
                         The directory where your Calibre library is stored (contains metadata.db)
@@ -43,7 +43,7 @@
                            type="text"
                            required
                            value="{{ calibredb_path or '' }}"
-                           placeholder="/Applications/calibre.app/Contents/MacOS/calibredb"
+                           placeholder="/usr/bin/calibredb"
                            class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm">
                     <p class="mt-1 text-xs text-gray-500">
                         Path to the calibredb command-line tool
@@ -62,10 +62,10 @@
         <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
             <h3 class="text-sm font-medium text-blue-800 mb-2">💡 Need help?</h3>
             <ul class="text-xs text-blue-700 space-y-1 list-disc list-inside">
-                <li><strong>Mac:</strong> Library is usually in ~/Calibre Library/</li>
-                <li><strong>Mac calibredb:</strong> /Applications/calibre.app/Contents/MacOS/calibredb</li>
-                <li><strong>Linux:</strong> Library might be in ~/calibre-library/</li>
-                <li><strong>Linux calibredb:</strong> Usually in /usr/bin/calibredb or /opt/calibre/calibredb</li>
+                <li><strong>Mac:</strong> Library is usually in <code>~/Calibre Library</code></li>
+                <li><strong>Mac calibredb:</strong> <code>/Applications/calibre.app/Contents/MacOS/calibredb</code></li>
+                <li><strong>Linux:</strong> Library might be in <code>~/Calibre Library</code> or <code>~/calibre-library</code></li>
+                <li><strong>Linux calibredb:</strong> Usually <code>/usr/bin/calibredb</code> or <code>/opt/calibre/calibredb</code></li>
             </ul>
         </div>
     </div>
