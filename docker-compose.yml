@@ -5,7 +5,7 @@ services:
     build: .
     container_name: folio
     ports:
-      - "5000:5000"
+      - "9099:9099"
     volumes:
       # Mount your Calibre library (adjust path as needed)
       - /path/to/your/calibre-library:/calibre-library:ro

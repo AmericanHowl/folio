@@ -21,7 +21,7 @@ COPY . .
 RUN mkdir -p instance
 
 # Expose port
-EXPOSE 5000
+EXPOSE 9099
 
 # Set environment variables
 ENV FLASK_APP=app
