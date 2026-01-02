@@ -3,7 +3,17 @@
 {% block title %}Library - {{ app_name }}{% endblock %}
 
 {% block content %}
-<div class="py-10">
+<div class="py-10" x-data="{
+    showModal: false,
+    modalContent: ''
+}"
+@open-book-modal.window="
+    showModal = true;
+    fetch('/library/api/book/' + $event.detail.bookId)
+        .then(r => r.text())
+        .then(html => modalContent = html);
+"
+@close-modal.window="showModal = false; modalContent = '';">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Header -->
         <div class="md:flex md:items-center md:justify-between mb-8">
@@ -15,63 +25,28 @@
 
         <!-- Search -->
         <div class="mb-6">
-            <form method="GET" action="{{ url_for('library.index') }}">
-                <div class="flex gap-2">
-                    <input type="text"
-                           name="q"
-                           value="{{ search_query }}"
-                           placeholder="Search books by title, author, or tags..."
-                           class="flex-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md px-4 py-2 border">
-                    <button type="submit"
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Search
-                    </button>
-                    {% if search_query %}
-                    <a href="{{ url_for('library.index') }}"
-                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Clear
-                    </a>
-                    {% endif %}
-                </div>
-            </form>
+            <div class="flex gap-2">
+                <input type="text"
+                       name="q"
+                       value="{{ search_query }}"
+                       placeholder="Search books by title, author, or tags..."
+                       hx-get="{{ url_for('library.api_books') }}"
+                       hx-trigger="input changed delay:500ms, search"
+                       hx-target="#book-grid"
+                       hx-include="[name='q']"
+                       class="flex-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md px-4 py-2 border">
+                {% if search_query %}
+                <a href="{{ url_for('library.index') }}"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 ring-offset-2 focus:ring-indigo-500">
+                    Clear
+                </a>
+                {% endif %}
+            </div>
         </div>
 
         <!-- Book Grid -->
-        {% if books %}
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {% for book in books %}
-            <div class="group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
-                <a href="{{ url_for('library.book_detail', book_id=book.id) }}" class="block">
-                    <!-- Book Cover Placeholder -->
-                    <div class="aspect-[2/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-t-lg flex items-center justify-center">
-                        <div class="text-4xl">📖</div>
-                    </div>
-
-                    <!-- Book Info -->
-                    <div class="p-3">
-                        <h3 class="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
-                            {{ book.title }}
-                        </h3>
-                        {% if book.authors %}
-                        <p class="text-xs text-gray-500 line-clamp-1">
-                            {{ book.authors }}
-                        </p>
-                        {% endif %}
-                    </div>
-                </a>
-
-                <!-- Download Button -->
-                <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <a href="{{ url_for('library.download_book', book_id=book.id) }}"
-                       class="inline-flex items-center p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"
-                       title="Download">
-                        <svg class="h-5 w-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </a>
-                </div>
-            </div>
-            {% endfor %}
+        <div id="book-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            {% include 'library/partials/book_grid.html' %}
         </div>
 
         <!-- Pagination -->
@@ -122,20 +97,12 @@
             </div>
         </div>
         {% endif %}
+    </div>
 
-        {% else %}
-        <div class="text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No books found</h3>
-            {% if search_query %}
-            <p class="mt-1 text-sm text-gray-500">Try a different search term</p>
-            {% else %}
-            <p class="mt-1 text-sm text-gray-500">Your library appears to be empty</p>
-            {% endif %}
-        </div>
-        {% endif %}
+    <!-- Modal Container -->
+    <div x-show="showModal"
+         x-cloak
+         x-html="modalContent">
     </div>
 </div>
 {% endblock %}

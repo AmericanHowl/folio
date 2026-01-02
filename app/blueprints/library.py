@@ -57,6 +57,23 @@ def book_detail(book_id):
         return render_template('library/error.html', error=str(e)), 500
 
 
+@library_bp.route('/cover/<int:book_id>')
+def book_cover(book_id):
+    """Serve book cover image."""
+    try:
+        calibre = CalibreService()
+        cover_path = calibre.get_cover_path(book_id)
+
+        if not cover_path:
+            # Return a placeholder image (you could create a default cover)
+            return '', 404
+
+        return send_file(cover_path, mimetype='image/jpeg')
+
+    except Exception as e:
+        return '', 404
+
+
 @library_bp.route('/download/<int:book_id>')
 def download_book(book_id):
     """Download a book file."""
@@ -101,6 +118,22 @@ def api_books():
             books = calibre.list_books(limit=per_page, offset=offset)
 
         return render_template('library/partials/book_grid.html', books=books)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@library_bp.route('/api/book/<int:book_id>')
+def api_book_detail(book_id):
+    """API endpoint for book details (HTMX modal)."""
+    try:
+        calibre = CalibreService()
+        book = calibre.get_book(book_id)
+
+        if not book:
+            return jsonify({'error': 'Book not found'}), 404
+
+        return render_template('library/partials/book_modal.html', book=book)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
