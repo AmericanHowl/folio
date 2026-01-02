@@ -1,5 +1,6 @@
 import subprocess
 import json
+import os
 from typing import List, Dict, Optional
 from app.models.settings import Setting
 
@@ -45,7 +46,7 @@ class CalibreService:
         Returns:
             List of book dictionaries with metadata
         """
-        args = ['list', '--for-machine']
+        args = ['list', '--for-machine', '--fields', 'id,title,authors,cover,path,formats,tags,series,series_index,publisher,pubdate,isbn,comments']
 
         if limit:
             args.extend(['--limit', str(limit)])
@@ -68,7 +69,7 @@ class CalibreService:
         Returns:
             Book dictionary with metadata or None if not found
         """
-        args = ['list', '--for-machine', '--search', f'id:{book_id}']
+        args = ['list', '--for-machine', '--fields', 'id,title,authors,cover,path,formats,tags,series,series_index,publisher,pubdate,isbn,comments', '--search', f'id:{book_id}']
         output = self._run_calibredb(args)
         books = json.loads(output) if output else []
 
@@ -83,9 +84,31 @@ class CalibreService:
         Returns:
             List of matching books
         """
-        args = ['list', '--for-machine', '--search', query]
+        args = ['list', '--for-machine', '--fields', 'id,title,authors,cover,path,formats,tags,series,series_index,publisher,pubdate,isbn,comments', '--search', query]
         output = self._run_calibredb(args)
         return json.loads(output) if output else []
+
+    def get_cover_path(self, book_id: int) -> Optional[str]:
+        """Get the file path to a book's cover image.
+
+        Args:
+            book_id: Calibre book ID
+
+        Returns:
+            Absolute path to cover.jpg or None if not found
+        """
+        book = self.get_book(book_id)
+        if not book or 'path' not in book:
+            return None
+
+        # Calibre stores covers as cover.jpg in the book's directory
+        book_dir = os.path.join(self.library_path, book['path'])
+        cover_path = os.path.join(book_dir, 'cover.jpg')
+
+        if os.path.isfile(cover_path):
+            return cover_path
+
+        return None
 
     def get_book_count(self) -> int:
         """Get total number of books in library."""
