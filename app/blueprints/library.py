@@ -86,7 +86,8 @@ def book_cover(book_id):
         else:
             mimetype = 'image/jpeg'
 
-        return send_file(cover_path, mimetype=mimetype)
+        # Important: as_attachment=False ensures the image displays inline
+        return send_file(cover_path, mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
         print(f"Error serving cover for book {book_id}: {str(e)}")
