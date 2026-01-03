@@ -65,13 +65,45 @@
                         </div>
                     </div>
 
-                    <!-- Search -->
-                    <div class="mb-6">
+                    <!-- New Books Notification -->
+                    <div x-show="hasNewBooks" x-cloak class="mb-6 bg-indigo-50 border-l-4 border-indigo-400 p-4 rounded">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-indigo-700">
+                                        New books have been added to your library!
+                                    </p>
+                                </div>
+                            </div>
+                            <button @click="refreshLibrary()"
+                                    class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-500">
+                                Refresh Library
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search and Sort -->
+                    <div class="mb-6 flex flex-col sm:flex-row gap-4">
                         <input type="text"
                                x-model="searchQuery"
                                @input.debounce.500ms="searchBooks()"
                                placeholder="Search books by title, author, or tags..."
-                               class="w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md px-4 py-2 border">
+                               class="flex-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md px-4 py-2 border">
+                        <select x-model="sortBy"
+                                @change="changeSortOrder(sortBy)"
+                                class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md px-4 py-2 border">
+                            <option value="title-asc">Title (A-Z)</option>
+                            <option value="title-desc">Title (Z-A)</option>
+                            <option value="author-asc">Author (A-Z)</option>
+                            <option value="author-desc">Author (Z-A)</option>
+                            <option value="date-desc">Newest First</option>
+                            <option value="date-asc">Oldest First</option>
+                        </select>
                     </div>
 
                     <!-- Loading -->
@@ -80,27 +112,38 @@
                     </div>
 
                     <!-- Book Grid -->
-                    <div x-show="!loading && filteredBooks.length > 0" x-cloak
-                         class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                        <template x-for="book in filteredBooks" :key="book.id">
-                            <div @click="openBookModal(book)"
-                                 class="group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                                <div class="aspect-[2/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-t-lg overflow-hidden flex items-center justify-center relative">
-                                    <img :src="`${calibreUrl}/get/cover/${book.id}`"
-                                         :alt="book.title"
-                                         class="w-full h-full object-cover absolute inset-0"
-                                         @error="$el.style.display='none'">
-                                    <div class="text-6xl">📖</div>
+                    <div x-show="!loading && displayedBooks.length > 0" x-cloak>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                            <template x-for="book in displayedBooks" :key="book.id">
+                                <div @click="openBookModal(book)"
+                                     class="group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                                    <div class="aspect-[2/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-t-lg overflow-hidden flex items-center justify-center relative">
+                                        <img :src="`${calibreUrl}/get/cover/${book.id}`"
+                                             :alt="book.title"
+                                             class="w-full h-full object-cover absolute inset-0"
+                                             @error="$el.style.display='none'">
+                                        <div class="text-6xl">📖</div>
+                                    </div>
+                                    <div class="p-3">
+                                        <h3 class="text-sm font-medium text-gray-900 line-clamp-2 mb-1"
+                                            :title="book.title"
+                                            x-text="book.title"></h3>
+                                        <p class="text-xs text-gray-500 line-clamp-1"
+                                           x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
+                                    </div>
                                 </div>
-                                <div class="p-3">
-                                    <h3 class="text-sm font-medium text-gray-900 line-clamp-2 mb-1"
-                                        :title="book.title"
-                                        x-text="book.title"></h3>
-                                    <p class="text-xs text-gray-500 line-clamp-1"
-                                       x-text="book.authors"></p>
-                                </div>
-                            </div>
-                        </template>
+                            </template>
+                        </div>
+
+                        <!-- Load More Button -->
+                        <div class="mt-8 text-center">
+                            <button @click="loadMoreBooks()"
+                                    x-show="!loadingMore && displayedBooks.length >= booksPerPage"
+                                    class="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                Load More Books
+                            </button>
+                            <div x-show="loadingMore" class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        </div>
                     </div>
 
                     <!-- No Books -->
@@ -148,11 +191,19 @@
                                     <div class="md:col-span-2 space-y-4">
                                         <div x-show="selectedBook.authors">
                                             <h4 class="text-sm font-medium text-gray-500">Authors</h4>
-                                            <p class="text-base" x-text="selectedBook.authors"></p>
+                                            <p class="text-base" x-text="Array.isArray(selectedBook.authors) ? selectedBook.authors.join(', ') : selectedBook.authors"></p>
                                         </div>
                                         <div x-show="selectedBook.publisher">
                                             <h4 class="text-sm font-medium text-gray-500">Publisher</h4>
                                             <p x-text="selectedBook.publisher"></p>
+                                        </div>
+                                        <div x-show="selectedBook.pubdate">
+                                            <h4 class="text-sm font-medium text-gray-500">Published</h4>
+                                            <p x-text="new Date(selectedBook.pubdate).getFullYear()"></p>
+                                        </div>
+                                        <div x-show="selectedBook.comments" class="col-span-full">
+                                            <h4 class="text-sm font-medium text-gray-500 mb-2">Description</h4>
+                                            <div class="text-sm text-gray-700 prose prose-sm max-w-none" x-html="selectedBook.comments"></div>
                                         </div>
                                     </div>
                                 </div>
