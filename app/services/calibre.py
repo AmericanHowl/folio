@@ -18,21 +18,12 @@ class CalibreService:
         self.calibredb_path = Setting.get('calibredb_path')
         self.library_path = Setting.get('calibre_library_path')
 
-    def _run_calibredb(self, args: List[str], readonly: bool = True) -> str:
-        """Run calibredb command and return output.
-
-        Args:
-            args: Command arguments
-            readonly: If True, adds --readonly flag to prevent database locks
-        """
+    def _run_calibredb(self, args: List[str]) -> str:
+        """Run calibredb command and return output."""
         if not self.calibredb_path or not self.library_path:
             raise ValueError("Calibre paths not configured")
 
         cmd = [self.calibredb_path] + args + ['--library-path', self.library_path]
-
-        # Add readonly flag to avoid conflicts with Calibre GUI
-        if readonly:
-            cmd.append('--readonly')
 
         try:
             result = subprocess.run(
