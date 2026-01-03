@@ -52,9 +52,51 @@
         .book-card:hover .book-card-overlay {
             opacity: 1;
         }
+
+        /* Kobo-specific styles */
+        body.kobo-mode {
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        body.kobo-mode .book-card-overlay {
+            display: none;
+        }
+
+        body.kobo-mode .book-card {
+            transform: none !important;
+        }
+
+        body.kobo-mode nav {
+            background-color: #f5f5f5 !important;
+            border-bottom: 1px solid #ddd !important;
+        }
+
+        body.kobo-mode .bg-\[\#1a2332\],
+        body.kobo-mode .bg-\[\#212D40\] {
+            background-color: #ffffff !important;
+        }
+
+        body.kobo-mode .text-white,
+        body.kobo-mode .text-gray-300,
+        body.kobo-mode .text-gray-400 {
+            color: #000000 !important;
+        }
+
+        body.kobo-mode .border-gray-700,
+        body.kobo-mode .border-gray-600 {
+            border-color: #ddd !important;
+        }
+
+        body.kobo-mode input,
+        body.kobo-mode select {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            border-color: #ccc !important;
+        }
     </style>
 </head>
-<body class="h-full" x-data="folioApp()" x-init="init()">
+<body class="h-full" x-data="folioApp()" x-init="init()" :class="{ 'kobo-mode': isKobo }">
     <div class="min-h-full">
         <!-- Navigation -->
         <nav class="bg-[#1a2332] border-b border-gray-700" x-data="{ mobileMenuOpen: false }">
@@ -64,7 +106,7 @@
                         <div class="flex-shrink-0 flex items-center">
                             <span class="text-4xl font-calsans text-[#D66853]">folio</span>
                         </div>
-                        <div class="hidden sm:ml-8 sm:flex sm:space-x-8">
+                        <div class="hidden sm:ml-8 sm:flex sm:space-x-8" x-show="!isKobo">
                             <a @click="currentTab = 'library'"
                                :class="currentTab === 'library' ? 'border-[#D66853] text-white' : 'border-transparent text-gray-400 hover:border-gray-500 hover:text-gray-200'"
                                class="inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
@@ -121,18 +163,22 @@
                         <i class="bi bi-collection"></i>
                         Library
                     </a>
-                    <a @click="currentTab = 'requests'; mobileMenuOpen = false"
-                       :class="currentTab === 'requests' ? 'bg-[#D66853]/20 border-[#D66853] text-white' : 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white'"
-                       class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
-                        <i class="bi bi-inbox"></i>
-                        Requests
-                    </a>
-                    <a @click="currentTab = 'explore'; mobileMenuOpen = false"
-                       :class="currentTab === 'explore' ? 'bg-[#D66853]/20 border-[#D66853] text-white' : 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white'"
-                       class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
-                        <i class="bi bi-compass"></i>
-                        Explore
-                    </a>
+                    <template x-if="!isKobo">
+                        <a @click="currentTab = 'requests'; mobileMenuOpen = false"
+                           :class="currentTab === 'requests' ? 'bg-[#D66853]/20 border-[#D66853] text-white' : 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white'"
+                           class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
+                            <i class="bi bi-inbox"></i>
+                            Requests
+                        </a>
+                    </template>
+                    <template x-if="!isKobo">
+                        <a @click="currentTab = 'explore'; mobileMenuOpen = false"
+                           :class="currentTab === 'explore' ? 'bg-[#D66853]/20 border-[#D66853] text-white' : 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white'"
+                           class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
+                            <i class="bi bi-compass"></i>
+                            Explore
+                        </a>
+                    </template>
                     <a @click="showSettings = true; mobileMenuOpen = false"
                        class="border-l-4 border-transparent text-gray-400 hover:bg-gray-800 hover:text-white py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
                         <i class="bi bi-gear"></i>
@@ -154,8 +200,8 @@
                         </div>
                     </div>
 
-                    <!-- New Books Notification -->
-                    <div x-show="hasNewBooks" x-cloak class="mb-6 bg-[#D66853]/10 border-l-4 border-[#D66853] p-4 rounded">
+                    <!-- New Books Notification (hidden on Kobo) -->
+                    <div x-show="hasNewBooks && !isKobo" x-cloak class="mb-6 bg-[#D66853]/10 border-l-4 border-[#D66853] p-4 rounded">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
                                 <div class="flex-shrink-0">
@@ -202,20 +248,28 @@
                     <div x-show="!loading && displayedBooks.length > 0" x-cloak>
                         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-6">
                             <template x-for="book in displayedBooks" :key="book.id">
-                                <div @click="openBookModal(book)"
-                                     class="book-card cursor-pointer transform transition-transform duration-200 hover:scale-105">
-                                    <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg overflow-hidden relative border-2 border-gray-600/50">
-                                        <img :src="`${calibreUrl}/get/cover/${book.id}`"
-                                             :alt="book.title"
-                                             class="w-full h-full object-cover"
-                                             @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23D1D5DB%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                <div @click="openBookModal(book)" class="cursor-pointer">
+                                    <div class="book-card transform transition-transform duration-200 hover:scale-105">
+                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg overflow-hidden relative border-2 border-gray-600/50">
+                                            <img :src="`${calibreUrl}/get/cover/${book.id}`"
+                                                 :alt="book.title"
+                                                 class="w-full h-full object-cover"
+                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23374151%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
 
-                                        <!-- Hover Overlay -->
-                                        <div class="book-card-overlay text-white text-center">
-                                            <h3 class="font-semibold text-sm mb-2 line-clamp-3" x-text="book.title"></h3>
-                                            <p class="text-xs text-gray-300 line-clamp-2"
-                                               x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
+                                            <!-- Hover Overlay (hidden on Kobo) -->
+                                            <div class="book-card-overlay text-white text-center">
+                                                <h3 class="font-semibold text-sm mb-2 line-clamp-3" x-text="book.title"></h3>
+                                                <p class="text-xs text-gray-300 line-clamp-2"
+                                                   x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
+                                            </div>
                                         </div>
+                                    </div>
+
+                                    <!-- Kobo-style: Title and Author below cover -->
+                                    <div x-show="isKobo" class="mt-2 text-center">
+                                        <h3 class="text-sm font-medium line-clamp-2 mb-1" x-text="book.title"></h3>
+                                        <p class="text-xs text-gray-600 line-clamp-1"
+                                           x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
                                     </div>
                                 </div>
                             </template>
@@ -271,8 +325,9 @@
                                                  @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23D1D5DB%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
                                         </div>
 
-                                        <!-- Edit Metadata Button -->
-                                        <button @click="console.log('Edit metadata for book', selectedBook.id)"
+                                        <!-- Edit Metadata Button (hidden on Kobo) -->
+                                        <button x-show="!isKobo"
+                                                @click="console.log('Edit metadata for book', selectedBook.id)"
                                                 class="w-full px-4 py-2 bg-[#D66853] text-white rounded-md hover:bg-[#c15743] flex items-center justify-center gap-2">
                                             <i class="bi bi-pencil-square"></i>
                                             Edit Metadata

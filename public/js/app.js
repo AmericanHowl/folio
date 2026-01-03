@@ -29,6 +29,9 @@ function folioApp() {
         lastBookCount: 0,
         hasNewBooks: false,
 
+        // Device detection
+        isKobo: /kobo/i.test(navigator.userAgent),
+
         // Configuration (stored in localStorage)
         calibreUrl: localStorage.getItem('calibreUrl') || '/api',
 
