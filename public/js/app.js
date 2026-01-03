@@ -15,7 +15,7 @@ function folioApp() {
         showSettings: false,
 
         // Configuration (stored in localStorage)
-        calibreUrl: localStorage.getItem('calibreUrl') || 'http://localhost:8080',
+        calibreUrl: localStorage.getItem('calibreUrl') || '/api',
 
         // API Client
         calibreAPI: null,
