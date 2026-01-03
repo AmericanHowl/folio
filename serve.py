@@ -57,6 +57,7 @@ def run_calibredb(args):
     """Execute calibredb command with the library path"""
     library_path = get_calibre_library()
     cmd = ['calibredb'] + args + ['--library-path', library_path]
+    print(f"🔧 Running: {' '.join(cmd)}")
     try:
         result = subprocess.run(
             cmd,
@@ -66,9 +67,13 @@ def run_calibredb(args):
         )
         return {'success': True, 'output': result.stdout}
     except subprocess.CalledProcessError as e:
-        return {'success': False, 'error': e.stderr}
+        error_msg = e.stderr.strip() if e.stderr else str(e)
+        print(f"❌ calibredb error: {error_msg}")
+        return {'success': False, 'error': error_msg}
     except FileNotFoundError:
-        return {'success': False, 'error': 'calibredb command not found. Please install Calibre.'}
+        error_msg = 'calibredb command not found. Please install Calibre.'
+        print(f"❌ {error_msg}")
+        return {'success': False, 'error': error_msg}
 
 
 def list_directories(path):
@@ -265,12 +270,16 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
         # Send response
         if errors:
+            print(f"❌ Metadata update failed for book {book_id}:")
+            for error in errors:
+                print(f"   - {error}")
             self.send_response(500)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             response = json.dumps({'success': False, 'errors': errors})
             self.wfile.write(response.encode('utf-8'))
         else:
+            print(f"✅ Metadata updated successfully for book {book_id}")
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()

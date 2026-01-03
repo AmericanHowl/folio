@@ -465,7 +465,11 @@ function folioApp() {
                 const result = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(result.error || 'Failed to update metadata');
+                    // Handle error array from server
+                    const errorMsg = result.errors
+                        ? result.errors.join('\n')
+                        : 'Failed to update metadata';
+                    throw new Error(errorMsg);
                 }
 
                 console.log('✅ Metadata updated successfully');
