@@ -56,7 +56,8 @@ def get_calibre_library():
 def run_calibredb(args):
     """Execute calibredb command with the library path"""
     library_path = get_calibre_library()
-    cmd = ['calibredb'] + args + ['--library-path', library_path]
+    calibredb_path = '/Applications/calibre.app/Contents/MacOS/calibredb'
+    cmd = [calibredb_path] + args + ['--library-path', library_path]
     print(f"🔧 Running: {' '.join(cmd)}")
     try:
         result = subprocess.run(
@@ -71,7 +72,7 @@ def run_calibredb(args):
         print(f"❌ calibredb error: {error_msg}")
         return {'success': False, 'error': error_msg}
     except FileNotFoundError:
-        error_msg = 'calibredb command not found. Please install Calibre.'
+        error_msg = f'calibredb not found at {calibredb_path}. Please install Calibre.'
         print(f"❌ {error_msg}")
         return {'success': False, 'error': error_msg}
 
