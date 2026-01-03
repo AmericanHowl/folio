@@ -193,8 +193,8 @@ function folioApp() {
          */
         async checkForNewBooks() {
             try {
-                const libraryInfo = await this.calibreAPI.getLibraryMetadata();
-                const currentCount = libraryInfo.total_num || 0;
+                // Just check the current book count
+                const currentCount = this.books.length;
 
                 if (this.lastBookCount === 0) {
                     this.lastBookCount = currentCount;
