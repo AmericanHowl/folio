@@ -2,28 +2,137 @@
 
 A modern ebook management system for the rest of us.
 
-**Folio** is "Overseerr for books" - a user-friendly interface to manage your Calibre library with better UX, especially designed for non-technical family members. Think of it as the missing web UI that makes Calibre accessible to everyone.
+**Folio** is "Overseerr for books" - a lightweight static web app to manage your Calibre library with better UX, designed for non-technical family members. Pure HTML/JS/CSS with no backend required!
+
+## 🏗️ Architecture
+
+Folio uses a **modern static frontend** architecture:
+
+```
+┌──────────────────────────────────────┐
+│   Static Frontend (public/)          │
+│   • HTML + Alpine.js                 │
+│   • Tailwind CSS (CDN)               │
+│   • Vanilla JavaScript APIs          │
+└─────────┬──────────────┬─────────────┘
+          │              │
+          ▼              ▼
+   ┌─────────────┐  ┌──────────────┐
+   │  Calibre    │  │  PocketBase  │
+   │  Content    │  │  Database    │
+   │  Server     │  │              │
+   │  (port 8080)│  │  (port 8090) │
+   └─────────────┘  └──────────────┘
+```
+
+**No Python/Flask backend!** Just static files + two services.
 
 ## 🎯 Project Goals
 
 Replace calibre-web-automated with:
 - 📱 **Better UX** - Large touch targets, simplified interface
-- 👥 **Three Interfaces** - Kobo browser (touch-optimized), Mobile/Tablet (requests), Desktop (admin)
-- 🔄 **Request-Based** - Manual review before downloads (not automatic)
-- 🎨 **Modern Stack** - HTMX + Alpine.js + Tailwind CSS
+- 🚀 **Static Frontend** - Fast, deployable anywhere
+- 👥 **Multi-Device** - Kobo browser, mobile, tablet, desktop
+- 🔄 **Request-Based** - Manual review before downloads
+- 🎨 **Modern Stack** - Alpine.js + Tailwind CSS
+
+## 🚀 Quick Start
+
+### Option 1: Docker (Recommended)
+
+1. **Start the services:**
+   ```bash
+   # Edit docker-compose.new.yml to set your Calibre library path
+   docker-compose -f docker-compose.new.yml up -d
+   ```
+
+2. **Access Folio:**
+   ```
+   http://localhost:9099
+   ```
+
+3. **Configure:**
+   - Click Settings (⚙️)
+   - Calibre URL: `http://localhost:8080`
+   - PocketBase URL: `http://localhost:8090`
+
+### Option 2: Manual Setup
+
+1. **Start Calibre Content Server:**
+   ```bash
+   calibre-server --port 8080 "/path/to/your/Calibre Library"
+   ```
+
+2. **Download & Run PocketBase:**
+   ```bash
+   # Download from https://pocketbase.io/docs/
+   ./pocketbase serve --http=0.0.0.0:8090
+   ```
+
+3. **Serve static files:**
+   ```bash
+   # Any static web server works
+   cd public
+   python -m http.server 9099
+   # Or use: npx serve -p 9099
+   ```
+
+4. **Open browser:**
+   ```
+   http://localhost:9099
+   ```
+
+## 📁 Project Structure
+
+```
+folio/
+├── public/                # Static frontend (deploy this!)
+│   ├── index.html        # Main app
+│   ├── js/
+│   │   ├── app.js        # Alpine.js app logic
+│   │   ├── calibre-api.js    # Calibre API client
+│   │   └── pocketbase-api.js # PocketBase client
+│   └── css/              # Custom styles (if needed)
+├── docker-compose.new.yml   # Docker setup
+├── nginx.conf               # nginx proxy config
+├── pocketbase-schema.json   # Database schema
+└── README.md
+
+Old Flask app (deprecated):
+├── app/                  # ⚠️ No longer used
+├── run.py                # ⚠️ No longer needed
+└── requirements.txt      # ⚠️ Not needed
+```
+
+## 🛠️ Tech Stack
+
+**Frontend:**
+- Pure HTML5
+- [Alpine.js](https://alpinejs.dev/) - Reactive UI (15KB)
+- [Tailwind CSS](https://tailwindcss.com/) - Styling (CDN)
+- Vanilla JavaScript - No build step!
+
+**Backend Services:**
+- [Calibre Content Server](https://manual.calibre-ebook.com/server.html) - Book library
+- [PocketBase](https://pocketbase.io/) - Database (requests, prefs)
+
+**Deployment:**
+- Any static hosting (nginx, Caddy, Vercel, Netlify, GitHub Pages)
+- Docker Compose for services
+- Authentik for OAuth/SSO (optional)
 
 ## 📋 Development Roadmap
 
 ### Phase 1: Calibre Library Manager ✅ (Current)
 
-**Component 1.1: Library Tab** - Browse and download existing Calibre books
-- [x] List books from Calibre library
-- [x] Search functionality
-- [x] Download books to device
-- [x] View book metadata
+**Component 1.1: Library Tab** - Browse existing Calibre books
+- [x] List books from Calibre Content Server
+- [x] Real-time search (client-side + server-side)
+- [x] View book covers
+- [x] Book metadata modal
+- [ ] Download books to device
 - [ ] Convert with kepubify
 - [ ] Sync to Kobo
-- [ ] Delete/organize books
 
 ### Phase 2: Book Acquisition (Future)
 
@@ -32,97 +141,49 @@ Replace calibre-web-automated with:
 - Browse popular/trending books
 
 **Component 2.2: Requests Tab** - Manage download requests
-- Request books (no automatic downloads)
+- Request books (stored in PocketBase)
 - Manual review of Prowlarr/MAM results
-- Auto-import to Calibre after approval
-- Track request status: Requested → Searching → Ready
+- Real-time status updates
+- Track: Requested → Searching → Ready
 - Keep completed requests visible for 1 week
 
-## 🏗️ Architecture
+## 🔧 Configuration
 
+Settings are stored in browser localStorage:
+- `calibreUrl` - Calibre Content Server URL
+- `pocketbaseUrl` - PocketBase URL
+
+For production, you can:
+1. Use environment variables
+2. Hardcode URLs in `js/app.js`
+3. Use nginx proxy (see `nginx.conf`)
+
+## 🐳 Docker Deployment
+
+The `docker-compose.new.yml` includes:
+
+1. **calibre-server** - Serves your Calibre library
+2. **pocketbase** - Stores requests and preferences
+3. **nginx** - Serves static files + proxies APIs
+
+**Update paths:**
+```yaml
+volumes:
+  - /your/path/to/Calibre Library:/books  # ← Change this!
 ```
-folio/
-├── app/
-│   ├── blueprints/          # Flask blueprints (routes)
-│   │   ├── setup.py         # Initial configuration
-│   │   ├── library.py       # Browse/download books
-│   │   ├── requests.py      # Request queue (Phase 2)
-│   │   └── explore.py       # Discover books (Phase 2)
-│   ├── models/              # Database models
-│   │   └── settings.py      # Configuration storage
-│   ├── services/            # Business logic
-│   │   └── calibre.py       # calibredb CLI wrapper
-│   ├── templates/           # Jinja2 templates
-│   └── static/              # CSS, JS, images
-├── instance/                # Database files (gitignored)
-├── requirements.txt         # Python dependencies
-└── run.py                   # Application entry point
+
+**Start everything:**
+```bash
+docker-compose -f docker-compose.new.yml up -d
 ```
-
-## 🚀 Quick Start
-
-### Local Development (Mac/Linux)
-
-1. **Clone and setup**:
-   ```bash
-   git clone <your-repo-url>
-   cd folio
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-
-2. **Run the application**:
-   ```bash
-   python run.py
-   ```
-
-3. **Open browser**:
-   ```
-   http://localhost:9099
-   ```
-
-4. **Initial Setup**:
-   - You'll be redirected to the setup page
-   - Enter your Calibre library path (e.g., `/home/user/Calibre Library/`)
-   - Enter your calibredb path (e.g., `/usr/bin/calibredb` on Linux, `/Applications/calibre.app/Contents/MacOS/calibredb` on Mac)
-   - Click "Continue"
-
-### Docker Deployment
-
-1. **Update docker-compose.yml**:
-   ```yaml
-   volumes:
-     # Update this path to your Calibre library
-     - /path/to/your/calibre-library:/calibre-library:ro
-   ```
-
-2. **Build and run**:
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Access**:
-   ```
-   http://localhost:9099
-   ```
-
-## 🛠️ Tech Stack
-
-- **Backend**: Python 3.11+ with Flask
-- **Database**: SQLite (folio_config.db for settings)
-- **Calibre Integration**: calibredb CLI wrapper (safer than direct DB access)
-- **Frontend**: HTMX + Alpine.js + Tailwind CSS
-- **Auth**: Planned Authentik OAuth (Phase 2)
-- **Deployment**: Docker + docker-compose
 
 ## 📱 Three-Interface Design
 
 ### 1. Kobo Browser (Primary for Family)
-- Large touch targets (minimum 48px)
+- Large touch targets (48px minimum)
 - Simplified navigation
 - Quick access to download books
-- WebAuthn QR code login (planned)
+- Optimized for e-ink displays
 
 ### 2. Mobile/Tablet
 - Request books remotely
@@ -135,61 +196,97 @@ folio/
 - Configure settings
 - Bulk operations
 
-## 🔧 Configuration
+## 🔐 Authentication
 
-All configuration is done via the web UI on first launch. Settings are stored in `instance/folio_config.db`.
+Folio itself has **no auth**. Use a reverse proxy like Authentik, Authelia, or nginx with basic auth.
 
-**Required Settings**:
-- Calibre Library Path
-- calibredb Executable Path
+**Example with Authentik:**
+```nginx
+location /folio {
+    auth_request /auth;
+    proxy_pass http://folio:9099;
+}
+```
 
-**Find calibredb**:
-- **Mac**: `/Applications/calibre.app/Contents/MacOS/calibredb`
-- **Linux**: `/usr/bin/calibredb` or `/opt/calibre/calibredb`
+Authentik handles WebAuthn, OAuth, LDAP, etc.
 
 ## 📊 Current Features
 
-- ✅ Web-based initial setup
-- ✅ Browse Calibre library
-- ✅ Search books by title/author/tags
-- ✅ Download books
+- ✅ Static HTML/JS/CSS (no build step)
+- ✅ Browse Calibre library via Content Server
+- ✅ Real-time search (debounced)
+- ✅ Book covers and metadata
 - ✅ Responsive design (mobile/tablet/desktop)
-- ✅ Configurable paths via web UI
-- ⏳ Kobo sync (planned)
-- ⏳ kepubify conversion (planned)
+- ✅ Settings modal (configure URLs)
+- ✅ PocketBase integration ready
 - ⏳ Book requests (Phase 2)
-- ⏳ Hardcover API integration (Phase 2)
+- ⏳ Hardcover API (Phase 2)
+- ⏳ Download/sync features
 
 ## 🧪 Development
 
-**Install dev dependencies**:
+**Local development:**
 ```bash
-pip install -r requirements-dev.txt
+# Serve static files
+cd public
+python -m http.server 9099
+
+# Or use any static server
+npx serve -p 9099
 ```
 
-**Run tests**:
-```bash
-pytest
+**Test Calibre API:**
+```javascript
+const api = new CalibreAPI('http://localhost:8080');
+const books = await api.getBooks();
+console.log(books);
 ```
 
-**Code formatting**:
-```bash
-black app/
-flake8 app/
+**Test PocketBase:**
+```javascript
+const db = new FolioDatabase('http://localhost:8090');
+await db.init();
+const requests = await db.getRequests();
+console.log(requests);
 ```
 
-## 📝 Environment Variables
+## 🚀 Deployment Options
 
-Create a `.env` file (see `.env.example`):
+### 1. Docker (Recommended)
+See docker-compose.new.yml above
 
-```bash
-FLASK_ENV=development
-SECRET_KEY=your-secret-key-here
+### 2. Static Hosting + Services
+- Deploy `public/` to Vercel/Netlify/GitHub Pages
+- Run Calibre Server on your NAS/server
+- Run PocketBase on your NAS/server
+- Configure URLs in settings
+
+### 3. Self-Hosted with nginx
+```nginx
+server {
+    listen 443 ssl;
+    server_name folio.example.com;
+
+    # Static files
+    location / {
+        root /var/www/folio/public;
+        try_files $uri /index.html;
+    }
+
+    # Proxy to services
+    location /calibre/ {
+        proxy_pass http://localhost:8080/;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:8090/;
+    }
+}
 ```
 
 ## 🤝 Contributing
 
-This is currently a personal project, but contributions are welcome!
+This is a personal project, but contributions welcome!
 
 1. Fork the repository
 2. Create a feature branch
@@ -198,19 +295,16 @@ This is currently a personal project, but contributions are welcome!
 
 ## 📄 License
 
-MIT License (or your preferred license)
+MIT License
 
 ## 🙏 Acknowledgments
 
 - Built to replace calibre-web-automated
 - Inspired by Overseerr's request-based workflow
-- Uses the excellent Calibre ecosystem
-
-## 📞 Support
-
-For issues or questions, please open a GitHub issue.
+- Uses Calibre Content Server API
+- Powered by PocketBase for data persistence
 
 ---
 
-**Status**: Phase 1, Component 1.1 - Library Tab ✅
-**Next**: Kobo sync and kepubify conversion
+**Status**: Phase 1, Component 1.1 - Static Frontend Complete ✅
+**Next**: Download functionality and request management

@@ -1,5 +1,6 @@
 /**
  * Folio - Main Application
+ * Simple static app that talks to Calibre Content Server
  */
 
 function folioApp() {
@@ -13,43 +14,34 @@ function folioApp() {
         loading: false,
         showSettings: false,
 
-        // Configuration
+        // Configuration (stored in localStorage)
         calibreUrl: localStorage.getItem('calibreUrl') || 'http://localhost:8080',
-        pocketbaseUrl: localStorage.getItem('pocketbaseUrl') || 'http://localhost:8090',
 
-        // API Clients
+        // API Client
         calibreAPI: null,
-        db: null,
 
         /**
          * Initialize the application
          */
         async init() {
-            console.log('Initializing Folio...');
+            console.log('📚 Initializing Folio...');
 
-            // Initialize API clients
             this.calibreAPI = new CalibreAPI(this.calibreUrl);
-            this.db = new FolioDatabase(this.pocketbaseUrl);
-            await this.db.init();
 
-            // Test connections
-            const calibreOk = await this.calibreAPI.testConnection();
-            const pocketbaseOk = await this.db.testConnection();
+            // Test connection
+            const connected = await this.calibreAPI.testConnection();
 
-            if (!calibreOk) {
-                console.warn('⚠️ Cannot connect to Calibre Content Server. Check settings.');
+            if (!connected) {
+                console.warn('⚠️ Cannot connect to Calibre Content Server');
+                console.log('💡 Make sure Calibre Content Server is running');
+                console.log(`   calibre-server --port 8080 "/path/to/library"`);
+                return;
             }
 
-            if (!pocketbaseOk) {
-                console.warn('⚠️ Cannot connect to PocketBase. Check settings.');
-            }
+            // Load books
+            await this.loadBooks();
 
-            // Load initial data
-            if (calibreOk) {
-                await this.loadBooks();
-            }
-
-            console.log('✅ Folio initialized');
+            console.log('✅ Folio ready!');
         },
 
         /**
@@ -60,7 +52,7 @@ function folioApp() {
             try {
                 this.books = await this.calibreAPI.getBooks({ limit: 100 });
                 this.filteredBooks = this.books;
-                console.log(`Loaded ${this.books.length} books`);
+                console.log(`📖 Loaded ${this.books.length} books`);
             } catch (error) {
                 console.error('Failed to load books:', error);
                 this.books = [];
@@ -71,34 +63,35 @@ function folioApp() {
         },
 
         /**
-         * Search books
+         * Search books (client-side first, then server if needed)
          */
         async searchBooks() {
-            if (!this.searchQuery.trim()) {
+            const query = this.searchQuery.toLowerCase().trim();
+
+            if (!query) {
                 this.filteredBooks = this.books;
                 return;
             }
 
-            this.loading = true;
-            try {
-                // Local search first (faster)
-                const query = this.searchQuery.toLowerCase();
-                this.filteredBooks = this.books.filter(book => {
-                    return (
-                        book.title?.toLowerCase().includes(query) ||
-                        book.authors?.toLowerCase().includes(query) ||
-                        book.tags?.some(tag => tag.toLowerCase().includes(query))
-                    );
-                });
+            // Client-side search first (instant!)
+            this.filteredBooks = this.books.filter(book => {
+                return (
+                    book.title?.toLowerCase().includes(query) ||
+                    book.authors?.toLowerCase().includes(query) ||
+                    book.tags?.some(tag => tag.toLowerCase().includes(query))
+                );
+            });
 
-                // If no local results, try server search
-                if (this.filteredBooks.length === 0) {
+            // If no results, try server search
+            if (this.filteredBooks.length === 0) {
+                this.loading = true;
+                try {
                     this.filteredBooks = await this.calibreAPI.searchBooks(this.searchQuery);
+                } catch (error) {
+                    console.error('Search failed:', error);
+                } finally {
+                    this.loading = false;
                 }
-            } catch (error) {
-                console.error('Search failed:', error);
-            } finally {
-                this.loading = false;
             }
         },
 
@@ -118,30 +111,13 @@ function folioApp() {
         },
 
         /**
-         * Save settings
+         * Save settings to localStorage
          */
         saveSettings() {
             localStorage.setItem('calibreUrl', this.calibreUrl);
-            localStorage.setItem('pocketbaseUrl', this.pocketbaseUrl);
-
-            // Reinitialize API clients
             this.calibreAPI = new CalibreAPI(this.calibreUrl);
-            this.db = new FolioDatabase(this.pocketbaseUrl);
-
-            // Reload data
             this.loadBooks();
-
-            console.log('Settings saved');
-        },
-
-        /**
-         * Format authors array or string
-         */
-        formatAuthors(authors) {
-            if (Array.isArray(authors)) {
-                return authors.join(', ');
-            }
-            return authors || 'Unknown Author';
+            console.log('✅ Settings saved');
         },
     };
 }

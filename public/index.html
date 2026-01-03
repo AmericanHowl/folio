@@ -11,9 +11,6 @@
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 
-    <!-- PocketBase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/pocketbase@0.20.0/dist/pocketbase.umd.js"></script>
-
     <style>
         [x-cloak] { display: none !important; }
     </style>
@@ -25,12 +22,9 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex">
-                        <!-- Logo -->
                         <div class="flex-shrink-0 flex items-center">
                             <span class="text-2xl font-bold text-indigo-600">📚 Folio</span>
                         </div>
-
-                        <!-- Desktop navigation -->
                         <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
                             <a @click="currentTab = 'library'"
                                :class="currentTab === 'library' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
@@ -42,52 +36,19 @@
                                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
                                 📝 Requests
                             </a>
-                            <a @click="currentTab = 'explore'"
+                            <a @click="currentTab === 'explore'"
                                :class="currentTab === 'explore' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
                                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
                                 🔍 Explore
                             </a>
                         </div>
                     </div>
-
-                    <!-- Settings -->
                     <div class="hidden sm:ml-6 sm:flex sm:items-center">
                         <button @click="showSettings = true"
                                 class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium">
                             ⚙️ Settings
                         </button>
                     </div>
-
-                    <!-- Mobile menu button -->
-                    <div class="flex items-center sm:hidden">
-                        <button @click="mobileMenuOpen = !mobileMenuOpen"
-                                class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
-                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mobile menu -->
-            <div x-show="mobileMenuOpen" x-cloak class="sm:hidden">
-                <div class="pt-2 pb-3 space-y-1">
-                    <a @click="currentTab = 'library'; mobileMenuOpen = false"
-                       :class="currentTab === 'library' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'border-transparent text-gray-600 hover:bg-gray-50'"
-                       class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium cursor-pointer">
-                        📚 Library
-                    </a>
-                    <a @click="currentTab = 'requests'; mobileMenuOpen = false"
-                       :class="currentTab === 'requests' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'border-transparent text-gray-600 hover:bg-gray-50'"
-                       class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium cursor-pointer">
-                        📝 Requests
-                    </a>
-                    <a @click="currentTab = 'explore'; mobileMenuOpen = false"
-                       :class="currentTab === 'explore' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'border-transparent text-gray-600 hover:bg-gray-50'"
-                       class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium cursor-pointer">
-                        🔍 Explore
-                    </a>
                 </div>
             </div>
         </nav>
@@ -97,11 +58,10 @@
             <!-- Library Tab -->
             <div x-show="currentTab === 'library'" x-cloak>
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <!-- Header -->
                     <div class="md:flex md:items-center md:justify-between mb-8">
                         <div class="flex-1 min-w-0">
                             <h1 class="text-3xl font-bold leading-tight text-gray-900">📚 Library</h1>
-                            <p class="mt-1 text-sm text-gray-500" x-text="`${books.length} books in your collection`"></p>
+                            <p class="mt-1 text-sm text-gray-500" x-text="`${books.length} books`"></p>
                         </div>
                     </div>
 
@@ -114,19 +74,17 @@
                                class="w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md px-4 py-2 border">
                     </div>
 
-                    <!-- Loading State -->
+                    <!-- Loading -->
                     <div x-show="loading" class="text-center py-12">
                         <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                        <p class="mt-4 text-gray-600">Loading books...</p>
                     </div>
 
                     <!-- Book Grid -->
-                    <div x-show="!loading && books.length > 0" x-cloak
+                    <div x-show="!loading && filteredBooks.length > 0" x-cloak
                          class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                         <template x-for="book in filteredBooks" :key="book.id">
                             <div @click="openBookModal(book)"
-                                 class="group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
-                                <!-- Book Cover -->
+                                 class="group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                                 <div class="aspect-[2/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-t-lg overflow-hidden flex items-center justify-center relative">
                                     <img :src="`${calibreUrl}/get/cover/${book.id}`"
                                          :alt="book.title"
@@ -134,14 +92,11 @@
                                          @error="$el.style.display='none'">
                                     <div class="text-6xl">📖</div>
                                 </div>
-
-                                <!-- Book Info -->
                                 <div class="p-3">
                                     <h3 class="text-sm font-medium text-gray-900 line-clamp-2 mb-1"
                                         :title="book.title"
                                         x-text="book.title"></h3>
                                     <p class="text-xs text-gray-500 line-clamp-1"
-                                       :title="book.authors"
                                        x-text="book.authors"></p>
                                 </div>
                             </div>
@@ -150,111 +105,59 @@
 
                     <!-- No Books -->
                     <div x-show="!loading && books.length === 0" x-cloak class="text-center py-12">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">No books found</h3>
-                        <p class="mt-1 text-sm text-gray-500">Check your Calibre Content Server connection</p>
+                        <h3 class="text-lg font-medium text-gray-900">No books found</h3>
+                        <p class="text-gray-500">Check your Calibre Content Server connection</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Requests Tab -->
-            <div x-show="currentTab === 'requests'" x-cloak>
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="md:flex md:items-center md:justify-between mb-8">
-                        <h1 class="text-3xl font-bold leading-tight text-gray-900">📝 Requests</h1>
-                    </div>
-                    <div class="text-center py-12 bg-white rounded-lg shadow">
-                        <div class="text-6xl mb-4">🚧</div>
-                        <h2 class="text-2xl font-bold text-gray-900 mb-2">Coming in Phase 2</h2>
-                        <p class="text-gray-600">Book request functionality will be added soon</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Explore Tab -->
-            <div x-show="currentTab === 'explore'" x-cloak>
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="md:flex md:items-center md:justify-between mb-8">
-                        <h1 class="text-3xl font-bold leading-tight text-gray-900">🔍 Explore</h1>
-                    </div>
-                    <div class="text-center py-12 bg-white rounded-lg shadow">
-                        <div class="text-6xl mb-4">🚧</div>
-                        <h2 class="text-2xl font-bold text-gray-900 mb-2">Coming in Phase 2</h2>
-                        <p class="text-gray-600">Hardcover API integration will be added soon</p>
-                    </div>
+            <!-- Requests/Explore Tabs (Coming Soon) -->
+            <div x-show="currentTab !== 'library'" x-cloak class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center py-12 bg-white rounded-lg shadow">
+                    <div class="text-6xl mb-4">🚧</div>
+                    <h2 class="text-2xl font-bold text-gray-900">Coming Soon</h2>
                 </div>
             </div>
         </main>
 
         <!-- Book Modal -->
         <div x-show="selectedBook" x-cloak>
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-50"
-                 @click="selectedBook = null"></div>
-
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 z-50" @click="selectedBook = null"></div>
             <div class="fixed inset-0 z-50 overflow-y-auto">
                 <div class="flex min-h-full items-center justify-center p-4">
-                    <div class="relative transform overflow-hidden rounded-lg bg-white shadow-xl transition-all w-full max-w-2xl"
-                         @click.stop>
+                    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl" @click.stop>
                         <template x-if="selectedBook">
-                            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <div class="flex items-start justify-between mb-4">
-                                    <h3 class="text-2xl font-bold text-gray-900" x-text="selectedBook.title"></h3>
+                            <div class="p-6">
+                                <div class="flex justify-between mb-4">
+                                    <h3 class="text-2xl font-bold" x-text="selectedBook.title"></h3>
                                     <button @click="selectedBook = null" class="text-gray-400 hover:text-gray-500">
                                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
                                     </button>
                                 </div>
-
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <!-- Cover -->
-                                    <div class="md:col-span-1">
-                                        <div class="aspect-[2/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg overflow-hidden flex items-center justify-center relative">
+                                    <div>
+                                        <div class="aspect-[2/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center relative overflow-hidden">
                                             <img :src="`${calibreUrl}/get/cover/${selectedBook.id}`"
-                                                 :alt="selectedBook.title"
                                                  class="w-full h-full object-cover absolute inset-0"
                                                  @error="$el.style.display='none'">
                                             <div class="text-6xl">📖</div>
                                         </div>
                                     </div>
-
-                                    <!-- Metadata -->
                                     <div class="md:col-span-2 space-y-4">
                                         <div x-show="selectedBook.authors">
-                                            <h4 class="text-sm font-medium text-gray-500">Author(s)</h4>
-                                            <p class="mt-1 text-base text-gray-900" x-text="selectedBook.authors"></p>
+                                            <h4 class="text-sm font-medium text-gray-500">Authors</h4>
+                                            <p class="text-base" x-text="selectedBook.authors"></p>
                                         </div>
                                         <div x-show="selectedBook.publisher">
                                             <h4 class="text-sm font-medium text-gray-500">Publisher</h4>
-                                            <p class="mt-1 text-base text-gray-900" x-text="selectedBook.publisher"></p>
-                                        </div>
-                                        <div x-show="selectedBook.tags && selectedBook.tags.length">
-                                            <h4 class="text-sm font-medium text-gray-500">Tags</h4>
-                                            <div class="mt-1 flex flex-wrap gap-2">
-                                                <template x-for="tag in selectedBook.tags" :key="tag">
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
-                                                          x-text="tag"></span>
-                                                </template>
-                                            </div>
+                                            <p x-text="selectedBook.publisher"></p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </template>
-
-                        <!-- Modal Footer -->
-                        <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                            <button type="button"
-                                    class="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto">
-                                Edit Metadata
-                            </button>
-                            <button @click="selectedBook = null"
-                                    class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">
-                                Close
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -265,44 +168,28 @@
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 z-50" @click="showSettings = false"></div>
             <div class="fixed inset-0 z-50 overflow-y-auto">
                 <div class="flex min-h-full items-center justify-center p-4">
-                    <div class="relative transform overflow-hidden rounded-lg bg-white shadow-xl w-full max-w-md" @click.stop>
-                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">⚙️ Settings</h3>
-
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                                        Calibre Content Server URL
-                                    </label>
-                                    <input type="url"
-                                           x-model="calibreUrl"
-                                           placeholder="http://localhost:8080"
-                                           class="w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md px-3 py-2 border">
-                                    <p class="mt-1 text-xs text-gray-500">URL of your Calibre Content Server</p>
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                                        PocketBase URL
-                                    </label>
-                                    <input type="url"
-                                           x-model="pocketbaseUrl"
-                                           placeholder="http://localhost:8090"
-                                           class="w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md px-3 py-2 border">
-                                    <p class="mt-1 text-xs text-gray-500">URL of your PocketBase instance</p>
-                                </div>
+                    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md" @click.stop>
+                        <div class="p-6">
+                            <h3 class="text-lg font-medium mb-4">⚙️ Settings</h3>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Calibre Content Server URL
+                                </label>
+                                <input type="url"
+                                       x-model="calibreUrl"
+                                       placeholder="http://localhost:8080"
+                                       class="w-full border-gray-300 rounded-md px-3 py-2 border">
                             </div>
-                        </div>
-
-                        <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                            <button @click="saveSettings(); showSettings = false"
-                                    class="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto">
-                                Save
-                            </button>
-                            <button @click="showSettings = false"
-                                    class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">
-                                Cancel
-                            </button>
+                            <div class="mt-6 flex justify-end gap-3">
+                                <button @click="showSettings = false"
+                                        class="px-4 py-2 text-sm text-gray-700 border rounded-md hover:bg-gray-50">
+                                    Cancel
+                                </button>
+                                <button @click="saveSettings(); showSettings = false"
+                                        class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-500">
+                                    Save
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -310,9 +197,7 @@
         </div>
     </div>
 
-    <!-- Main App Script -->
     <script src="js/calibre-api.js"></script>
-    <script src="js/pocketbase-api.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
