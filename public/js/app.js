@@ -30,10 +30,11 @@ function folioApp() {
         hasNewBooks: false,
 
         // Device detection
-        isKobo: /kobo/i.test(navigator.userAgent),
+        isKobo: false,
 
         // Configuration (stored in localStorage)
         calibreUrl: localStorage.getItem('calibreUrl') || '/api',
+        koboMode: localStorage.getItem('koboMode') || 'auto', // 'auto', 'on', 'off'
 
         // API Client
         calibreAPI: null,
@@ -43,6 +44,9 @@ function folioApp() {
          */
         async init() {
             console.log('📚 Initializing Folio...');
+
+            // Detect Kobo device
+            this.detectKobo();
 
             this.calibreAPI = new CalibreAPI(this.calibreUrl);
 
@@ -63,6 +67,35 @@ function folioApp() {
             this.startAutoUpdate();
 
             console.log('✅ Folio ready!');
+        },
+
+        /**
+         * Detect Kobo device
+         */
+        detectKobo() {
+            const ua = navigator.userAgent;
+            console.log('🔍 User Agent:', ua);
+
+            // Check manual override first
+            if (this.koboMode === 'on') {
+                this.isKobo = true;
+                console.log('📱 Kobo mode: ENABLED (manual)');
+                return;
+            }
+
+            if (this.koboMode === 'off') {
+                this.isKobo = false;
+                console.log('📱 Kobo mode: DISABLED (manual)');
+                return;
+            }
+
+            // Auto-detect Kobo devices
+            const isKoboDevice = /kobo/i.test(ua) ||
+                                /ebookreader/i.test(ua) ||
+                                /koboereader/i.test(ua);
+
+            this.isKobo = isKoboDevice;
+            console.log('📱 Kobo mode:', this.isKobo ? 'ENABLED (auto-detected)' : 'DISABLED (not detected)');
         },
 
         /**
@@ -283,7 +316,9 @@ function folioApp() {
          */
         saveSettings() {
             localStorage.setItem('calibreUrl', this.calibreUrl);
+            localStorage.setItem('koboMode', this.koboMode);
             this.calibreAPI = new CalibreAPI(this.calibreUrl);
+            this.detectKobo();
             this.loadBooks();
             console.log('✅ Settings saved');
         },

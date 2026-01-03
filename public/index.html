@@ -383,14 +383,28 @@
                                 <i class="bi bi-gear"></i>
                                 Settings
                             </h3>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-1">
-                                    Calibre Content Server URL
-                                </label>
-                                <input type="url"
-                                       x-model="calibreUrl"
-                                       placeholder="http://localhost:8080"
-                                       class="w-full bg-[#212D40] text-white border-gray-700 placeholder-gray-500 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-1">
+                                        Calibre Content Server URL
+                                    </label>
+                                    <input type="url"
+                                           x-model="calibreUrl"
+                                           placeholder="http://localhost:8080"
+                                           class="w-full bg-[#212D40] text-white border-gray-700 placeholder-gray-500 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-1">
+                                        Kobo E-Reader Mode
+                                    </label>
+                                    <select x-model="koboMode"
+                                            class="w-full bg-[#212D40] text-white border-gray-700 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                        <option value="auto">Auto-detect</option>
+                                        <option value="on">Always On</option>
+                                        <option value="off">Always Off</option>
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-400">Current: <span x-text="isKobo ? 'Kobo Mode Enabled' : 'Normal Mode'"></span></p>
+                                </div>
                             </div>
                             <div class="mt-6 flex justify-end gap-3">
                                 <button @click="showSettings = false"
