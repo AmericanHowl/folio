@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Folio Server - Serves static files, proxies Calibre API, and handles metadata editing
-This solves CORS issues and provides metadata management in a single script
+Folio Server - Serves static files and manages Calibre library via direct DB access
+No Calibre Content Server needed - reads directly from metadata.db
 """
 import http.server
 import socketserver
@@ -13,10 +13,10 @@ import os
 import base64
 import tempfile
 import re
+import sqlite3
 from pathlib import Path
 
 PORT = 9099
-CALIBRE_URL = "http://localhost:8080"
 CONFIG_FILE = "config.json"
 
 # Global config
@@ -51,6 +51,124 @@ def save_config():
 def get_calibre_library():
     """Get the current Calibre library path"""
     return config.get('calibre_library', os.path.expanduser('~/Calibre Library'))
+
+
+def get_db_connection():
+    """Get a connection to the Calibre metadata database"""
+    library_path = get_calibre_library()
+    db_path = os.path.join(library_path, 'metadata.db')
+
+    if not os.path.exists(db_path):
+        raise FileNotFoundError(f"Calibre database not found at {db_path}")
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_books(limit=50, offset=0, search=None):
+    """Get books from the Calibre database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Base query
+        query = """
+            SELECT
+                b.id,
+                b.title,
+                b.sort,
+                b.timestamp,
+                b.pubdate,
+                b.series_index,
+                b.path,
+                b.has_cover,
+                GROUP_CONCAT(DISTINCT a.name, ' & ') as authors,
+                GROUP_CONCAT(DISTINCT t.name, ', ') as tags,
+                c.text as comments,
+                p.name as publisher,
+                s.name as series
+            FROM books b
+            LEFT JOIN books_authors_link bal ON b.id = bal.book
+            LEFT JOIN authors a ON bal.author = a.id
+            LEFT JOIN books_tags_link btl ON b.id = btl.book
+            LEFT JOIN tags t ON btl.tag = t.id
+            LEFT JOIN comments c ON b.id = c.book
+            LEFT JOIN books_publishers_link bpl ON b.id = bpl.book
+            LEFT JOIN publishers p ON bpl.publisher = p.id
+            LEFT JOIN books_series_link bsl ON b.id = bsl.book
+            LEFT JOIN series s ON bsl.series = s.id
+        """
+
+        # Add search if provided
+        if search:
+            query += " WHERE b.title LIKE ? OR a.name LIKE ?"
+            params = (f'%{search}%', f'%{search}%', limit, offset)
+        else:
+            params = (limit, offset)
+
+        query += " GROUP BY b.id ORDER BY b.sort LIMIT ? OFFSET ?"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        books = []
+        for row in rows:
+            # Get formats
+            cursor.execute(
+                "SELECT format, name FROM data WHERE book = ?",
+                (row['id'],)
+            )
+            formats = [f['format'].upper() for f in cursor.fetchall()]
+
+            book = {
+                'id': row['id'],
+                'title': row['title'],
+                'authors': row['authors'].split(' & ') if row['authors'] else [],
+                'tags': row['tags'].split(', ') if row['tags'] else [],
+                'comments': row['comments'],
+                'publisher': row['publisher'],
+                'series': row['series'],
+                'series_index': row['series_index'],
+                'timestamp': row['timestamp'],
+                'pubdate': row['pubdate'],
+                'has_cover': bool(row['has_cover']),
+                'formats': formats,
+                'path': row['path']
+            }
+            books.append(book)
+
+        conn.close()
+        return books
+    except Exception as e:
+        print(f"❌ Error loading books: {e}")
+        return []
+
+
+def get_book_cover(book_id):
+    """Get the cover image for a book"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT path, has_cover FROM books WHERE id = ?", (book_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row or not row['has_cover']:
+            return None
+
+        library_path = get_calibre_library()
+        cover_path = os.path.join(library_path, row['path'], 'cover.jpg')
+
+        if os.path.exists(cover_path):
+            with open(cover_path, 'rb') as f:
+                return f.read()
+
+        return None
+    except Exception as e:
+        print(f"❌ Error loading cover: {e}")
+        return None
 
 
 def run_calibredb(args):
@@ -148,20 +266,35 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response.encode('utf-8'))
             return
 
-        # Proxy API requests to Calibre Content Server
-        if path.startswith('/api/'):
-            calibre_path = path.replace('/api/', '/', 1)
-            try:
-                req = urllib.request.Request(f"{CALIBRE_URL}{calibre_path}")
-                with urllib.request.urlopen(req) as response:
-                    self.send_response(response.status)
-                    for header, value in response.headers.items():
-                        if header.lower() not in ['transfer-encoding', 'connection']:
-                            self.send_header(header, value)
-                    self.end_headers()
-                    self.wfile.write(response.read())
-            except Exception as e:
-                self.send_error(502, f"Bad Gateway: {e}")
+        # API: Get books
+        if path == '/api/books':
+            limit = int(query_params.get('limit', [50])[0])
+            offset = int(query_params.get('offset', [0])[0])
+            search = query_params.get('search', [None])[0]
+
+            books = get_books(limit=limit, offset=offset, search=search)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = json.dumps(books)
+            self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Get book cover
+        cover_match = re.match(r'/api/cover/(\d+)', path)
+        if cover_match:
+            book_id = int(cover_match.group(1))
+            cover_data = get_book_cover(book_id)
+
+            if cover_data:
+                self.send_response(200)
+                self.send_header('Content-Type', 'image/jpeg')
+                self.send_header('Cache-Control', 'public, max-age=86400')
+                self.end_headers()
+                self.wfile.write(cover_data)
+            else:
+                self.send_error(404, "Cover not found")
             return
 
         # Serve static files from public/
@@ -309,10 +442,10 @@ if __name__ == "__main__":
 
     with socketserver.TCPServer(("", PORT), FolioHandler) as httpd:
         print(f"🚀 Folio server running at http://localhost:{PORT}")
-        print(f"📚 Calibre Content Server: {CALIBRE_URL}")
         print(f"📖 Calibre Library: {get_calibre_library()}")
-        print(f"\n   /api/* → {CALIBRE_URL}/* (read)")
-        print(f"   /api/metadata-and-cover/* → calibredb (write)")
+        print(f"\n   /api/books → Book list from metadata.db")
+        print(f"   /api/cover/* → Book covers")
+        print(f"   /api/metadata-and-cover/* → Metadata editing")
         print(f"   /api/config → Configuration")
         print(f"   /api/browse → Directory browser")
         print("\nPress Ctrl+C to stop")

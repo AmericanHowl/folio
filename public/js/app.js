@@ -34,16 +34,12 @@ function folioApp() {
         hasNewBooks: false,
 
         // Configuration
-        calibreUrl: localStorage.getItem('calibreUrl') || '/api',
         calibreLibraryPath: '',
 
         // Directory Browser
         browserPath: '',
         browserParent: null,
         browserEntries: [],
-
-        // API Client
-        calibreAPI: null,
 
         /**
          * Initialize the application
@@ -61,18 +57,6 @@ function folioApp() {
                 return;
             }
 
-            this.calibreAPI = new CalibreAPI(this.calibreUrl);
-
-            // Test connection
-            const connected = await this.calibreAPI.testConnection();
-
-            if (!connected) {
-                console.warn('⚠️ Cannot connect to Calibre Content Server');
-                console.log('💡 Make sure Calibre Content Server is running');
-                console.log(`   calibre-server --port 8080 "/path/to/library"`);
-                return;
-            }
-
             // Load books
             await this.loadBooks();
 
@@ -83,17 +67,15 @@ function folioApp() {
         },
 
         /**
-         * Load books from Calibre Content Server
+         * Load books from Calibre database
          */
         async loadBooks() {
             this.loading = true;
             this.currentPage = 0;
             try {
-                // Load first page
-                this.books = await this.calibreAPI.getBooks({
-                    limit: this.booksPerPage,
-                    offset: 0
-                });
+                // Load books from API
+                const response = await fetch(`/api/books?limit=${this.booksPerPage}&offset=0`);
+                this.books = await response.json();
                 this.filteredBooks = this.books;
                 this.totalBooks = this.books.length;
                 this.updateDisplayedBooks();
@@ -117,10 +99,9 @@ function folioApp() {
             this.loadingMore = true;
             try {
                 const nextPage = this.currentPage + 1;
-                const newBooks = await this.calibreAPI.getBooks({
-                    limit: this.booksPerPage,
-                    offset: nextPage * this.booksPerPage
-                });
+                const offset = nextPage * this.booksPerPage;
+                const response = await fetch(`/api/books?limit=${this.booksPerPage}&offset=${offset}`);
+                const newBooks = await response.json();
 
                 if (newBooks.length > 0) {
                     this.books = [...this.books, ...newBooks];
@@ -265,18 +246,6 @@ function folioApp() {
                 );
             });
 
-            // If no results, try server search
-            if (this.filteredBooks.length === 0) {
-                this.loading = true;
-                try {
-                    this.filteredBooks = await this.calibreAPI.searchBooks(this.searchQuery);
-                } catch (error) {
-                    console.error('Search failed:', error);
-                } finally {
-                    this.loading = false;
-                }
-            }
-
             this.updateDisplayedBooks();
         },
 
@@ -285,14 +254,7 @@ function folioApp() {
          */
         async openBookModal(book) {
             this.selectedBook = book;
-
-            // Load full metadata in background
-            try {
-                const fullMetadata = await this.calibreAPI.getBookMetadata(book.id);
-                this.selectedBook = { ...this.selectedBook, ...fullMetadata };
-            } catch (error) {
-                console.error('Failed to load book metadata:', error);
-            }
+            // Metadata is already complete from database query
         },
 
         /**
@@ -310,13 +272,9 @@ function folioApp() {
         },
 
         /**
-         * Save settings (URL to localStorage, library path to server)
+         * Save settings (library path to server)
          */
         async saveSettings() {
-            // Save URL to localStorage
-            localStorage.setItem('calibreUrl', this.calibreUrl);
-            this.calibreAPI = new CalibreAPI(this.calibreUrl);
-
             // Save library path to server
             try {
                 const response = await fetch('/api/config', {
