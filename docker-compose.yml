@@ -27,7 +27,7 @@ services:
       # Mount the same Calibre library for metadata updates
       - /path/to/your/calibre-library:/calibre-library
     ports:
-      - "5000:5000"
+      - "9100:9100"
     restart: unless-stopped
     depends_on:
       - calibre
