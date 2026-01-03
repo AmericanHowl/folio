@@ -205,7 +205,7 @@
                                 <div @click="openBookModal(book)" class="cursor-pointer">
                                     <div class="book-card transform transition-transform duration-200 hover:scale-105">
                                         <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg overflow-hidden relative border-2 border-gray-300/50">
-                                            <img :src="`${calibreUrl}/get/cover/${book.id}`"
+                                            <img :src="`/api/cover/${book.id}`"
                                                  :alt="book.title"
                                                  class="w-full h-full object-cover"
                                                  @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23374151%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
@@ -268,7 +268,7 @@
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div>
                                         <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border-2 border-gray-300/50 flex items-center justify-center relative overflow-hidden mb-4">
-                                            <img :src="`${calibreUrl}/get/cover/${selectedBook.id}`"
+                                            <img :src="`/api/cover/${selectedBook.id}`"
                                                  class="w-full h-full object-cover"
                                                  @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23D1D5DB%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
                                         </div>
@@ -297,12 +297,10 @@
                                             <h4 class="text-sm font-medium text-gray-600 mb-2">Available Formats</h4>
                                             <div class="flex flex-wrap gap-2">
                                                 <template x-for="format in selectedBook.formats" :key="format">
-                                                    <a :href="`${calibreUrl}/get/${format}/${selectedBook.id}`"
-                                                       class="px-3 py-1 bg-gray-700 text-white rounded-md text-sm hover:bg-gray-600 flex items-center gap-1"
-                                                       download>
-                                                        <i class="bi bi-download"></i>
+                                                    <span class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md text-sm flex items-center gap-1">
+                                                        <i class="bi bi-file-earmark"></i>
                                                         <span x-text="format"></span>
-                                                    </a>
+                                                    </span>
                                                 </template>
                                             </div>
                                         </div>
@@ -557,7 +555,7 @@
                                         <div class="flex items-start gap-4">
                                             <div class="w-32 h-48 bg-gray-100 rounded border-2 border-gray-300 flex items-center justify-center overflow-hidden">
                                                 <img x-show="editingBook.coverData"
-                                                     :src="editingBook.coverData || `${calibreUrl}/get/cover/${editingBook.id}`"
+                                                     :src="editingBook.coverData || `/api/cover/${editingBook.id}`"
                                                      class="w-full h-full object-cover"
                                                      alt="Cover preview">
                                                 <div x-show="!editingBook.coverData" class="text-gray-400 text-xs text-center p-2">
