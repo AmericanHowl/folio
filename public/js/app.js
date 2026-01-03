@@ -302,12 +302,53 @@ function folioApp() {
         async saveMetadata() {
             console.log('📝 Saving metadata for book:', this.editingBook);
 
-            // TODO: Implement actual metadata update via calibredb CLI or backend service
-            // For now, just log the changes
-            alert('Metadata editing is not yet implemented. This requires calibredb CLI integration.');
+            this.loading = true;
 
-            this.showEditMetadata = false;
-            this.editingBook = null;
+            try {
+                // Prepare metadata payload
+                const payload = {
+                    title: this.editingBook.title,
+                    authors: this.editingBook.authors,
+                    publisher: this.editingBook.publisher,
+                    comments: this.editingBook.comments,
+                };
+
+                // Include cover data if uploaded
+                if (this.editingBook.coverData) {
+                    payload.coverData = this.editingBook.coverData;
+                }
+
+                // Call backend API
+                const response = await fetch(`/backend/api/metadata-and-cover/${this.editingBook.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to update metadata');
+                }
+
+                console.log('✅ Metadata updated successfully');
+
+                // Reload books to reflect changes
+                await this.loadBooks();
+
+                this.showEditMetadata = false;
+                this.editingBook = null;
+
+                // Show success message
+                alert('Metadata updated successfully!');
+            } catch (error) {
+                console.error('Failed to save metadata:', error);
+                alert(`Failed to save metadata: ${error.message}`);
+            } finally {
+                this.loading = false;
+            }
         },
 
         /**

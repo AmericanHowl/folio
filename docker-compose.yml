@@ -17,6 +17,21 @@ services:
       - "8081:8081"  # Web UI
     restart: unless-stopped
 
+  # Backend API (Flask)
+  backend:
+    build: ./backend
+    container_name: folio-backend
+    environment:
+      - CALIBRE_LIBRARY=/calibre-library
+    volumes:
+      # Mount the same Calibre library for metadata updates
+      - /path/to/your/calibre-library:/calibre-library
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    depends_on:
+      - calibre
+
   # Static Web Server (nginx)
   web:
     image: nginx:alpine
@@ -29,6 +44,7 @@ services:
     restart: unless-stopped
     depends_on:
       - calibre
+      - backend
 
 networks:
   default:
