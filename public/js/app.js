@@ -16,6 +16,8 @@ function folioApp() {
         loadingMore: false,
         showSettings: false,
         showEditMetadata: false,
+        showBrowser: false,
+        showInitialSetup: false,
         editingBook: null,
 
         // Pagination
@@ -31,8 +33,14 @@ function folioApp() {
         lastBookCount: 0,
         hasNewBooks: false,
 
-        // Configuration (stored in localStorage)
+        // Configuration
         calibreUrl: localStorage.getItem('calibreUrl') || '/api',
+        calibreLibraryPath: '',
+
+        // Directory Browser
+        browserPath: '',
+        browserParent: null,
+        browserEntries: [],
 
         // API Client
         calibreAPI: null,
@@ -42,6 +50,16 @@ function folioApp() {
          */
         async init() {
             console.log('📚 Initializing Folio...');
+
+            // Load server config
+            await this.loadConfig();
+
+            // Check if we need initial setup
+            if (!this.calibreLibraryPath) {
+                console.log('📋 No library configured, showing setup screen');
+                this.showInitialSetup = true;
+                return;
+            }
 
             this.calibreAPI = new CalibreAPI(this.calibreUrl);
 
@@ -278,13 +296,130 @@ function folioApp() {
         },
 
         /**
-         * Save settings to localStorage
+         * Load configuration from server
          */
-        saveSettings() {
+        async loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                this.calibreLibraryPath = data.calibre_library || '';
+                console.log('📖 Loaded config:', data);
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        },
+
+        /**
+         * Save settings (URL to localStorage, library path to server)
+         */
+        async saveSettings() {
+            // Save URL to localStorage
             localStorage.setItem('calibreUrl', this.calibreUrl);
             this.calibreAPI = new CalibreAPI(this.calibreUrl);
-            this.loadBooks();
-            console.log('✅ Settings saved');
+
+            // Save library path to server
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        calibre_library: this.calibreLibraryPath
+                    }),
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    console.log('✅ Settings saved');
+                    this.loadBooks();
+                } else {
+                    console.error('Failed to save settings:', result.error);
+                    alert('Failed to save settings: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+                alert('Failed to save settings: ' + error.message);
+            }
+        },
+
+        /**
+         * Open directory browser
+         */
+        async openBrowser() {
+            this.showBrowser = true;
+            // Start from home directory or current path
+            const startPath = this.calibreLibraryPath || '~';
+            await this.browseTo(startPath);
+        },
+
+        /**
+         * Browse to a directory
+         */
+        async browseTo(path) {
+            try {
+                const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Browse error:', data.error);
+                    alert(`Error: ${data.error}`);
+                    return;
+                }
+
+                this.browserPath = data.path;
+                this.browserParent = data.parent;
+                this.browserEntries = data.entries;
+            } catch (error) {
+                console.error('Failed to browse:', error);
+                alert('Failed to browse directory: ' + error.message);
+            }
+        },
+
+        /**
+         * Select a library from the browser
+         */
+        selectLibrary(path) {
+            this.calibreLibraryPath = path;
+            this.showBrowser = false;
+            console.log('📚 Selected library:', path);
+        },
+
+        /**
+         * Complete initial setup
+         */
+        async completeSetup() {
+            if (!this.calibreLibraryPath) {
+                alert('Please select a Calibre library directory');
+                return;
+            }
+
+            // Save config
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        calibre_library: this.calibreLibraryPath
+                    }),
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    console.log('✅ Setup complete');
+                    this.showInitialSetup = false;
+                    // Initialize the app
+                    this.init();
+                } else {
+                    console.error('Failed to save config:', result.error);
+                    alert('Failed to save configuration: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Failed to complete setup:', error);
+                alert('Failed to complete setup: ' + error.message);
+            }
         },
 
         /**

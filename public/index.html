@@ -330,14 +330,35 @@
                                 <i class="bi bi-gear"></i>
                                 Settings
                             </h3>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    Calibre Content Server URL
-                                </label>
-                                <input type="url"
-                                       x-model="calibreUrl"
-                                       placeholder="http://localhost:8080"
-                                       class="w-full bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Calibre Content Server URL
+                                    </label>
+                                    <input type="url"
+                                           x-model="calibreUrl"
+                                           placeholder="http://localhost:8080"
+                                           class="w-full bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Calibre Library Path
+                                    </label>
+                                    <div class="flex gap-2">
+                                        <input type="text"
+                                               x-model="calibreLibraryPath"
+                                               placeholder="~/Calibre Library"
+                                               class="flex-1 bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                        <button @click="openBrowser()"
+                                                class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100 inline-flex items-center gap-2">
+                                            <i class="bi bi-folder2-open"></i>
+                                            Browse
+                                        </button>
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        Path to your Calibre library directory (contains metadata.db)
+                                    </p>
+                                </div>
                             </div>
                             <div class="mt-6 flex justify-end gap-3">
                                 <button @click="showSettings = false"
@@ -347,6 +368,129 @@
                                 <button @click="saveSettings(); showSettings = false"
                                         class="px-4 py-2 text-sm text-white bg-[#D66853] rounded-md hover:bg-[#c15743]">
                                     Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Directory Browser Modal -->
+        <div x-show="showBrowser" x-cloak>
+            <div class="fixed inset-0 bg-black bg-opacity-80 z-50" @click="showBrowser = false"></div>
+            <div class="fixed inset-0 z-50 overflow-y-auto">
+                <div class="flex min-h-full items-center justify-center p-4">
+                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-2xl" @click.stop>
+                        <div class="p-6">
+                            <h3 class="text-lg font-medium mb-4 text-gray-900 flex items-center gap-2">
+                                <i class="bi bi-folder2-open"></i>
+                                Select Calibre Library
+                            </h3>
+
+                            <!-- Current path -->
+                            <div class="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
+                                <div class="text-xs text-gray-500 mb-1">Current Path:</div>
+                                <div class="text-sm font-mono text-gray-900" x-text="browserPath"></div>
+                            </div>
+
+                            <!-- Directory listing -->
+                            <div class="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
+                                <!-- Parent directory -->
+                                <div x-show="browserParent"
+                                     @click="browseTo(browserParent)"
+                                     class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 flex items-center gap-2">
+                                    <i class="bi bi-arrow-up text-gray-400"></i>
+                                    <span class="text-sm text-gray-600">..</span>
+                                </div>
+
+                                <!-- Directories -->
+                                <template x-for="entry in browserEntries" :key="entry.path">
+                                    <div @click="browseTo(entry.path)"
+                                         class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 flex items-center justify-between gap-2">
+                                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                                            <i class="bi bi-folder-fill text-gray-400 flex-shrink-0"></i>
+                                            <span class="text-sm text-gray-900 truncate" x-text="entry.name"></span>
+                                        </div>
+                                        <button x-show="entry.is_calibre_library"
+                                                @click.stop="selectLibrary(entry.path)"
+                                                class="flex-shrink-0 px-3 py-1 text-xs text-white bg-[#D66853] rounded hover:bg-[#c15743]">
+                                            Select
+                                        </button>
+                                        <span x-show="entry.is_calibre_library"
+                                              class="flex-shrink-0 text-xs text-[#D66853] font-medium">
+                                            Calibre Library
+                                        </span>
+                                    </div>
+                                </template>
+
+                                <!-- Empty state -->
+                                <div x-show="browserEntries.length === 0" class="px-4 py-8 text-center text-gray-500">
+                                    <i class="bi bi-folder-x text-4xl mb-2"></i>
+                                    <p class="text-sm">No folders found</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-6 flex justify-end gap-3">
+                                <button @click="showBrowser = false"
+                                        class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Initial Setup Screen -->
+        <div x-show="showInitialSetup" x-cloak>
+            <div class="fixed inset-0 bg-black bg-opacity-95 z-50"></div>
+            <div class="fixed inset-0 z-50 overflow-y-auto">
+                <div class="flex min-h-full items-center justify-center p-4">
+                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-2xl">
+                        <div class="p-8">
+                            <div class="text-center mb-8">
+                                <h1 class="text-5xl font-calsans text-[#D66853] mb-4">folio</h1>
+                                <p class="text-gray-600">Welcome! Let's set up your Calibre library.</p>
+                            </div>
+
+                            <div class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        Calibre Library Path
+                                    </label>
+                                    <div class="flex gap-2">
+                                        <input type="text"
+                                               x-model="calibreLibraryPath"
+                                               placeholder="~/Calibre Library"
+                                               class="flex-1 bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                        <button @click="openBrowser()"
+                                                class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100 inline-flex items-center gap-2">
+                                            <i class="bi bi-folder2-open"></i>
+                                            Browse
+                                        </button>
+                                    </div>
+                                    <p class="mt-2 text-xs text-gray-500">
+                                        Select the directory containing your Calibre library (should have a metadata.db file)
+                                    </p>
+                                </div>
+
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <h4 class="text-sm font-medium text-blue-900 mb-2">Note:</h4>
+                                    <p class="text-sm text-blue-800">
+                                        Make sure the Calibre Content Server is running on port 8080:
+                                    </p>
+                                    <code class="block mt-2 p-2 bg-blue-100 rounded text-xs">
+                                        calibre-server --port 8080 "/path/to/your/Calibre Library"
+                                    </code>
+                                </div>
+                            </div>
+
+                            <div class="mt-8 flex justify-end">
+                                <button @click="completeSetup()"
+                                        class="px-6 py-3 text-sm text-white bg-[#D66853] rounded-md hover:bg-[#c15743]">
+                                    Complete Setup
                                 </button>
                             </div>
                         </div>
