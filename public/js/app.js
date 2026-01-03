@@ -15,6 +15,8 @@ function folioApp() {
         loading: false,
         loadingMore: false,
         showSettings: false,
+        showEditMetadata: false,
+        editingBook: null,
 
         // Pagination
         booksPerPage: 30,
@@ -283,6 +285,44 @@ function folioApp() {
             this.calibreAPI = new CalibreAPI(this.calibreUrl);
             this.loadBooks();
             console.log('✅ Settings saved');
+        },
+
+        /**
+         * Open edit metadata modal
+         */
+        openEditMetadata(book) {
+            this.editingBook = { ...book };
+            this.showEditMetadata = true;
+            this.selectedBook = null; // Close book detail modal
+        },
+
+        /**
+         * Save metadata changes
+         */
+        async saveMetadata() {
+            console.log('📝 Saving metadata for book:', this.editingBook);
+
+            // TODO: Implement actual metadata update via calibredb CLI or backend service
+            // For now, just log the changes
+            alert('Metadata editing is not yet implemented. This requires calibredb CLI integration.');
+
+            this.showEditMetadata = false;
+            this.editingBook = null;
+        },
+
+        /**
+         * Handle cover art upload
+         */
+        handleCoverUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.editingBook.coverData = e.target.result;
+                    console.log('📷 Cover art loaded');
+                };
+                reader.readAsDataURL(file);
+            }
         },
     };
 }

@@ -273,9 +273,8 @@
                                                  @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23D1D5DB%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
                                         </div>
 
-                                        <!-- Edit Metadata Button (hidden on Kobo) -->
-                                        <button 
-                                                @click="console.log('Edit metadata for book', selectedBook.id)"
+                                        <!-- Edit Metadata Button -->
+                                        <button @click="openEditMetadata(selectedBook)"
                                                 class="w-full px-4 py-2 bg-[#D66853] text-white rounded-md hover:bg-[#c15743] flex items-center justify-center gap-2">
                                             <i class="bi bi-pencil-square"></i>
                                             Edit Metadata
@@ -351,6 +350,115 @@
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Metadata Modal -->
+        <div x-show="showEditMetadata" x-cloak>
+            <div class="fixed inset-0 bg-black bg-opacity-80 z-50" @click="showEditMetadata = false"></div>
+            <div class="fixed inset-0 z-50 overflow-y-auto">
+                <div class="flex min-h-full items-center justify-center p-4">
+                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-2xl" @click.stop>
+                        <template x-if="editingBook">
+                            <div class="p-6">
+                                <div class="flex justify-between mb-6">
+                                    <h3 class="text-2xl font-bold text-gray-900">Edit Metadata</h3>
+                                    <button @click="showEditMetadata = false" class="text-gray-600 hover:text-gray-900">
+                                        <i class="bi bi-x-lg text-xl"></i>
+                                    </button>
+                                </div>
+
+                                <div class="space-y-6">
+                                    <!-- Title -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Title
+                                        </label>
+                                        <input type="text"
+                                               x-model="editingBook.title"
+                                               class="w-full bg-white text-gray-900 border-gray-200 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                    </div>
+
+                                    <!-- Authors -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Authors
+                                        </label>
+                                        <input type="text"
+                                               x-model="editingBook.authors"
+                                               placeholder="Separate multiple authors with commas"
+                                               class="w-full bg-white text-gray-900 border-gray-200 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                        <p class="mt-1 text-xs text-gray-500">Use commas to separate multiple authors</p>
+                                    </div>
+
+                                    <!-- Publisher -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Publisher
+                                        </label>
+                                        <input type="text"
+                                               x-model="editingBook.publisher"
+                                               class="w-full bg-white text-gray-900 border-gray-200 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                    </div>
+
+                                    <!-- Description -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Description
+                                        </label>
+                                        <textarea x-model="editingBook.comments"
+                                                  rows="5"
+                                                  class="w-full bg-white text-gray-900 border-gray-200 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]"></textarea>
+                                    </div>
+
+                                    <!-- Cover Art Upload -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Cover Art
+                                        </label>
+                                        <div class="flex items-start gap-4">
+                                            <div class="w-32 h-48 bg-gray-100 rounded border-2 border-gray-300 flex items-center justify-center overflow-hidden">
+                                                <img x-show="editingBook.coverData"
+                                                     :src="editingBook.coverData || `${calibreUrl}/get/cover/${editingBook.id}`"
+                                                     class="w-full h-full object-cover"
+                                                     alt="Cover preview">
+                                                <div x-show="!editingBook.coverData" class="text-gray-400 text-xs text-center p-2">
+                                                    Current Cover
+                                                </div>
+                                            </div>
+                                            <div class="flex-1">
+                                                <input type="file"
+                                                       accept="image/*"
+                                                       @change="handleCoverUpload($event)"
+                                                       class="block w-full text-sm text-gray-500
+                                                              file:mr-4 file:py-2 file:px-4
+                                                              file:rounded file:border-0
+                                                              file:text-sm file:font-medium
+                                                              file:bg-[#D66853] file:text-white
+                                                              hover:file:bg-[#c15743]
+                                                              file:cursor-pointer cursor-pointer">
+                                                <p class="mt-2 text-xs text-gray-500">
+                                                    Upload a JPG, PNG, or GIF image
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-8 flex justify-end gap-3">
+                                    <button @click="showEditMetadata = false"
+                                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100">
+                                        Cancel
+                                    </button>
+                                    <button @click="saveMetadata()"
+                                            class="px-4 py-2 text-sm text-white bg-[#D66853] rounded-md hover:bg-[#c15743]">
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
