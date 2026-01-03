@@ -318,8 +318,8 @@ function folioApp() {
                     payload.coverData = this.editingBook.coverData;
                 }
 
-                // Call backend API
-                const response = await fetch(`/backend/api/metadata-and-cover/${this.editingBook.id}`, {
+                // Call metadata API
+                const response = await fetch(`/api/metadata-and-cover/${this.editingBook.id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
