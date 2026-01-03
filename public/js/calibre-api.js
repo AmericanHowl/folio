@@ -37,31 +37,23 @@ class CalibreAPI {
             }
 
             const data = await response.json();
+            console.log(`Found ${data.book_ids.length} books`);
 
-            // Debug: log the response to see its structure
-            console.log('Calibre API response:', data);
+            // Calibre only returns book IDs, we need to fetch metadata for each
+            const books = await Promise.all(
+                data.book_ids.map(async (id) => {
+                    try {
+                        const metadata = await this.getBookMetadata(id);
+                        return { id, ...metadata };
+                    } catch (error) {
+                        console.error(`Failed to load metadata for book ${id}:`, error);
+                        // Return minimal book info if metadata fails
+                        return { id, title: `Book ${id}`, authors: 'Unknown' };
+                    }
+                })
+            );
 
-            // Handle different response formats
-            if (data.book_ids && Array.isArray(data.book_ids)) {
-                // Format: { book_ids: [1,2,3], metadata: {...} }
-                if (data.metadata) {
-                    return data.book_ids.map(id => ({
-                        id: id,
-                        ...data.metadata[id]
-                    }));
-                }
-                // If no metadata object, just return IDs
-                return data.book_ids.map(id => ({ id: id }));
-            }
-
-            // If data is already an array of books
-            if (Array.isArray(data)) {
-                return data;
-            }
-
-            // Unknown format
-            console.error('Unexpected API response format:', data);
-            return [];
+            return books;
 
         } catch (error) {
             console.error('Error fetching books:', error);
