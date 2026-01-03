@@ -83,8 +83,8 @@ def get_books(limit=50, offset=0, search=None):
                 b.series_index,
                 b.path,
                 b.has_cover,
-                GROUP_CONCAT(DISTINCT a.name, ' & ') as authors,
-                GROUP_CONCAT(DISTINCT t.name, ', ') as tags,
+                GROUP_CONCAT(a.name, ' & ') as authors,
+                GROUP_CONCAT(t.name, ', ') as tags,
                 c.text as comments,
                 p.name as publisher,
                 s.name as series
