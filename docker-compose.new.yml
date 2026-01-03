@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Calibre Content Server
+  calibre-server:
+    image: linuxserver/calibre-web:latest
+    container_name: folio-calibre
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+    volumes:
+      # Mount your Calibre library (adjust path)
+      - /path/to/your/calibre-library:/books
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    command: calibre-server --port 8080 /books
+
+  # PocketBase Database
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: folio-pocketbase
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./pb_data:/pb/pb_data
+      - ./pocketbase-schema.json:/pb/schema.json:ro
+    restart: unless-stopped
+    command: serve --http=0.0.0.0:8090
+
+  # Static File Server (nginx)
+  web:
+    image: nginx:alpine
+    container_name: folio-web
+    ports:
+      - "9099:80"
+    volumes:
+      - ./public:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    depends_on:
+      - calibre-server
+      - pocketbase
+
+networks:
+  default:
+    name: folio-network
