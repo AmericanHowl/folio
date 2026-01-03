@@ -38,11 +38,31 @@ class CalibreAPI {
 
             const data = await response.json();
 
-            // Convert Calibre's format to our format
-            return data.book_ids.map(id => ({
-                id: id,
-                ...data.metadata[id]
-            }));
+            // Debug: log the response to see its structure
+            console.log('Calibre API response:', data);
+
+            // Handle different response formats
+            if (data.book_ids && Array.isArray(data.book_ids)) {
+                // Format: { book_ids: [1,2,3], metadata: {...} }
+                if (data.metadata) {
+                    return data.book_ids.map(id => ({
+                        id: id,
+                        ...data.metadata[id]
+                    }));
+                }
+                // If no metadata object, just return IDs
+                return data.book_ids.map(id => ({ id: id }));
+            }
+
+            // If data is already an array of books
+            if (Array.isArray(data)) {
+                return data;
+            }
+
+            // Unknown format
+            console.error('Unexpected API response format:', data);
+            return [];
+
         } catch (error) {
             console.error('Error fetching books:', error);
             throw error;
