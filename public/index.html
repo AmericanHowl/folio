@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-50">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Folio - Your Personal Library</title>
+    <title>folio - Your Personal Library</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,44 +11,133 @@
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 
+    <!-- Cal Sans Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cal+Sans:wght@400;600&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
     <style>
         [x-cloak] { display: none !important; }
+
+        body {
+            background-color: #ffffff;
+            color: #1f2937;
+        }
+
+        .font-calsans {
+            font-family: 'Cal Sans', sans-serif;
+        }
+
+        .book-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .book-card-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .book-card:hover .book-card-overlay {
+            opacity: 1;
+        }
     </style>
 </head>
-<body class="h-full" x-data="folioApp()" x-init="init()">
+<body class="h-full bg-gray-50" x-data="folioApp()" x-init="init()">
     <div class="min-h-full">
         <!-- Navigation -->
         <nav class="bg-white border-b border-gray-200" x-data="{ mobileMenuOpen: false }">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
-                    <div class="flex">
+                    <div class="flex items-center">
                         <div class="flex-shrink-0 flex items-center">
-                            <span class="text-2xl font-bold text-indigo-600">📚 Folio</span>
+                            <span class="text-4xl font-calsans text-[#D66853]">folio</span>
                         </div>
-                        <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        <div class="hidden sm:ml-8 sm:flex sm:space-x-8">
                             <a @click="currentTab = 'library'"
-                               :class="currentTab === 'library' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-                               class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
-                                📚 Library
+                               :class="currentTab === 'library' ? 'border-[#D66853] text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                               class="inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
+                                <i class="bi bi-collection"></i>
+                                Library
                             </a>
                             <a @click="currentTab = 'requests'"
-                               :class="currentTab === 'requests' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-                               class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
-                                📝 Requests
+                               :class="currentTab === 'requests' ? 'border-[#D66853] text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                               class="inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
+                                <i class="bi bi-inbox"></i>
+                                Requests
                             </a>
-                            <a @click="currentTab === 'explore'"
-                               :class="currentTab === 'explore' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-                               class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
-                                🔍 Explore
+                            <a @click="currentTab = 'explore'"
+                               :class="currentTab === 'explore' ? 'border-[#D66853] text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                               class="inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
+                                <i class="bi bi-compass"></i>
+                                Explore
                             </a>
                         </div>
                     </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:items-center">
-                        <button @click="showSettings = true"
-                                class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium">
-                            ⚙️ Settings
-                        </button>
+                    <div class="flex items-center">
+                        <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                            <button @click="showSettings = true"
+                                    class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium inline-flex items-center gap-2">
+                                <i class="bi bi-gear"></i>
+                                Settings
+                            </button>
+                        </div>
+                        <!-- Mobile menu button -->
+                        <div class="flex items-center sm:hidden">
+                            <button @click="mobileMenuOpen = !mobileMenuOpen"
+                                    class="text-gray-500 hover:text-gray-700 p-2">
+                                <i class="bi text-2xl" :class="mobileMenuOpen ? 'bi-x' : 'bi-list'"></i>
+                            </button>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Mobile menu -->
+            <div x-show="mobileMenuOpen"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 class="sm:hidden"
+                 @click.away="mobileMenuOpen = false">
+                <div class="pt-2 pb-3 space-y-1 border-t border-gray-200 bg-gray-50">
+                    <a @click="currentTab = 'library'; mobileMenuOpen = false"
+                       :class="currentTab === 'library' ? 'bg-[#D66853]/10 border-[#D66853] text-gray-900' : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+                       class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
+                        <i class="bi bi-collection"></i>
+                        Library
+                    </a>
+                    <a @click="currentTab = 'requests'; mobileMenuOpen = false"
+                       :class="currentTab === 'requests' ? 'bg-[#D66853]/10 border-[#D66853] text-gray-900' : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+                       class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
+                        <i class="bi bi-inbox"></i>
+                        Requests
+                    </a>
+                    <a @click="currentTab = 'explore'; mobileMenuOpen = false"
+                       :class="currentTab === 'explore' ? 'bg-[#D66853]/10 border-[#D66853] text-gray-900' : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+                       class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
+                        <i class="bi bi-compass"></i>
+                        Explore
+                    </a>
+                    <a @click="showSettings = true; mobileMenuOpen = false"
+                       class="border-l-4 border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
+                        <i class="bi bi-gear"></i>
+                        Settings
+                    </a>
                 </div>
             </div>
         </nav>
@@ -60,61 +149,103 @@
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div class="md:flex md:items-center md:justify-between mb-8">
                         <div class="flex-1 min-w-0">
-                            <h1 class="text-3xl font-bold leading-tight text-gray-900">📚 Library</h1>
-                            <p class="mt-1 text-sm text-gray-500" x-text="`${books.length} books`"></p>
+                            <h1 class="text-3xl font-bold leading-tight text-gray-900">Library</h1>
+                            <p class="mt-1 text-sm text-gray-600" x-text="`${books.length} books`"></p>
                         </div>
                     </div>
 
-                    <!-- Search -->
-                    <div class="mb-6">
+                    <!-- New Books Notification (hidden on Kobo) -->
+                    <div x-show="hasNewBooks" x-cloak class="mb-6 bg-[#D66853]/10 border-l-4 border-[#D66853] p-4 rounded">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="bi bi-info-circle text-[#D66853]"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-gray-700">
+                                        New books have been added to your library!
+                                    </p>
+                                </div>
+                            </div>
+                            <button @click="refreshLibrary()"
+                                    class="px-4 py-2 bg-[#D66853] text-white text-sm rounded-md hover:bg-[#c15743]">
+                                Refresh Library
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search and Sort -->
+                    <div class="mb-6 flex flex-col sm:flex-row gap-4">
                         <input type="text"
                                x-model="searchQuery"
                                @input.debounce.500ms="searchBooks()"
                                placeholder="Search books by title, author, or tags..."
-                               class="w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md px-4 py-2 border">
+                               class="flex-1 bg-white text-gray-900 placeholder-gray-400 shadow-sm focus:ring-[#D66853] focus:border-[#D66853] block sm:text-sm border-gray-200 rounded-md px-4 py-2 border">
+                        <select x-model="sortBy"
+                                @change="changeSortOrder(sortBy)"
+                                class="bg-white text-gray-900 shadow-sm focus:ring-[#D66853] focus:border-[#D66853] block sm:text-sm border-gray-200 rounded-md px-4 py-2 border">
+                            <option value="title-asc">Title (A-Z)</option>
+                            <option value="title-desc">Title (Z-A)</option>
+                            <option value="author-asc">Author (A-Z)</option>
+                            <option value="author-desc">Author (Z-A)</option>
+                            <option value="date-desc">Newest First</option>
+                            <option value="date-asc">Oldest First</option>
+                        </select>
                     </div>
 
                     <!-- Loading -->
                     <div x-show="loading" class="text-center py-12">
-                        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#D66853]"></div>
                     </div>
 
                     <!-- Book Grid -->
-                    <div x-show="!loading && filteredBooks.length > 0" x-cloak
-                         class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                        <template x-for="book in filteredBooks" :key="book.id">
-                            <div @click="openBookModal(book)"
-                                 class="group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                                <div class="aspect-[2/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-t-lg overflow-hidden flex items-center justify-center relative">
-                                    <img :src="`${calibreUrl}/get/cover/${book.id}`"
-                                         :alt="book.title"
-                                         class="w-full h-full object-cover absolute inset-0"
-                                         @error="$el.style.display='none'">
-                                    <div class="text-6xl">📖</div>
+                    <div x-show="!loading && displayedBooks.length > 0" x-cloak>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-6">
+                            <template x-for="book in displayedBooks" :key="book.id">
+                                <div @click="openBookModal(book)" class="cursor-pointer">
+                                    <div class="book-card transform transition-transform duration-200 hover:scale-105">
+                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg overflow-hidden relative border-2 border-gray-300/50">
+                                            <img :src="`${calibreUrl}/get/cover/${book.id}`"
+                                                 :alt="book.title"
+                                                 class="w-full h-full object-cover"
+                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23374151%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+
+                                            <!-- Hover Overlay (hidden on Kobo) -->
+                                            <div class="book-card-overlay text-gray-900 text-center">
+                                                <h3 class="font-semibold text-sm mb-2 line-clamp-3" x-text="book.title"></h3>
+                                                <p class="text-xs text-gray-700 line-clamp-2"
+                                                   x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                 </div>
-                                <div class="p-3">
-                                    <h3 class="text-sm font-medium text-gray-900 line-clamp-2 mb-1"
-                                        :title="book.title"
-                                        x-text="book.title"></h3>
-                                    <p class="text-xs text-gray-500 line-clamp-1"
-                                       x-text="book.authors"></p>
-                                </div>
-                            </div>
-                        </template>
+                            </template>
+                        </div>
+
+                        <!-- Load More Button -->
+                        <div class="mt-8 text-center">
+                            <button @click="loadMoreBooks()"
+                                    x-show="!loadingMore && displayedBooks.length >= booksPerPage"
+                                    class="px-6 py-3 bg-[#D66853] text-white rounded-md hover:bg-[#c15743] focus:outline-none focus:ring-2 focus:ring-[#D66853]">
+                                Load More Books
+                            </button>
+                            <div x-show="loadingMore" class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#D66853]"></div>
+                        </div>
                     </div>
 
                     <!-- No Books -->
                     <div x-show="!loading && books.length === 0" x-cloak class="text-center py-12">
                         <h3 class="text-lg font-medium text-gray-900">No books found</h3>
-                        <p class="text-gray-500">Check your Calibre Content Server connection</p>
+                        <p class="text-gray-600">Check your Calibre Content Server connection</p>
                     </div>
                 </div>
             </div>
 
             <!-- Requests/Explore Tabs (Coming Soon) -->
             <div x-show="currentTab !== 'library'" x-cloak class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="text-center py-12 bg-white rounded-lg shadow">
-                    <div class="text-6xl mb-4">🚧</div>
+                <div class="text-center py-12 bg-white rounded-lg border border-gray-200">
+                    <div class="text-6xl mb-4"><i class="bi bi-hourglass-split text-[#D66853]"></i></div>
                     <h2 class="text-2xl font-bold text-gray-900">Coming Soon</h2>
                 </div>
             </div>
@@ -122,37 +253,62 @@
 
         <!-- Book Modal -->
         <div x-show="selectedBook" x-cloak>
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 z-50" @click="selectedBook = null"></div>
+            <div class="fixed inset-0 bg-black bg-opacity-80 z-50" @click="selectedBook = null"></div>
             <div class="fixed inset-0 z-50 overflow-y-auto">
                 <div class="flex min-h-full items-center justify-center p-4">
-                    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl" @click.stop>
+                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-3xl" @click.stop>
                         <template x-if="selectedBook">
                             <div class="p-6">
-                                <div class="flex justify-between mb-4">
-                                    <h3 class="text-2xl font-bold" x-text="selectedBook.title"></h3>
-                                    <button @click="selectedBook = null" class="text-gray-400 hover:text-gray-500">
-                                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
+                                <div class="flex justify-between mb-6">
+                                    <h3 class="text-2xl font-bold text-gray-900" x-text="selectedBook.title"></h3>
+                                    <button @click="selectedBook = null" class="text-gray-600 hover:text-gray-900">
+                                        <i class="bi bi-x-lg text-xl"></i>
                                     </button>
                                 </div>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div>
-                                        <div class="aspect-[2/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center relative overflow-hidden">
+                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border-2 border-gray-300/50 flex items-center justify-center relative overflow-hidden mb-4">
                                             <img :src="`${calibreUrl}/get/cover/${selectedBook.id}`"
-                                                 class="w-full h-full object-cover absolute inset-0"
-                                                 @error="$el.style.display='none'">
-                                            <div class="text-6xl">📖</div>
+                                                 class="w-full h-full object-cover"
+                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23D1D5DB%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
                                         </div>
+
+                                        <!-- Edit Metadata Button -->
+                                        <button @click="openEditMetadata(selectedBook)"
+                                                class="w-full px-4 py-2 bg-[#D66853] text-white rounded-md hover:bg-[#c15743] flex items-center justify-center gap-2">
+                                            <i class="bi bi-pencil-square"></i>
+                                            Edit Metadata
+                                        </button>
                                     </div>
                                     <div class="md:col-span-2 space-y-4">
                                         <div x-show="selectedBook.authors">
-                                            <h4 class="text-sm font-medium text-gray-500">Authors</h4>
-                                            <p class="text-base" x-text="selectedBook.authors"></p>
+                                            <h4 class="text-sm font-medium text-gray-600">Authors</h4>
+                                            <p class="text-base text-gray-900" x-text="Array.isArray(selectedBook.authors) ? selectedBook.authors.join(', ') : selectedBook.authors"></p>
                                         </div>
                                         <div x-show="selectedBook.publisher">
-                                            <h4 class="text-sm font-medium text-gray-500">Publisher</h4>
-                                            <p x-text="selectedBook.publisher"></p>
+                                            <h4 class="text-sm font-medium text-gray-600">Publisher</h4>
+                                            <p class="text-gray-900" x-text="selectedBook.publisher"></p>
+                                        </div>
+                                        <div x-show="selectedBook.pubdate">
+                                            <h4 class="text-sm font-medium text-gray-600">Published</h4>
+                                            <p class="text-gray-900" x-text="new Date(selectedBook.pubdate).getFullYear()"></p>
+                                        </div>
+                                        <div x-show="selectedBook.formats && selectedBook.formats.length > 0">
+                                            <h4 class="text-sm font-medium text-gray-600 mb-2">Available Formats</h4>
+                                            <div class="flex flex-wrap gap-2">
+                                                <template x-for="format in selectedBook.formats" :key="format">
+                                                    <a :href="`${calibreUrl}/get/${format}/${selectedBook.id}`"
+                                                       class="px-3 py-1 bg-gray-700 text-white rounded-md text-sm hover:bg-gray-600 flex items-center gap-1"
+                                                       download>
+                                                        <i class="bi bi-download"></i>
+                                                        <span x-text="format"></span>
+                                                    </a>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <div x-show="selectedBook.comments" class="col-span-full">
+                                            <h4 class="text-sm font-medium text-gray-600 mb-2">Description</h4>
+                                            <div class="text-sm text-gray-700 prose prose-sm prose-invert max-w-none" x-html="selectedBook.comments"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -165,12 +321,15 @@
 
         <!-- Settings Modal -->
         <div x-show="showSettings" x-cloak>
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 z-50" @click="showSettings = false"></div>
+            <div class="fixed inset-0 bg-black bg-opacity-80 z-50" @click="showSettings = false"></div>
             <div class="fixed inset-0 z-50 overflow-y-auto">
                 <div class="flex min-h-full items-center justify-center p-4">
-                    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md" @click.stop>
+                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-md" @click.stop>
                         <div class="p-6">
-                            <h3 class="text-lg font-medium mb-4">⚙️ Settings</h3>
+                            <h3 class="text-lg font-medium mb-4 text-gray-900 flex items-center gap-2">
+                                <i class="bi bi-gear"></i>
+                                Settings
+                            </h3>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">
                                     Calibre Content Server URL
@@ -178,19 +337,128 @@
                                 <input type="url"
                                        x-model="calibreUrl"
                                        placeholder="http://localhost:8080"
-                                       class="w-full border-gray-300 rounded-md px-3 py-2 border">
+                                       class="w-full bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
                             </div>
                             <div class="mt-6 flex justify-end gap-3">
                                 <button @click="showSettings = false"
-                                        class="px-4 py-2 text-sm text-gray-700 border rounded-md hover:bg-gray-50">
+                                        class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100">
                                     Cancel
                                 </button>
                                 <button @click="saveSettings(); showSettings = false"
-                                        class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-500">
+                                        class="px-4 py-2 text-sm text-white bg-[#D66853] rounded-md hover:bg-[#c15743]">
                                     Save
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Metadata Modal -->
+        <div x-show="showEditMetadata" x-cloak>
+            <div class="fixed inset-0 bg-black bg-opacity-80 z-50" @click="showEditMetadata = false"></div>
+            <div class="fixed inset-0 z-50 overflow-y-auto">
+                <div class="flex min-h-full items-center justify-center p-4">
+                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-2xl" @click.stop>
+                        <template x-if="editingBook">
+                            <div class="p-6">
+                                <div class="flex justify-between mb-6">
+                                    <h3 class="text-2xl font-bold text-gray-900">Edit Metadata</h3>
+                                    <button @click="showEditMetadata = false" class="text-gray-600 hover:text-gray-900">
+                                        <i class="bi bi-x-lg text-xl"></i>
+                                    </button>
+                                </div>
+
+                                <div class="space-y-6">
+                                    <!-- Title -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Title
+                                        </label>
+                                        <input type="text"
+                                               x-model="editingBook.title"
+                                               class="w-full bg-white text-gray-900 border-gray-200 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                    </div>
+
+                                    <!-- Authors -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Authors
+                                        </label>
+                                        <input type="text"
+                                               x-model="editingBook.authors"
+                                               placeholder="Separate multiple authors with commas"
+                                               class="w-full bg-white text-gray-900 border-gray-200 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                        <p class="mt-1 text-xs text-gray-500">Use commas to separate multiple authors</p>
+                                    </div>
+
+                                    <!-- Publisher -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Publisher
+                                        </label>
+                                        <input type="text"
+                                               x-model="editingBook.publisher"
+                                               class="w-full bg-white text-gray-900 border-gray-200 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                    </div>
+
+                                    <!-- Description -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Description
+                                        </label>
+                                        <textarea x-model="editingBook.comments"
+                                                  rows="5"
+                                                  class="w-full bg-white text-gray-900 border-gray-200 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]"></textarea>
+                                    </div>
+
+                                    <!-- Cover Art Upload -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Cover Art
+                                        </label>
+                                        <div class="flex items-start gap-4">
+                                            <div class="w-32 h-48 bg-gray-100 rounded border-2 border-gray-300 flex items-center justify-center overflow-hidden">
+                                                <img x-show="editingBook.coverData"
+                                                     :src="editingBook.coverData || `${calibreUrl}/get/cover/${editingBook.id}`"
+                                                     class="w-full h-full object-cover"
+                                                     alt="Cover preview">
+                                                <div x-show="!editingBook.coverData" class="text-gray-400 text-xs text-center p-2">
+                                                    Current Cover
+                                                </div>
+                                            </div>
+                                            <div class="flex-1">
+                                                <input type="file"
+                                                       accept="image/*"
+                                                       @change="handleCoverUpload($event)"
+                                                       class="block w-full text-sm text-gray-500
+                                                              file:mr-4 file:py-2 file:px-4
+                                                              file:rounded file:border-0
+                                                              file:text-sm file:font-medium
+                                                              file:bg-[#D66853] file:text-white
+                                                              hover:file:bg-[#c15743]
+                                                              file:cursor-pointer cursor-pointer">
+                                                <p class="mt-2 text-xs text-gray-500">
+                                                    Upload a JPG, PNG, or GIF image
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-8 flex justify-end gap-3">
+                                    <button @click="showEditMetadata = false"
+                                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100">
+                                        Cancel
+                                    </button>
+                                    <button @click="saveMetadata()"
+                                            class="px-4 py-2 text-sm text-white bg-[#D66853] rounded-md hover:bg-[#c15743]">
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>

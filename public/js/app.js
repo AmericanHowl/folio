@@ -9,10 +9,27 @@ function folioApp() {
         currentTab: 'library',
         books: [],
         filteredBooks: [],
+        displayedBooks: [],
         selectedBook: null,
         searchQuery: '',
         loading: false,
+        loadingMore: false,
         showSettings: false,
+        showEditMetadata: false,
+        editingBook: null,
+
+        // Pagination
+        booksPerPage: 30,
+        currentPage: 0,
+        totalBooks: 0,
+
+        // Sorting
+        sortBy: 'title-asc',
+
+        // Auto-update
+        autoUpdateInterval: null,
+        lastBookCount: 0,
+        hasNewBooks: false,
 
         // Configuration (stored in localStorage)
         calibreUrl: localStorage.getItem('calibreUrl') || '/api',
@@ -41,6 +58,9 @@ function folioApp() {
             // Load books
             await this.loadBooks();
 
+            // Start auto-update check
+            this.startAutoUpdate();
+
             console.log('✅ Folio ready!');
         },
 
@@ -49,17 +69,156 @@ function folioApp() {
          */
         async loadBooks() {
             this.loading = true;
+            this.currentPage = 0;
             try {
-                this.books = await this.calibreAPI.getBooks({ limit: 100 });
+                // Load first page
+                this.books = await this.calibreAPI.getBooks({
+                    limit: this.booksPerPage,
+                    offset: 0
+                });
                 this.filteredBooks = this.books;
+                this.totalBooks = this.books.length;
+                this.updateDisplayedBooks();
                 console.log(`📖 Loaded ${this.books.length} books`);
             } catch (error) {
                 console.error('Failed to load books:', error);
                 this.books = [];
                 this.filteredBooks = [];
+                this.displayedBooks = [];
             } finally {
                 this.loading = false;
             }
+        },
+
+        /**
+         * Load more books (pagination)
+         */
+        async loadMoreBooks() {
+            if (this.loadingMore) return;
+
+            this.loadingMore = true;
+            try {
+                const nextPage = this.currentPage + 1;
+                const newBooks = await this.calibreAPI.getBooks({
+                    limit: this.booksPerPage,
+                    offset: nextPage * this.booksPerPage
+                });
+
+                if (newBooks.length > 0) {
+                    this.books = [...this.books, ...newBooks];
+                    this.filteredBooks = this.books;
+                    this.currentPage = nextPage;
+                    this.updateDisplayedBooks();
+                    console.log(`📖 Loaded ${newBooks.length} more books (total: ${this.books.length})`);
+                }
+            } catch (error) {
+                console.error('Failed to load more books:', error);
+            } finally {
+                this.loadingMore = false;
+            }
+        },
+
+        /**
+         * Update the list of displayed books
+         */
+        updateDisplayedBooks() {
+            this.displayedBooks = this.sortBooks(this.filteredBooks);
+        },
+
+        /**
+         * Sort books based on current sort option
+         */
+        sortBooks(bookList) {
+            const sorted = [...bookList];
+
+            switch (this.sortBy) {
+                case 'title-asc':
+                    sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                    break;
+                case 'title-desc':
+                    sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+                    break;
+                case 'author-asc':
+                    sorted.sort((a, b) => {
+                        const authorA = Array.isArray(a.authors) ? a.authors[0] : (a.authors || '');
+                        const authorB = Array.isArray(b.authors) ? b.authors[0] : (b.authors || '');
+                        return authorA.localeCompare(authorB);
+                    });
+                    break;
+                case 'author-desc':
+                    sorted.sort((a, b) => {
+                        const authorA = Array.isArray(a.authors) ? a.authors[0] : (a.authors || '');
+                        const authorB = Array.isArray(b.authors) ? b.authors[0] : (b.authors || '');
+                        return authorB.localeCompare(authorA);
+                    });
+                    break;
+                case 'date-desc':
+                    sorted.sort((a, b) => {
+                        const dateA = a.pubdate ? new Date(a.pubdate) : new Date(0);
+                        const dateB = b.pubdate ? new Date(b.pubdate) : new Date(0);
+                        return dateB - dateA;
+                    });
+                    break;
+                case 'date-asc':
+                    sorted.sort((a, b) => {
+                        const dateA = a.pubdate ? new Date(a.pubdate) : new Date(0);
+                        const dateB = b.pubdate ? new Date(b.pubdate) : new Date(0);
+                        return dateA - dateB;
+                    });
+                    break;
+            }
+
+            return sorted;
+        },
+
+        /**
+         * Change sort order
+         */
+        changeSortOrder(sortBy) {
+            this.sortBy = sortBy;
+            this.updateDisplayedBooks();
+        },
+
+        /**
+         * Start auto-update check for new books
+         */
+        startAutoUpdate() {
+            // Check every 30 seconds
+            this.autoUpdateInterval = setInterval(() => {
+                this.checkForNewBooks();
+            }, 30000);
+        },
+
+        /**
+         * Check if new books have been added
+         */
+        async checkForNewBooks() {
+            try {
+                const libraryInfo = await this.calibreAPI.getLibraryMetadata();
+                const currentCount = libraryInfo.total_num || 0;
+
+                if (this.lastBookCount === 0) {
+                    this.lastBookCount = currentCount;
+                    return;
+                }
+
+                if (currentCount > this.lastBookCount) {
+                    console.log(`🆕 New books detected! (${currentCount - this.lastBookCount} new)`);
+                    this.hasNewBooks = true;
+                    this.lastBookCount = currentCount;
+                }
+            } catch (error) {
+                console.error('Failed to check for new books:', error);
+            }
+        },
+
+        /**
+         * Refresh library to load new books
+         */
+        async refreshLibrary() {
+            this.hasNewBooks = false;
+            await this.loadBooks();
+            console.log('📚 Library refreshed');
         },
 
         /**
@@ -70,14 +229,20 @@ function folioApp() {
 
             if (!query) {
                 this.filteredBooks = this.books;
+                this.updateDisplayedBooks();
                 return;
             }
 
             // Client-side search first (instant!)
             this.filteredBooks = this.books.filter(book => {
+                // Handle authors as either string or array
+                const authorsText = Array.isArray(book.authors)
+                    ? book.authors.join(' ').toLowerCase()
+                    : (book.authors?.toLowerCase() || '');
+
                 return (
                     book.title?.toLowerCase().includes(query) ||
-                    book.authors?.toLowerCase().includes(query) ||
+                    authorsText.includes(query) ||
                     book.tags?.some(tag => tag.toLowerCase().includes(query))
                 );
             });
@@ -93,6 +258,8 @@ function folioApp() {
                     this.loading = false;
                 }
             }
+
+            this.updateDisplayedBooks();
         },
 
         /**
@@ -118,6 +285,85 @@ function folioApp() {
             this.calibreAPI = new CalibreAPI(this.calibreUrl);
             this.loadBooks();
             console.log('✅ Settings saved');
+        },
+
+        /**
+         * Open edit metadata modal
+         */
+        openEditMetadata(book) {
+            this.editingBook = { ...book };
+            this.showEditMetadata = true;
+            this.selectedBook = null; // Close book detail modal
+        },
+
+        /**
+         * Save metadata changes
+         */
+        async saveMetadata() {
+            console.log('📝 Saving metadata for book:', this.editingBook);
+
+            this.loading = true;
+
+            try {
+                // Prepare metadata payload
+                const payload = {
+                    title: this.editingBook.title,
+                    authors: this.editingBook.authors,
+                    publisher: this.editingBook.publisher,
+                    comments: this.editingBook.comments,
+                };
+
+                // Include cover data if uploaded
+                if (this.editingBook.coverData) {
+                    payload.coverData = this.editingBook.coverData;
+                }
+
+                // Call backend API
+                const response = await fetch(`/backend/api/metadata-and-cover/${this.editingBook.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to update metadata');
+                }
+
+                console.log('✅ Metadata updated successfully');
+
+                // Reload books to reflect changes
+                await this.loadBooks();
+
+                this.showEditMetadata = false;
+                this.editingBook = null;
+
+                // Show success message
+                alert('Metadata updated successfully!');
+            } catch (error) {
+                console.error('Failed to save metadata:', error);
+                alert(`Failed to save metadata: ${error.message}`);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        /**
+         * Handle cover art upload
+         */
+        handleCoverUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.editingBook.coverData = e.target.result;
+                    console.log('📷 Cover art loaded');
+                };
+                reader.readAsDataURL(file);
+            }
         },
     };
 }
