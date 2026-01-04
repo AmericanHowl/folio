@@ -16,6 +16,8 @@ function folioApp() {
         loadingMore: false,
         showSettings: false,
         showEditMetadata: false,
+        showBrowser: false,
+        showInitialSetup: false,
         editingBook: null,
 
         // Pagination
@@ -31,11 +33,13 @@ function folioApp() {
         lastBookCount: 0,
         hasNewBooks: false,
 
-        // Configuration (stored in localStorage)
-        calibreUrl: localStorage.getItem('calibreUrl') || '/api',
+        // Configuration
+        calibreLibraryPath: '',
 
-        // API Client
-        calibreAPI: null,
+        // Directory Browser
+        browserPath: '',
+        browserParent: null,
+        browserEntries: [],
 
         /**
          * Initialize the application
@@ -43,15 +47,13 @@ function folioApp() {
         async init() {
             console.log('📚 Initializing Folio...');
 
-            this.calibreAPI = new CalibreAPI(this.calibreUrl);
+            // Load server config
+            await this.loadConfig();
 
-            // Test connection
-            const connected = await this.calibreAPI.testConnection();
-
-            if (!connected) {
-                console.warn('⚠️ Cannot connect to Calibre Content Server');
-                console.log('💡 Make sure Calibre Content Server is running');
-                console.log(`   calibre-server --port 8080 "/path/to/library"`);
+            // Check if we need initial setup
+            if (!this.calibreLibraryPath) {
+                console.log('📋 No library configured, showing setup screen');
+                this.showInitialSetup = true;
                 return;
             }
 
@@ -65,17 +67,15 @@ function folioApp() {
         },
 
         /**
-         * Load books from Calibre Content Server
+         * Load books from Calibre database
          */
         async loadBooks() {
             this.loading = true;
             this.currentPage = 0;
             try {
-                // Load first page
-                this.books = await this.calibreAPI.getBooks({
-                    limit: this.booksPerPage,
-                    offset: 0
-                });
+                // Load books from API
+                const response = await fetch(`/api/books?limit=${this.booksPerPage}&offset=0`);
+                this.books = await response.json();
                 this.filteredBooks = this.books;
                 this.totalBooks = this.books.length;
                 this.updateDisplayedBooks();
@@ -99,10 +99,9 @@ function folioApp() {
             this.loadingMore = true;
             try {
                 const nextPage = this.currentPage + 1;
-                const newBooks = await this.calibreAPI.getBooks({
-                    limit: this.booksPerPage,
-                    offset: nextPage * this.booksPerPage
-                });
+                const offset = nextPage * this.booksPerPage;
+                const response = await fetch(`/api/books?limit=${this.booksPerPage}&offset=${offset}`);
+                const newBooks = await response.json();
 
                 if (newBooks.length > 0) {
                     this.books = [...this.books, ...newBooks];
@@ -194,8 +193,8 @@ function folioApp() {
          */
         async checkForNewBooks() {
             try {
-                const libraryInfo = await this.calibreAPI.getLibraryMetadata();
-                const currentCount = libraryInfo.total_num || 0;
+                // Just check the current book count
+                const currentCount = this.books.length;
 
                 if (this.lastBookCount === 0) {
                     this.lastBookCount = currentCount;
@@ -247,18 +246,6 @@ function folioApp() {
                 );
             });
 
-            // If no results, try server search
-            if (this.filteredBooks.length === 0) {
-                this.loading = true;
-                try {
-                    this.filteredBooks = await this.calibreAPI.searchBooks(this.searchQuery);
-                } catch (error) {
-                    console.error('Search failed:', error);
-                } finally {
-                    this.loading = false;
-                }
-            }
-
             this.updateDisplayedBooks();
         },
 
@@ -267,31 +254,143 @@ function folioApp() {
          */
         async openBookModal(book) {
             this.selectedBook = book;
+            // Metadata is already complete from database query
+        },
 
-            // Load full metadata in background
+        /**
+         * Load configuration from server
+         */
+        async loadConfig() {
             try {
-                const fullMetadata = await this.calibreAPI.getBookMetadata(book.id);
-                this.selectedBook = { ...this.selectedBook, ...fullMetadata };
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                this.calibreLibraryPath = data.calibre_library || '';
+                console.log('📖 Loaded config:', data);
             } catch (error) {
-                console.error('Failed to load book metadata:', error);
+                console.error('Failed to load config:', error);
             }
         },
 
         /**
-         * Save settings to localStorage
+         * Save settings (library path to server)
          */
-        saveSettings() {
-            localStorage.setItem('calibreUrl', this.calibreUrl);
-            this.calibreAPI = new CalibreAPI(this.calibreUrl);
-            this.loadBooks();
-            console.log('✅ Settings saved');
+        async saveSettings() {
+            // Save library path to server
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        calibre_library: this.calibreLibraryPath
+                    }),
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    console.log('✅ Settings saved');
+                    this.loadBooks();
+                } else {
+                    console.error('Failed to save settings:', result.error);
+                    alert('Failed to save settings: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+                alert('Failed to save settings: ' + error.message);
+            }
+        },
+
+        /**
+         * Open directory browser
+         */
+        async openBrowser() {
+            this.showBrowser = true;
+            // Start from home directory or current path
+            const startPath = this.calibreLibraryPath || '~';
+            await this.browseTo(startPath);
+        },
+
+        /**
+         * Browse to a directory
+         */
+        async browseTo(path) {
+            try {
+                const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Browse error:', data.error);
+                    alert(`Error: ${data.error}`);
+                    return;
+                }
+
+                this.browserPath = data.path;
+                this.browserParent = data.parent;
+                this.browserEntries = data.entries;
+            } catch (error) {
+                console.error('Failed to browse:', error);
+                alert('Failed to browse directory: ' + error.message);
+            }
+        },
+
+        /**
+         * Select a library from the browser
+         */
+        selectLibrary(path) {
+            this.calibreLibraryPath = path;
+            this.showBrowser = false;
+            console.log('📚 Selected library:', path);
+        },
+
+        /**
+         * Complete initial setup
+         */
+        async completeSetup() {
+            if (!this.calibreLibraryPath) {
+                alert('Please select a Calibre library directory');
+                return;
+            }
+
+            // Save config
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        calibre_library: this.calibreLibraryPath
+                    }),
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    console.log('✅ Setup complete');
+                    this.showInitialSetup = false;
+                    // Initialize the app
+                    this.init();
+                } else {
+                    console.error('Failed to save config:', result.error);
+                    alert('Failed to save configuration: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Failed to complete setup:', error);
+                alert('Failed to complete setup: ' + error.message);
+            }
         },
 
         /**
          * Open edit metadata modal
          */
         openEditMetadata(book) {
-            this.editingBook = { ...book };
+            // Copy book data and convert arrays to comma-separated strings for editing
+            this.editingBook = {
+                ...book,
+                authors: Array.isArray(book.authors) ? book.authors.join(', ') : (book.authors || ''),
+                tags: Array.isArray(book.tags) ? book.tags.join(', ') : (book.tags || ''),
+                pubdate: book.pubdate ? new Date(book.pubdate).getFullYear().toString() : ''
+            };
             this.showEditMetadata = true;
             this.selectedBook = null; // Close book detail modal
         },
@@ -318,8 +417,8 @@ function folioApp() {
                     payload.coverData = this.editingBook.coverData;
                 }
 
-                // Call backend API
-                const response = await fetch(`/backend/api/metadata-and-cover/${this.editingBook.id}`, {
+                // Call metadata API
+                const response = await fetch(`/api/metadata-and-cover/${this.editingBook.id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -330,7 +429,11 @@ function folioApp() {
                 const result = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(result.error || 'Failed to update metadata');
+                    // Handle error array from server
+                    const errorMsg = result.errors
+                        ? result.errors.join('\n')
+                        : 'Failed to update metadata';
+                    throw new Error(errorMsg);
                 }
 
                 console.log('✅ Metadata updated successfully');
@@ -364,6 +467,72 @@ function folioApp() {
                 };
                 reader.readAsDataURL(file);
             }
+        },
+
+        /**
+         * Handle cover art drag & drop
+         */
+        handleCoverDrop(event) {
+            const file = event.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.editingBook.coverData = e.target.result;
+                    console.log('📷 Cover art dropped');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                alert('Please drop an image file');
+            }
+        },
+
+        /**
+         * Search for metadata (placeholder - not implemented yet)
+         */
+        searchMetadata() {
+            console.log('🔍 Search metadata clicked (not yet implemented)');
+            alert('Metadata search will be implemented in a future version. This will allow you to automatically fetch book information from online sources like Hardcover, Google Books, or Open Library.');
+        },
+
+        /**
+         * Get unique authors from all books for autocomplete
+         */
+        getAuthors() {
+            const authorsSet = new Set();
+            this.books.forEach(book => {
+                if (Array.isArray(book.authors)) {
+                    book.authors.forEach(author => authorsSet.add(author));
+                } else if (book.authors) {
+                    authorsSet.add(book.authors);
+                }
+            });
+            return Array.from(authorsSet).sort();
+        },
+
+        /**
+         * Get unique publishers from all books for autocomplete
+         */
+        getPublishers() {
+            const publishersSet = new Set();
+            this.books.forEach(book => {
+                if (book.publisher) {
+                    publishersSet.add(book.publisher);
+                }
+            });
+            return Array.from(publishersSet).sort();
+        },
+
+        /**
+         * Get unique genres/tags from all books for autocomplete
+         */
+        getGenres() {
+            const genresSet = new Set();
+            this.books.forEach(book => {
+                if (Array.isArray(book.tags)) {
+                    book.tags.forEach(tag => genresSet.add(tag));
+                }
+            });
+            return Array.from(genresSet).sort();
         },
     };
 }
