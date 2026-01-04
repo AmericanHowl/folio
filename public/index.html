@@ -36,12 +36,12 @@
 
         /* Custom Color Palette */
         :root {
-            --color-primary: #f95738;
-            --color-primary-dark: #e03d1f;
-            --color-secondary: #ee964b;
-            --color-accent: #f4d35e;
-            --color-dark: #0d3b66;
-            --color-cream: #faf0ca;
+            --color-primary: #5eb1bf;
+            --color-primary-dark: #4a8f9a;
+            --color-secondary: #ef7b45;
+            --color-accent: #d84727;
+            --color-dark: #042a2b;
+            --color-cream: #cdedf6;
         }
 
         /* Custom color classes */
@@ -69,7 +69,7 @@
 
         .focus\:ring-primary:focus {
             --tw-ring-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(249, 87, 56, 0.3);
+            box-shadow: 0 0 0 3px rgba(94, 177, 191, 0.3);
         }
 
         /* Safe Area Support */
@@ -84,7 +84,7 @@
         }
 
         body {
-            background: linear-gradient(to bottom, #ffffff 0%, #faf0ca 100%);
+            background: linear-gradient(to bottom, #ffffff 0%, #cdedf6 100%);
             color: #1f2937;
             -webkit-overflow-scrolling: touch;
             height: 100%;
@@ -165,7 +165,7 @@
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
-            background: linear-gradient(135deg, #ee964b 0%, #f95738 100%);
+            background: linear-gradient(135deg, #ef7b45 0%, #d84727 100%);
         }
 
         .book-card:active .book-cover-wrapper {
@@ -713,11 +713,11 @@
                                         </div>
                                         <button x-show="entry.is_calibre_library"
                                                 @click.stop="selectLibrary(entry.path)"
-                                                class="flex-shrink-0 px-3 py-1 text-xs text-white bg-[#D66853] rounded hover:bg-[#c15743]">
+                                                class="flex-shrink-0 px-3 py-1 text-xs text-white bg-accent rounded hover:bg-accent">
                                             Select
                                         </button>
                                         <span x-show="entry.is_calibre_library"
-                                              class="flex-shrink-0 text-xs text-[#D66853] font-medium">
+                                              class="flex-shrink-0 text-xs text-accent font-medium">
                                             Calibre Library
                                         </span>
                                     </div>
@@ -763,7 +763,7 @@
                                         <input type="text"
                                                x-model="calibreLibraryPath"
                                                placeholder="~/Calibre Library"
-                                               class="flex-1 bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
+                                               class="flex-1 bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-2 focus:ring-accent focus:border-accent">
                                         <button @click="openBrowser()"
                                                 class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100 inline-flex items-center gap-2">
                                             <i class="bi bi-folder2-open"></i>
@@ -778,7 +778,7 @@
 
                             <div class="mt-8 flex justify-end">
                                 <button @click="completeSetup()"
-                                        class="px-6 py-3 text-sm text-white bg-[#D66853] rounded-md hover:bg-[#c15743]">
+                                        class="px-6 py-3 text-sm text-white bg-accent rounded-md hover:bg-accent">
                                     Complete Setup
                                 </button>
                             </div>
