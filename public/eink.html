@@ -1,45 +1,122 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>My Books - Folio</title>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
-
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
     <style>
-        [x-cloak] { display: none !important; }
-
-        /* E-ink optimized styles */
         * {
-            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #e8e8e8;
             color: #2a2a2a;
+            padding-bottom: 60px;
         }
 
-        /* Book grid - 4 columns like Kobo */
+        /* Header */
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #999;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-time {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .header-icons {
+            font-size: 16px;
+            color: #666;
+        }
+
+        /* Tabs */
+        .tabs {
+            background: #fff;
+            border-bottom: 1px solid #999;
+            display: flex;
+            gap: 24px;
+            padding: 0 16px;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 12px 4px;
+            border-bottom: 2px solid transparent;
+            color: #666;
+            font-size: 15px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            border-bottom-color: #2a2a2a;
+            color: #2a2a2a;
+            font-weight: 500;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: #f5f5f5;
+            border-bottom: 1px solid #ccc;
+            padding: 12px 16px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .filter-label {
+            font-size: 13px;
+            color: #666;
+        }
+
+        select {
+            background: #fff;
+            border: 1px solid #999;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 14px;
+            color: #2a2a2a;
+            flex: 1;
+            max-width: 120px;
+        }
+
+        .settings-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            padding: 4px;
+            cursor: pointer;
+        }
+
+        /* Book Grid */
         .book-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1.25rem;
-            padding: 0.75rem;
+            gap: 20px;
+            padding: 12px;
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 600px) {
             .book-grid {
                 grid-template-columns: repeat(3, 1fr);
-                gap: 1rem;
+                gap: 16px;
             }
         }
 
@@ -48,17 +125,13 @@
             cursor: pointer;
         }
 
-        .book-card:active {
-            opacity: 0.7;
-        }
-
         .book-cover {
             aspect-ratio: 2/3;
             background: #d0d0d0;
             border: 1px solid #999;
             border-radius: 4px;
             overflow: hidden;
-            margin-bottom: 0.5rem;
+            margin-bottom: 8px;
         }
 
         .book-cover img {
@@ -67,43 +140,50 @@
             object-fit: cover;
         }
 
-        .book-info {
-            font-size: 0.75rem;
-            line-height: 1.2;
-            color: #444;
-        }
-
-        /* Truncate text */
-        .truncate-2 {
+        .book-title {
+            font-size: 12px;
+            line-height: 1.3;
+            margin-bottom: 4px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
-            overflow: hidden;
         }
 
-        /* Navigation */
-        .nav-tabs {
-            display: flex;
-            gap: 1.5rem;
-            border-bottom: 1px solid #999;
-            padding: 0 1rem;
-        }
-
-        .nav-tab {
-            padding: 0.75rem 0.25rem;
-            border-bottom: 2px solid transparent;
+        .book-author {
+            font-size: 11px;
             color: #666;
-            font-size: 0.95rem;
-            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
         }
 
-        .nav-tab.active {
-            border-bottom-color: #2a2a2a;
-            color: #2a2a2a;
-            font-weight: 500;
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
         }
 
-        /* Bottom navigation */
+        .spinner {
+            border: 2px solid #ccc;
+            border-top: 2px solid #2a2a2a;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Bottom Nav */
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -113,511 +193,466 @@
             border-top: 1px solid #999;
             display: flex;
             justify-content: space-around;
-            padding: 0.75rem 0;
+            padding: 12px 0;
         }
 
         .bottom-nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.25rem;
-            font-size: 0.7rem;
+            gap: 4px;
+            font-size: 11px;
             color: #666;
             cursor: pointer;
+            text-align: center;
         }
 
         .bottom-nav-item.active {
             color: #2a2a2a;
         }
 
-        .bottom-nav-item i {
-            font-size: 1.25rem;
-        }
-
-        /* Filters */
-        .filter-bar {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid #ccc;
-            background: #f5f5f5;
-        }
-
-        select {
-            background: #fff;
-            border: 1px solid #999;
-            border-radius: 4px;
-            padding: 0.4rem 0.75rem;
-            font-size: 0.85rem;
-            color: #2a2a2a;
+        .bottom-nav-icon {
+            font-size: 20px;
         }
 
         /* Modal */
-        .modal-overlay {
+        .modal {
+            display: none;
             position: fixed;
             inset: 0;
+            z-index: 100;
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal-overlay {
+            position: absolute;
+            inset: 0;
             background: rgba(0, 0, 0, 0.8);
-            z-index: 50;
         }
 
         .modal-content {
-            position: fixed;
-            inset: 0;
-            z-index: 51;
-            overflow-y: auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-        }
-
-        .modal-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             background: #fff;
             border: 2px solid #2a2a2a;
             border-radius: 8px;
             max-width: 500px;
-            width: 100%;
-            padding: 1.5rem;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
         }
 
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: 1px solid #2a2a2a;
-            border-radius: 4px;
-            background: #fff;
-            color: #2a2a2a;
-            font-size: 0.9rem;
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+            flex: 1;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
             cursor: pointer;
+            padding: 0;
+            margin-left: 12px;
+        }
+
+        .modal-body {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .modal-cover {
+            width: 120px;
+            flex-shrink: 0;
+        }
+
+        .modal-cover img {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            border: 1px solid #999;
+            border-radius: 4px;
+        }
+
+        .modal-info {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .info-group {
+            margin-bottom: 12px;
+        }
+
+        .info-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
             font-weight: 500;
         }
 
-        .btn:active {
-            background: #e8e8e8;
-        }
-
-        .btn-primary {
+        .btn {
+            width: 100%;
+            padding: 12px 20px;
+            border: 1px solid #2a2a2a;
+            border-radius: 4px;
             background: #2a2a2a;
             color: #fff;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
         }
 
-        .btn-primary:active {
-            background: #444;
+        .hidden {
+            display: none;
         }
 
-        /* Loading spinner */
-        .spinner {
-            border: 2px solid #ccc;
-            border-top: 2px solid #2a2a2a;
-            border-radius: 50%;
-            width: 2rem;
-            height: 2rem;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
         }
     </style>
 </head>
-<body class="h-full" x-data="einkApp()" x-init="init()">
-    <div class="min-h-full pb-16">
-        <!-- Header -->
-        <div class="bg-white border-b border-gray-400">
-            <div class="flex items-center justify-between px-4 py-3">
-                <div class="text-sm text-gray-600" x-text="currentTime"></div>
-                <div class="flex items-center gap-3">
-                    <i class="bi bi-wifi text-lg"></i>
-                    <i class="bi bi-battery-full text-lg"></i>
-                </div>
-            </div>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-time" id="clock">12:00 PM</div>
+        <div class="header-icons">📶 🔋</div>
+    </div>
 
-            <!-- Tabs -->
-            <div class="nav-tabs">
-                <div class="nav-tab active">Books</div>
-                <div class="nav-tab">Authors</div>
-                <div class="nav-tab">Series</div>
-                <div class="nav-tab">Collections</div>
-            </div>
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active">Books</div>
+        <div class="tab">Authors</div>
+        <div class="tab">Series</div>
+        <div class="tab">Collections</div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <span class="filter-label">Filter:</span>
+            <select id="filter-select">
+                <option value="all">All</option>
+                <option value="reading">Reading</option>
+                <option value="unread">Unread</option>
+            </select>
         </div>
-
-        <!-- Filter Bar -->
-        <div class="filter-bar">
-            <div class="flex items-center gap-2 flex-1">
-                <span class="text-xs text-gray-600">Filter:</span>
-                <select x-model="filterBy" class="flex-1 max-w-32">
-                    <option value="all">All</option>
-                    <option value="reading">Reading</option>
-                    <option value="unread">Unread</option>
-                </select>
-            </div>
-            <div class="flex items-center gap-2 flex-1">
-                <span class="text-xs text-gray-600">Sort:</span>
-                <select x-model="sortBy" @change="updateDisplayedBooks()" class="flex-1 max-w-32">
-                    <option value="recent">Recent</option>
-                    <option value="title">Title</option>
-                    <option value="author">Author</option>
-                </select>
-            </div>
-            <button @click="showSettings = true" class="p-1">
-                <i class="bi bi-three-dots-vertical text-lg"></i>
-            </button>
+        <div class="filter-group">
+            <span class="filter-label">Sort:</span>
+            <select id="sort-select">
+                <option value="recent">Recent</option>
+                <option value="title">Title</option>
+                <option value="author">Author</option>
+            </select>
         </div>
+        <button class="settings-btn" onclick="alert('Settings coming soon')">⋮</button>
+    </div>
 
-        <!-- Loading -->
-        <div x-show="loading" class="flex justify-center items-center py-12">
-            <div class="spinner"></div>
+    <!-- Loading -->
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Book Grid -->
+    <div id="book-grid" class="book-grid hidden"></div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="empty-state hidden">
+        <div style="font-size: 48px; margin-bottom: 12px;">📚</div>
+        <div style="font-size: 16px; margin-bottom: 8px;">No books found</div>
+        <div style="font-size: 13px;">Check your library configuration</div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+        <div class="bottom-nav-item">
+            <div class="bottom-nav-icon">🏠</div>
+            <div>Home</div>
         </div>
-
-        <!-- Book Grid -->
-        <div x-show="!loading" x-cloak class="book-grid">
-            <template x-for="book in displayedBooks" :key="book.id">
-                <div class="book-card" @click="openBookModal(book)">
-                    <div class="book-cover">
-                        <img :src="`/api/cover/${book.id}`"
-                             :alt="book.title"
-                             loading="lazy"
-                             @error="$el.style.display='none'">
-                    </div>
-                    <div class="book-info">
-                        <div class="truncate-2 font-medium mb-0.5" x-text="book.title"></div>
-                        <div class="truncate-2 text-gray-600" x-text="getAuthorText(book)"></div>
-                    </div>
-                </div>
-            </template>
+        <div class="bottom-nav-item active">
+            <div class="bottom-nav-icon">📖</div>
+            <div>My Books</div>
         </div>
-
-        <!-- No Books -->
-        <div x-show="!loading && books.length === 0" x-cloak class="text-center py-12 px-4">
-            <i class="bi bi-book text-4xl text-gray-400 mb-2"></i>
-            <p class="text-gray-600">No books found</p>
-            <p class="text-xs text-gray-500 mt-1">Configure your library in Settings</p>
+        <div class="bottom-nav-item">
+            <div class="bottom-nav-icon">📓</div>
+            <div>Notebooks</div>
         </div>
-
-        <!-- Bottom Navigation -->
-        <div class="bottom-nav">
-            <div class="bottom-nav-item">
-                <i class="bi bi-house"></i>
-                <span>Home</span>
-            </div>
-            <div class="bottom-nav-item active">
-                <i class="bi bi-book-fill"></i>
-                <span>My Books</span>
-            </div>
-            <div class="bottom-nav-item">
-                <i class="bi bi-journal"></i>
-                <span>My Notebooks</span>
-            </div>
-            <div class="bottom-nav-item">
-                <i class="bi bi-compass"></i>
-                <span>Discover</span>
-            </div>
-            <div class="bottom-nav-item" @click="showSettings = true">
-                <i class="bi bi-three-dots"></i>
-                <span>More</span>
-            </div>
+        <div class="bottom-nav-item">
+            <div class="bottom-nav-icon">🧭</div>
+            <div>Discover</div>
+        </div>
+        <div class="bottom-nav-item">
+            <div class="bottom-nav-icon">⋯</div>
+            <div>More</div>
         </div>
     </div>
 
     <!-- Book Detail Modal -->
-    <div x-show="selectedBook" x-cloak>
-        <div class="modal-overlay" @click="selectedBook = null"></div>
+    <div id="book-modal" class="modal">
+        <div class="modal-overlay" onclick="closeModal()"></div>
         <div class="modal-content">
-            <div class="modal-box" @click.stop>
-                <template x-if="selectedBook">
-                    <div>
-                        <!-- Close button -->
-                        <div class="flex justify-between items-start mb-4">
-                            <h3 class="text-lg font-bold text-gray-900" x-text="selectedBook.title"></h3>
-                            <button @click="selectedBook = null" class="p-1">
-                                <i class="bi bi-x-lg text-xl"></i>
-                            </button>
-                        </div>
-
-                        <!-- Cover and Info -->
-                        <div class="flex gap-4 mb-4">
-                            <div style="width: 120px; flex-shrink: 0;">
-                                <div class="book-cover">
-                                    <img :src="`/api/cover/${selectedBook.id}`"
-                                         :alt="selectedBook.title"
-                                         @error="$el.style.display='none'">
-                                </div>
-                            </div>
-                            <div class="flex-1 text-sm space-y-2">
-                                <div>
-                                    <div class="text-xs text-gray-500 uppercase">Author</div>
-                                    <div class="font-medium" x-text="getAuthorText(selectedBook)"></div>
-                                </div>
-                                <div x-show="selectedBook.pubdate">
-                                    <div class="text-xs text-gray-500 uppercase">Year</div>
-                                    <div x-text="new Date(selectedBook.pubdate).getFullYear()"></div>
-                                </div>
-                                <div x-show="selectedBook.formats && selectedBook.formats.length > 0">
-                                    <div class="text-xs text-gray-500 uppercase">Formats</div>
-                                    <div x-text="selectedBook.formats.join(', ')"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tags -->
-                        <div x-show="selectedBook.tags && selectedBook.tags.length > 0" class="mb-4">
-                            <div class="text-xs text-gray-500 uppercase mb-1">Genres</div>
-                            <div class="flex flex-wrap gap-1">
-                                <template x-for="tag in selectedBook.tags" :key="tag">
-                                    <span class="text-xs px-2 py-1 bg-gray-200 rounded" x-text="tag"></span>
-                                </template>
-                            </div>
-                        </div>
-
-                        <!-- Description -->
-                        <div x-show="selectedBook.comments" class="mb-4">
-                            <div class="text-xs text-gray-500 uppercase mb-1">Description</div>
-                            <div class="text-sm text-gray-700 leading-relaxed"
-                                 x-html="selectedBook.comments"
-                                 style="max-height: 200px; overflow-y: auto;"></div>
-                        </div>
-
-                        <!-- Download Button -->
-                        <div class="flex gap-2 mt-4">
-                            <button @click="downloadBook(selectedBook)" class="btn btn-primary flex-1">
-                                <i class="bi bi-download mr-2"></i>
-                                Download to Kobo
-                            </button>
-                        </div>
-                    </div>
-                </template>
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Book Title</h3>
+                <button class="close-btn" onclick="closeModal()">×</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div x-show="showSettings" x-cloak>
-        <div class="modal-overlay" @click="showSettings = false"></div>
-        <div class="modal-content">
-            <div class="modal-box" @click.stop>
-                <h3 class="text-lg font-bold mb-4">Settings</h3>
-
-                <div class="space-y-3 mb-6">
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Calibre Library</label>
-                        <input type="text"
-                               x-model="calibreLibraryPath"
-                               class="w-full px-3 py-2 border border-gray-400 rounded text-sm"
-                               placeholder="~/Calibre Library">
+            <div class="modal-body">
+                <div class="modal-cover">
+                    <img id="modal-cover" src="" alt="Book cover">
+                </div>
+                <div class="modal-info">
+                    <div class="info-group">
+                        <div class="info-label">Author</div>
+                        <div class="info-value" id="modal-author">Unknown</div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Books per page</label>
-                        <select x-model="booksPerPage" class="w-full">
-                            <option value="20">20</option>
-                            <option value="40">40</option>
-                            <option value="60">60</option>
-                            <option value="100">100</option>
-                        </select>
+                    <div class="info-group" id="modal-year-group" class="hidden">
+                        <div class="info-label">Year</div>
+                        <div class="info-value" id="modal-year"></div>
+                    </div>
+                    <div class="info-group" id="modal-formats-group" class="hidden">
+                        <div class="info-label">Formats</div>
+                        <div class="info-value" id="modal-formats"></div>
                     </div>
                 </div>
-
-                <div class="flex gap-2">
-                    <button @click="showSettings = false" class="btn flex-1">Cancel</button>
-                    <button @click="saveSettings()" class="btn btn-primary flex-1">Save</button>
-                </div>
             </div>
+            <div id="modal-description" style="margin-bottom: 16px; display: none;">
+                <div class="info-label">Description</div>
+                <div id="modal-description-text" style="font-size: 13px; line-height: 1.5; margin-top: 8px;"></div>
+            </div>
+            <button class="btn" onclick="downloadBook()">
+                📥 Download to Kobo
+            </button>
         </div>
     </div>
 
     <script>
-        function einkApp() {
-            return {
-                // State
-                books: [],
-                displayedBooks: [],
-                selectedBook: null,
-                loading: false,
-                showSettings: false,
-                currentTime: '',
+        // Global state
+        var books = [];
+        var currentBook = null;
 
-                // Filters
-                filterBy: 'all',
-                sortBy: 'recent',
-                booksPerPage: 40,
-
-                // Config
-                calibreLibraryPath: '',
-
-                /**
-                 * Initialize
-                 */
-                async init() {
-                    console.log('📚 E-ink interface loading...');
-                    this.updateClock();
-                    setInterval(() => this.updateClock(), 60000); // Update every minute
-
-                    await this.loadConfig();
-                    await this.loadBooks();
-                },
-
-                /**
-                 * Update clock
-                 */
-                updateClock() {
-                    const now = new Date();
-                    this.currentTime = now.toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true
-                    });
-                },
-
-                /**
-                 * Load books from API
-                 */
-                async loadBooks() {
-                    this.loading = true;
-                    try {
-                        const response = await fetch(`/api/books?limit=${this.booksPerPage}&offset=0`);
-                        this.books = await response.json();
-                        this.updateDisplayedBooks();
-                        console.log(`📖 Loaded ${this.books.length} books`);
-                    } catch (error) {
-                        console.error('Failed to load books:', error);
-                        this.books = [];
-                        this.displayedBooks = [];
-                    } finally {
-                        this.loading = false;
-                    }
-                },
-
-                /**
-                 * Update displayed books based on filters and sort
-                 */
-                updateDisplayedBooks() {
-                    let filtered = [...this.books];
-
-                    // Apply filter
-                    if (this.filterBy !== 'all') {
-                        // For now, show all books since we don't track read status
-                        // This can be extended in the future
-                    }
-
-                    // Apply sort
-                    switch (this.sortBy) {
-                        case 'title':
-                            filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                            break;
-                        case 'author':
-                            filtered.sort((a, b) => {
-                                const authorA = this.getAuthorText(a);
-                                const authorB = this.getAuthorText(b);
-                                return authorA.localeCompare(authorB);
-                            });
-                            break;
-                        case 'recent':
-                        default:
-                            filtered.sort((a, b) => {
-                                const dateA = a.pubdate ? new Date(a.pubdate) : new Date(0);
-                                const dateB = b.pubdate ? new Date(b.pubdate) : new Date(0);
-                                return dateB - dateA;
-                            });
-                            break;
-                    }
-
-                    this.displayedBooks = filtered;
-                },
-
-                /**
-                 * Get author text for display
-                 */
-                getAuthorText(book) {
-                    if (!book.authors) return 'Unknown';
-                    return Array.isArray(book.authors)
-                        ? book.authors.join(', ')
-                        : book.authors;
-                },
-
-                /**
-                 * Open book modal
-                 */
-                openBookModal(book) {
-                    this.selectedBook = book;
-                },
-
-                /**
-                 * Download book to Kobo
-                 */
-                async downloadBook(book) {
-                    if (!book.formats || book.formats.length === 0) {
-                        alert('No formats available for download');
-                        return;
-                    }
-
-                    // Prefer EPUB format for Kobo
-                    const format = book.formats.includes('EPUB')
-                        ? 'EPUB'
-                        : book.formats[0];
-
-                    try {
-                        // Create download link
-                        const downloadUrl = `/api/download/${book.id}/${format}`;
-                        const link = document.createElement('a');
-                        link.href = downloadUrl;
-                        link.download = `${book.title}.${format.toLowerCase()}`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-
-                        console.log(`📥 Downloading ${book.title} (${format})`);
-
-                        // Close modal after initiating download
-                        setTimeout(() => {
-                            this.selectedBook = null;
-                        }, 500);
-                    } catch (error) {
-                        console.error('Download failed:', error);
-                        alert('Failed to download book');
-                    }
-                },
-
-                /**
-                 * Load configuration
-                 */
-                async loadConfig() {
-                    try {
-                        const response = await fetch('/api/config');
-                        const data = await response.json();
-                        this.calibreLibraryPath = data.calibre_library || '';
-                    } catch (error) {
-                        console.error('Failed to load config:', error);
-                    }
-                },
-
-                /**
-                 * Save settings
-                 */
-                async saveSettings() {
-                    try {
-                        const response = await fetch('/api/config', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                calibre_library: this.calibreLibraryPath
-                            }),
-                        });
-
-                        const result = await response.json();
-                        if (result.success) {
-                            console.log('✅ Settings saved');
-                            this.showSettings = false;
-                            await this.loadBooks();
-                        } else {
-                            alert('Failed to save settings: ' + result.error);
-                        }
-                    } catch (error) {
-                        console.error('Failed to save settings:', error);
-                        alert('Failed to save settings');
-                    }
-                },
-            };
+        // Update clock
+        function updateClock() {
+            var now = new Date();
+            var hours = now.getHours();
+            var minutes = now.getMinutes();
+            var ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            document.getElementById('clock').textContent = hours + ':' + minutes + ' ' + ampm;
         }
+
+        updateClock();
+        setInterval(updateClock, 60000);
+
+        // Load books
+        function loadBooks() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/books?limit=100&offset=0', true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        books = JSON.parse(xhr.responseText);
+                        console.log('Loaded ' + books.length + ' books');
+                        displayBooks();
+                    } catch (e) {
+                        console.error('Failed to parse books:', e);
+                        showEmpty();
+                    }
+                } else {
+                    console.error('Failed to load books:', xhr.status);
+                    showEmpty();
+                }
+            };
+            xhr.onerror = function() {
+                console.error('Network error loading books');
+                showEmpty();
+            };
+            xhr.send();
+        }
+
+        // Display books
+        function displayBooks() {
+            var loading = document.getElementById('loading');
+            var grid = document.getElementById('book-grid');
+            var empty = document.getElementById('empty-state');
+
+            loading.classList.add('hidden');
+
+            if (books.length === 0) {
+                showEmpty();
+                return;
+            }
+
+            empty.classList.add('hidden');
+            grid.classList.remove('hidden');
+            grid.innerHTML = '';
+
+            var sortBy = document.getElementById('sort-select').value;
+            var sortedBooks = sortBooks(books.slice(), sortBy);
+
+            for (var i = 0; i < sortedBooks.length; i++) {
+                var book = sortedBooks[i];
+                var card = createBookCard(book);
+                grid.appendChild(card);
+            }
+        }
+
+        // Sort books
+        function sortBooks(bookList, sortBy) {
+            if (sortBy === 'title') {
+                bookList.sort(function(a, b) {
+                    return (a.title || '').localeCompare(b.title || '');
+                });
+            } else if (sortBy === 'author') {
+                bookList.sort(function(a, b) {
+                    var authorA = getAuthorText(a);
+                    var authorB = getAuthorText(b);
+                    return authorA.localeCompare(authorB);
+                });
+            } else {
+                // Recent (by date)
+                bookList.sort(function(a, b) {
+                    var dateA = a.pubdate ? new Date(a.pubdate) : new Date(0);
+                    var dateB = b.pubdate ? new Date(b.pubdate) : new Date(0);
+                    return dateB - dateA;
+                });
+            }
+            return bookList;
+        }
+
+        // Get author text
+        function getAuthorText(book) {
+            if (!book.authors) return 'Unknown';
+            if (Array.isArray(book.authors)) {
+                return book.authors.join(', ');
+            }
+            return book.authors;
+        }
+
+        // Create book card
+        function createBookCard(book) {
+            var card = document.createElement('div');
+            card.className = 'book-card';
+            card.onclick = function() { openModal(book); };
+
+            var cover = document.createElement('div');
+            cover.className = 'book-cover';
+            var img = document.createElement('img');
+            img.src = '/api/cover/' + book.id;
+            img.alt = book.title;
+            img.onerror = function() { this.style.display = 'none'; };
+            cover.appendChild(img);
+
+            var title = document.createElement('div');
+            title.className = 'book-title';
+            title.textContent = book.title || 'Unknown';
+
+            var author = document.createElement('div');
+            author.className = 'book-author';
+            author.textContent = getAuthorText(book);
+
+            card.appendChild(cover);
+            card.appendChild(title);
+            card.appendChild(author);
+
+            return card;
+        }
+
+        // Show empty state
+        function showEmpty() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('book-grid').classList.add('hidden');
+            document.getElementById('empty-state').classList.remove('hidden');
+        }
+
+        // Open modal
+        function openModal(book) {
+            currentBook = book;
+
+            document.getElementById('modal-title').textContent = book.title || 'Unknown';
+            document.getElementById('modal-cover').src = '/api/cover/' + book.id;
+            document.getElementById('modal-author').textContent = getAuthorText(book);
+
+            if (book.pubdate) {
+                var year = new Date(book.pubdate).getFullYear();
+                document.getElementById('modal-year').textContent = year;
+                document.getElementById('modal-year-group').style.display = 'block';
+            } else {
+                document.getElementById('modal-year-group').style.display = 'none';
+            }
+
+            if (book.formats && book.formats.length > 0) {
+                document.getElementById('modal-formats').textContent = book.formats.join(', ');
+                document.getElementById('modal-formats-group').style.display = 'block';
+            } else {
+                document.getElementById('modal-formats-group').style.display = 'none';
+            }
+
+            if (book.comments) {
+                document.getElementById('modal-description-text').innerHTML = book.comments;
+                document.getElementById('modal-description').style.display = 'block';
+            } else {
+                document.getElementById('modal-description').style.display = 'none';
+            }
+
+            document.getElementById('book-modal').classList.add('active');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('book-modal').classList.remove('active');
+            currentBook = null;
+        }
+
+        // Download book
+        function downloadBook() {
+            if (!currentBook) return;
+
+            if (!currentBook.formats || currentBook.formats.length === 0) {
+                alert('No formats available for download');
+                return;
+            }
+
+            var format = currentBook.formats.indexOf('EPUB') !== -1
+                ? 'EPUB'
+                : currentBook.formats[0];
+
+            var url = '/api/download/' + currentBook.id + '/' + format;
+            window.location.href = url;
+
+            setTimeout(function() {
+                closeModal();
+            }, 500);
+        }
+
+        // Sort change handler
+        document.getElementById('sort-select').onchange = function() {
+            displayBooks();
+        };
+
+        // Start loading
+        loadBooks();
     </script>
 </body>
 </html>
