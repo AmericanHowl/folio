@@ -376,29 +376,30 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     header, encoded = cover_data.split(',', 1)
                     image_data = base64.b64decode(encoded)
 
-                    # Determine file extension from MIME type
-                    mime_type = header.split(';')[0].split(':')[1]
-                    ext_map = {
-                        'image/jpeg': '.jpg',
-                        'image/jpg': '.jpg',
-                        'image/png': '.png',
-                        'image/gif': '.gif'
-                    }
-                    ext = ext_map.get(mime_type, '.jpg')
+                    # Get book path from database
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT path FROM books WHERE id = ?", (book_id,))
+                    row = cursor.fetchone()
 
-                    # Save to temporary file
-                    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_file:
-                        tmp_file.write(image_data)
-                        tmp_path = tmp_file.name
+                    if row:
+                        book_path = row['path']
+                        library_path = get_calibre_library()
+                        cover_path = os.path.join(library_path, book_path, 'cover.jpg')
 
-                    # Update cover using calibredb
-                    result = run_calibredb(['set_cover', book_id, tmp_path])
+                        # Write cover file directly to book directory
+                        with open(cover_path, 'wb') as f:
+                            f.write(image_data)
 
-                    # Clean up temp file
-                    os.unlink(tmp_path)
+                        # Update has_cover flag in database
+                        cursor.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (book_id,))
+                        conn.commit()
 
-                    if not result['success']:
-                        errors.append(f'Failed to update cover: {result.get("error", "Unknown error")}')
+                        print(f"✅ Cover updated for book {book_id}")
+                    else:
+                        errors.append(f'Failed to update cover: Book not found')
+
+                    conn.close()
             except Exception as e:
                 errors.append(f'Failed to process cover: {str(e)}')
 
