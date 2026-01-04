@@ -318,6 +318,63 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(404, "Cover not found")
             return
 
+        # API: Download book file
+        download_match = re.match(r'/api/download/(\d+)/(\w+)', path)
+        if download_match:
+            book_id = int(download_match.group(1))
+            format = download_match.group(2).upper()
+
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+
+                # Get book path and format file
+                cursor.execute(
+                    "SELECT b.path, b.title, d.name, d.format FROM books b JOIN data d ON b.id = d.book WHERE b.id = ? AND d.format = ?",
+                    (book_id, format)
+                )
+                row = cursor.fetchone()
+                conn.close()
+
+                if not row:
+                    self.send_error(404, f"Book format {format} not found")
+                    return
+
+                library_path = get_calibre_library()
+                book_file_path = os.path.join(library_path, row['path'], f"{row['name']}.{format.lower()}")
+
+                if not os.path.exists(book_file_path):
+                    self.send_error(404, f"Book file not found at {book_file_path}")
+                    return
+
+                # Determine MIME type based on format
+                mime_types = {
+                    'EPUB': 'application/epub+zip',
+                    'PDF': 'application/pdf',
+                    'MOBI': 'application/x-mobipocket-ebook',
+                    'AZW3': 'application/vnd.amazon.ebook',
+                    'TXT': 'text/plain',
+                }
+                mime_type = mime_types.get(format, 'application/octet-stream')
+
+                # Send the file
+                with open(book_file_path, 'rb') as f:
+                    book_data = f.read()
+
+                self.send_response(200)
+                self.send_header('Content-Type', mime_type)
+                self.send_header('Content-Disposition', f'attachment; filename="{row["title"]}.{format.lower()}"')
+                self.send_header('Content-Length', len(book_data))
+                self.end_headers()
+                self.wfile.write(book_data)
+                print(f"📥 Downloaded: {row['title']} ({format})")
+                return
+
+            except Exception as e:
+                print(f"❌ Download error: {e}")
+                self.send_error(500, f"Download failed: {str(e)}")
+                return
+
         # Serve static files from public/ (directory set in __init__)
         super().do_GET()
 
@@ -468,8 +525,10 @@ if __name__ == "__main__":
         print(f"📖 Calibre Library: {get_calibre_library()}")
         print(f"\n   /api/books → Book list from metadata.db")
         print(f"   /api/cover/* → Book covers")
+        print(f"   /api/download/{id}/{format} → Download book files")
         print(f"   /api/metadata-and-cover/* → Metadata editing")
         print(f"   /api/config → Configuration")
         print(f"   /api/browse → Directory browser")
+        print(f"\n   📱 E-ink interface: http://localhost:{PORT}/eink.html")
         print("\nPress Ctrl+C to stop")
         httpd.serve_forever()
