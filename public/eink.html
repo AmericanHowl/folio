@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>My Books - Folio</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folio Library</title>
     <style>
         * {
             margin: 0;
@@ -12,126 +11,89 @@
             box-sizing: border-box;
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #e8e8e8;
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #e8e8e8;
             color: #2a2a2a;
-            padding-bottom: 60px;
         }
 
         /* Header */
         .header {
             background: #fff;
-            border-bottom: 1px solid #999;
+            border-bottom: 2px solid #999;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        /* Controls */
+        .controls {
+            background: #f5f5f5;
+            border-bottom: 1px solid #ccc;
             padding: 12px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .header-time {
-            font-size: 14px;
-            color: #666;
-        }
-
-        .header-icons {
-            font-size: 16px;
-            color: #666;
-        }
-
-        /* Tabs */
-        .tabs {
-            background: #fff;
-            border-bottom: 1px solid #999;
-            display: flex;
-            gap: 24px;
-            padding: 0 16px;
-            overflow-x: auto;
-        }
-
-        .tab {
-            padding: 12px 4px;
-            border-bottom: 2px solid transparent;
-            color: #666;
-            font-size: 15px;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-
-        .tab.active {
-            border-bottom-color: #2a2a2a;
-            color: #2a2a2a;
-            font-weight: 500;
-        }
-
-        /* Filter Bar */
-        .filter-bar {
-            background: #f5f5f5;
-            border-bottom: 1px solid #ccc;
-            padding: 12px 16px;
-            display: flex;
-            gap: 16px;
-            align-items: center;
-        }
-
-        .filter-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex: 1;
-        }
-
-        .filter-label {
-            font-size: 13px;
-            color: #666;
-        }
-
-        select {
+        .controls select {
             background: #fff;
             border: 1px solid #999;
-            border-radius: 4px;
-            padding: 6px 12px;
+            padding: 8px 12px;
             font-size: 14px;
-            color: #2a2a2a;
-            flex: 1;
-            max-width: 120px;
         }
 
-        .settings-btn {
-            background: none;
-            border: none;
-            font-size: 20px;
-            padding: 4px;
+        .controls button {
+            background: #fff;
+            border: 1px solid #999;
+            padding: 8px 16px;
+            font-size: 14px;
             cursor: pointer;
         }
 
-        /* Book Grid */
+        /* Content area */
+        .content {
+            position: absolute;
+            top: 110px;
+            bottom: 60px;
+            left: 0;
+            right: 0;
+            overflow: hidden;
+        }
+
+        /* Book grid using table for better compatibility */
         .book-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
+            width: 100%;
+            padding: 16px;
+            table-layout: fixed;
+        }
+
+        .book-grid td {
             padding: 12px;
-        }
-
-        @media (max-width: 600px) {
-            .book-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 16px;
-            }
-        }
-
-        .book-card {
+            vertical-align: top;
             text-align: center;
+        }
+
+        .book-item {
             cursor: pointer;
         }
 
         .book-cover {
-            aspect-ratio: 2/3;
+            width: 100%;
+            max-width: 150px;
+            height: 225px;
             background: #d0d0d0;
             border: 1px solid #999;
-            border-radius: 4px;
+            margin: 0 auto 8px;
+            position: relative;
             overflow: hidden;
-            margin-bottom: 8px;
         }
 
         .book-cover img {
@@ -141,517 +103,416 @@
         }
 
         .book-title {
-            font-size: 12px;
-            line-height: 1.3;
-            margin-bottom: 4px;
+            font-size: 13px;
             font-weight: 500;
+            margin-bottom: 4px;
+            line-height: 1.3;
+            max-height: 2.6em;
             overflow: hidden;
-            text-overflow: ellipsis;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
         }
 
         .book-author {
-            font-size: 11px;
+            font-size: 12px;
             color: #666;
+            line-height: 1.2;
+            max-height: 2.4em;
             overflow: hidden;
-            text-overflow: ellipsis;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
         }
 
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 40px;
-        }
-
-        .spinner {
-            border: 2px solid #ccc;
-            border-top: 2px solid #2a2a2a;
-            border-radius: 50%;
-            width: 32px;
-            height: 32px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Bottom Nav */
-        .bottom-nav {
-            position: fixed;
+        /* Pagination */
+        .pagination {
+            position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
             background: #f5f5f5;
             border-top: 1px solid #999;
+            padding: 12px 16px;
             display: flex;
-            justify-content: space-around;
-            padding: 12px 0;
-        }
-
-        .bottom-nav-item {
-            display: flex;
-            flex-direction: column;
+            justify-content: space-between;
             align-items: center;
-            gap: 4px;
-            font-size: 11px;
-            color: #666;
+        }
+
+        .pagination button {
+            background: #2a2a2a;
+            color: #fff;
+            border: 1px solid #000;
+            padding: 10px 24px;
+            font-size: 15px;
             cursor: pointer;
-            text-align: center;
+            min-width: 100px;
         }
 
-        .bottom-nav-item.active {
-            color: #2a2a2a;
+        .pagination button:disabled {
+            background: #ccc;
+            color: #888;
+            border-color: #999;
         }
 
-        .bottom-nav-icon {
-            font-size: 20px;
+        .page-info {
+            font-size: 14px;
+            color: #666;
         }
 
         /* Modal */
         .modal {
             display: none;
             position: fixed;
-            inset: 0;
-            z-index: 100;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
         }
 
         .modal.active {
             display: block;
         }
 
-        .modal-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.8);
-        }
-
-        .modal-content {
+        .modal-box {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             background: #fff;
-            border: 2px solid #2a2a2a;
-            border-radius: 8px;
+            border: 2px solid #000;
+            padding: 20px;
             max-width: 500px;
             width: 90%;
-            max-height: 80vh;
+            max-height: 80%;
             overflow-y: auto;
-            padding: 20px;
         }
 
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 16px;
-        }
-
-        .modal-title {
-            font-size: 18px;
-            font-weight: bold;
-            flex: 1;
-        }
-
-        .close-btn {
+        .modal-close {
+            float: right;
             background: none;
             border: none;
-            font-size: 24px;
+            font-size: 28px;
+            font-weight: bold;
             cursor: pointer;
-            padding: 0;
-            margin-left: 12px;
+            line-height: 1;
         }
 
-        .modal-body {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 16px;
+        .modal-content {
+            clear: both;
+            padding-top: 10px;
         }
 
         .modal-cover {
+            float: left;
             width: 120px;
-            flex-shrink: 0;
+            margin-right: 16px;
+            margin-bottom: 16px;
         }
 
         .modal-cover img {
             width: 100%;
-            aspect-ratio: 2/3;
-            object-fit: cover;
             border: 1px solid #999;
-            border-radius: 4px;
         }
 
-        .modal-info {
-            flex: 1;
-            font-size: 14px;
-        }
-
-        .info-group {
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
             margin-bottom: 12px;
         }
 
-        .info-label {
-            font-size: 11px;
+        .modal-info {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .modal-label {
+            font-weight: 600;
             color: #666;
+            font-size: 12px;
             text-transform: uppercase;
-            margin-bottom: 4px;
         }
 
-        .info-value {
-            font-weight: 500;
-        }
-
-        .btn {
+        .download-btn {
+            clear: both;
+            display: block;
             width: 100%;
-            padding: 12px 20px;
-            border: 1px solid #2a2a2a;
-            border-radius: 4px;
             background: #2a2a2a;
             color: #fff;
-            font-size: 15px;
-            font-weight: 500;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 16px;
             cursor: pointer;
-            text-align: center;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #666;
         }
 
         .hidden {
             display: none;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #666;
         }
     </style>
 </head>
 <body>
     <!-- Header -->
     <div class="header">
-        <div class="header-time" id="clock">12:00 PM</div>
-        <div class="header-icons">📶 🔋</div>
+        <h1>My Library</h1>
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs">
-        <div class="tab active">Books</div>
-        <div class="tab">Authors</div>
-        <div class="tab">Series</div>
-        <div class="tab">Collections</div>
+    <!-- Controls -->
+    <div class="controls">
+        <select id="sort-select">
+            <option value="recent">Recent</option>
+            <option value="title">Title</option>
+            <option value="author">Author</option>
+        </select>
+        <button onclick="location.reload()">Refresh</button>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="filter-bar">
-        <div class="filter-group">
-            <span class="filter-label">Filter:</span>
-            <select id="filter-select">
-                <option value="all">All</option>
-                <option value="reading">Reading</option>
-                <option value="unread">Unread</option>
-            </select>
-        </div>
-        <div class="filter-group">
-            <span class="filter-label">Sort:</span>
-            <select id="sort-select">
-                <option value="recent">Recent</option>
-                <option value="title">Title</option>
-                <option value="author">Author</option>
-            </select>
-        </div>
-        <button class="settings-btn" onclick="alert('Settings coming soon')">⋮</button>
+    <!-- Content -->
+    <div class="content">
+        <div id="loading" class="loading">Loading books...</div>
+        <table id="book-grid" class="book-grid hidden">
+            <!-- Books will be inserted here -->
+        </table>
     </div>
 
-    <!-- Loading -->
-    <div id="loading" class="loading">
-        <div class="spinner"></div>
-    </div>
-
-    <!-- Book Grid -->
-    <div id="book-grid" class="book-grid hidden"></div>
-
-    <!-- Empty State -->
-    <div id="empty-state" class="empty-state hidden">
-        <div style="font-size: 48px; margin-bottom: 12px;">📚</div>
-        <div style="font-size: 16px; margin-bottom: 8px;">No books found</div>
-        <div style="font-size: 13px;">Check your library configuration</div>
-    </div>
-
-    <!-- Bottom Nav -->
-    <div class="bottom-nav">
-        <div class="bottom-nav-item">
-            <div class="bottom-nav-icon">🏠</div>
-            <div>Home</div>
+    <!-- Pagination -->
+    <div class="pagination">
+        <button id="prev-btn" onclick="prevPage()">← Previous</button>
+        <div class="page-info">
+            <span id="page-info">Page 1</span>
         </div>
-        <div class="bottom-nav-item active">
-            <div class="bottom-nav-icon">📖</div>
-            <div>My Books</div>
-        </div>
-        <div class="bottom-nav-item">
-            <div class="bottom-nav-icon">📓</div>
-            <div>Notebooks</div>
-        </div>
-        <div class="bottom-nav-item">
-            <div class="bottom-nav-icon">🧭</div>
-            <div>Discover</div>
-        </div>
-        <div class="bottom-nav-item">
-            <div class="bottom-nav-icon">⋯</div>
-            <div>More</div>
-        </div>
+        <button id="next-btn" onclick="nextPage()">Next →</button>
     </div>
 
     <!-- Book Detail Modal -->
-    <div id="book-modal" class="modal">
-        <div class="modal-overlay" onclick="closeModal()"></div>
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title" id="modal-title">Book Title</h3>
-                <button class="close-btn" onclick="closeModal()">×</button>
-            </div>
-            <div class="modal-body">
+    <div id="modal" class="modal">
+        <div class="modal-box">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div class="modal-content">
                 <div class="modal-cover">
-                    <img id="modal-cover" src="" alt="Book cover">
+                    <img id="modal-cover-img" src="" alt="Cover">
                 </div>
+                <h2 class="modal-title" id="modal-title">Book Title</h2>
                 <div class="modal-info">
-                    <div class="info-group">
-                        <div class="info-label">Author</div>
-                        <div class="info-value" id="modal-author">Unknown</div>
-                    </div>
-                    <div class="info-group" id="modal-year-group" class="hidden">
-                        <div class="info-label">Year</div>
-                        <div class="info-value" id="modal-year"></div>
-                    </div>
-                    <div class="info-group" id="modal-formats-group" class="hidden">
-                        <div class="info-label">Formats</div>
-                        <div class="info-value" id="modal-formats"></div>
-                    </div>
+                    <div class="modal-label">Author</div>
+                    <div id="modal-author">Unknown</div>
                 </div>
+                <div class="modal-info" id="modal-year-wrap" style="display:none">
+                    <div class="modal-label">Year</div>
+                    <div id="modal-year"></div>
+                </div>
+                <div class="modal-info" id="modal-formats-wrap" style="display:none">
+                    <div class="modal-label">Formats</div>
+                    <div id="modal-formats"></div>
+                </div>
+                <button class="download-btn" onclick="downloadBook()">Download to Kobo</button>
             </div>
-            <div id="modal-description" style="margin-bottom: 16px; display: none;">
-                <div class="info-label">Description</div>
-                <div id="modal-description-text" style="font-size: 13px; line-height: 1.5; margin-top: 8px;"></div>
-            </div>
-            <button class="btn" onclick="downloadBook()">
-                📥 Download to Kobo
-            </button>
         </div>
     </div>
 
     <script>
-        // Global state
         var books = [];
         var currentBook = null;
+        var currentPage = 0;
+        var booksPerPage = 12; // 3 rows x 4 columns
 
-        // Update clock
-        function updateClock() {
-            var now = new Date();
-            var hours = now.getHours();
-            var minutes = now.getMinutes();
-            var ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12;
-            hours = hours ? hours : 12;
-            minutes = minutes < 10 ? '0' + minutes : minutes;
-            document.getElementById('clock').textContent = hours + ':' + minutes + ' ' + ampm;
-        }
-
-        updateClock();
-        setInterval(updateClock, 60000);
-
-        // Load books
+        // Load books from API
         function loadBooks() {
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', '/api/books?limit=100&offset=0', true);
+            xhr.open('GET', '/api/books?limit=200&offset=0', true);
             xhr.onload = function() {
                 if (xhr.status === 200) {
-                    try {
-                        books = JSON.parse(xhr.responseText);
-                        console.log('Loaded ' + books.length + ' books');
-                        displayBooks();
-                    } catch (e) {
-                        console.error('Failed to parse books:', e);
-                        showEmpty();
-                    }
+                    books = JSON.parse(xhr.responseText);
+                    console.log('Loaded ' + books.length + ' books');
+                    sortBooks();
+                    showPage();
                 } else {
-                    console.error('Failed to load books:', xhr.status);
-                    showEmpty();
+                    document.getElementById('loading').textContent = 'Error loading books';
                 }
             };
             xhr.onerror = function() {
-                console.error('Network error loading books');
-                showEmpty();
+                document.getElementById('loading').textContent = 'Network error';
             };
             xhr.send();
         }
 
-        // Display books
-        function displayBooks() {
-            var loading = document.getElementById('loading');
-            var grid = document.getElementById('book-grid');
-            var empty = document.getElementById('empty-state');
-
-            loading.classList.add('hidden');
-
-            if (books.length === 0) {
-                showEmpty();
-                return;
-            }
-
-            empty.classList.add('hidden');
-            grid.classList.remove('hidden');
-            grid.innerHTML = '';
-
-            var sortBy = document.getElementById('sort-select').value;
-            var sortedBooks = sortBooks(books.slice(), sortBy);
-
-            for (var i = 0; i < sortedBooks.length; i++) {
-                var book = sortedBooks[i];
-                var card = createBookCard(book);
-                grid.appendChild(card);
-            }
-        }
-
         // Sort books
-        function sortBooks(bookList, sortBy) {
+        function sortBooks() {
+            var sortBy = document.getElementById('sort-select').value;
+
             if (sortBy === 'title') {
-                bookList.sort(function(a, b) {
+                books.sort(function(a, b) {
                     return (a.title || '').localeCompare(b.title || '');
                 });
             } else if (sortBy === 'author') {
-                bookList.sort(function(a, b) {
-                    var authorA = getAuthorText(a);
-                    var authorB = getAuthorText(b);
+                books.sort(function(a, b) {
+                    var authorA = getAuthor(a);
+                    var authorB = getAuthor(b);
                     return authorA.localeCompare(authorB);
                 });
             } else {
-                // Recent (by date)
-                bookList.sort(function(a, b) {
+                books.sort(function(a, b) {
                     var dateA = a.pubdate ? new Date(a.pubdate) : new Date(0);
                     var dateB = b.pubdate ? new Date(b.pubdate) : new Date(0);
                     return dateB - dateA;
                 });
             }
-            return bookList;
         }
 
         // Get author text
-        function getAuthorText(book) {
+        function getAuthor(book) {
             if (!book.authors) return 'Unknown';
-            if (Array.isArray(book.authors)) {
-                return book.authors.join(', ');
-            }
+            if (book.authors.length) return book.authors.join(', ');
             return book.authors;
         }
 
-        // Create book card
-        function createBookCard(book) {
-            var card = document.createElement('div');
-            card.className = 'book-card';
-            card.onclick = function() { openModal(book); };
-
-            var cover = document.createElement('div');
-            cover.className = 'book-cover';
-            var img = document.createElement('img');
-            img.src = '/api/cover/' + book.id;
-            img.alt = book.title;
-            img.onerror = function() { this.style.display = 'none'; };
-            cover.appendChild(img);
-
-            var title = document.createElement('div');
-            title.className = 'book-title';
-            title.textContent = book.title || 'Unknown';
-
-            var author = document.createElement('div');
-            author.className = 'book-author';
-            author.textContent = getAuthorText(book);
-
-            card.appendChild(cover);
-            card.appendChild(title);
-            card.appendChild(author);
-
-            return card;
-        }
-
-        // Show empty state
-        function showEmpty() {
+        // Show current page
+        function showPage() {
             document.getElementById('loading').classList.add('hidden');
-            document.getElementById('book-grid').classList.add('hidden');
-            document.getElementById('empty-state').classList.remove('hidden');
+
+            var grid = document.getElementById('book-grid');
+            grid.classList.remove('hidden');
+            grid.innerHTML = '';
+
+            var start = currentPage * booksPerPage;
+            var end = Math.min(start + booksPerPage, books.length);
+            var pageBooks = books.slice(start, end);
+
+            // Create rows of 4 books
+            var row;
+            for (var i = 0; i < pageBooks.length; i++) {
+                if (i % 4 === 0) {
+                    row = document.createElement('tr');
+                    grid.appendChild(row);
+                }
+
+                var cell = document.createElement('td');
+                var book = pageBooks[i];
+
+                cell.innerHTML =
+                    '<div class="book-item" onclick="openModal(' + book.id + ')">' +
+                    '<div class="book-cover">' +
+                    '<img src="/api/cover/' + book.id + '" alt="' + escapeHtml(book.title) + '">' +
+                    '</div>' +
+                    '<div class="book-title">' + escapeHtml(book.title || 'Unknown') + '</div>' +
+                    '<div class="book-author">' + escapeHtml(getAuthor(book)) + '</div>' +
+                    '</div>';
+
+                row.appendChild(cell);
+            }
+
+            // Fill remaining cells in last row
+            var remaining = pageBooks.length % 4;
+            if (remaining > 0) {
+                for (var j = 0; j < 4 - remaining; j++) {
+                    row.appendChild(document.createElement('td'));
+                }
+            }
+
+            // Update pagination
+            var totalPages = Math.ceil(books.length / booksPerPage);
+            document.getElementById('page-info').textContent =
+                'Page ' + (currentPage + 1) + ' of ' + totalPages;
+
+            document.getElementById('prev-btn').disabled = currentPage === 0;
+            document.getElementById('next-btn').disabled = currentPage >= totalPages - 1;
         }
 
-        // Open modal
-        function openModal(book) {
-            currentBook = book;
+        // Pagination
+        function nextPage() {
+            var totalPages = Math.ceil(books.length / booksPerPage);
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                showPage();
+            }
+        }
 
-            document.getElementById('modal-title').textContent = book.title || 'Unknown';
-            document.getElementById('modal-cover').src = '/api/cover/' + book.id;
-            document.getElementById('modal-author').textContent = getAuthorText(book);
+        function prevPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                showPage();
+            }
+        }
 
-            if (book.pubdate) {
-                var year = new Date(book.pubdate).getFullYear();
-                document.getElementById('modal-year').textContent = year;
-                document.getElementById('modal-year-group').style.display = 'block';
-            } else {
-                document.getElementById('modal-year-group').style.display = 'none';
+        // Open book modal
+        function openModal(bookId) {
+            for (var i = 0; i < books.length; i++) {
+                if (books[i].id === bookId) {
+                    currentBook = books[i];
+                    break;
+                }
             }
 
-            if (book.formats && book.formats.length > 0) {
-                document.getElementById('modal-formats').textContent = book.formats.join(', ');
-                document.getElementById('modal-formats-group').style.display = 'block';
+            if (!currentBook) return;
+
+            document.getElementById('modal-title').textContent = currentBook.title || 'Unknown';
+            document.getElementById('modal-cover-img').src = '/api/cover/' + currentBook.id;
+            document.getElementById('modal-author').textContent = getAuthor(currentBook);
+
+            if (currentBook.pubdate) {
+                document.getElementById('modal-year').textContent =
+                    new Date(currentBook.pubdate).getFullYear();
+                document.getElementById('modal-year-wrap').style.display = 'block';
             } else {
-                document.getElementById('modal-formats-group').style.display = 'none';
+                document.getElementById('modal-year-wrap').style.display = 'none';
             }
 
-            if (book.comments) {
-                document.getElementById('modal-description-text').innerHTML = book.comments;
-                document.getElementById('modal-description').style.display = 'block';
+            if (currentBook.formats && currentBook.formats.length) {
+                document.getElementById('modal-formats').textContent =
+                    currentBook.formats.join(', ');
+                document.getElementById('modal-formats-wrap').style.display = 'block';
             } else {
-                document.getElementById('modal-description').style.display = 'none';
+                document.getElementById('modal-formats-wrap').style.display = 'none';
             }
 
-            document.getElementById('book-modal').classList.add('active');
+            document.getElementById('modal').classList.add('active');
         }
 
         // Close modal
         function closeModal() {
-            document.getElementById('book-modal').classList.remove('active');
+            document.getElementById('modal').classList.remove('active');
             currentBook = null;
         }
 
         // Download book
         function downloadBook() {
-            if (!currentBook) return;
-
-            if (!currentBook.formats || currentBook.formats.length === 0) {
-                alert('No formats available for download');
+            if (!currentBook || !currentBook.formats || !currentBook.formats.length) {
+                alert('No formats available');
                 return;
             }
 
-            var format = currentBook.formats.indexOf('EPUB') !== -1
+            var format = currentBook.formats.indexOf('EPUB') >= 0
                 ? 'EPUB'
                 : currentBook.formats[0];
 
-            var url = '/api/download/' + currentBook.id + '/' + format;
-            window.location.href = url;
+            window.location.href = '/api/download/' + currentBook.id + '/' + format;
 
             setTimeout(function() {
                 closeModal();
             }, 500);
         }
 
+        // Escape HTML
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+
         // Sort change handler
         document.getElementById('sort-select').onchange = function() {
-            displayBooks();
+            currentPage = 0;
+            sortBooks();
+            showPage();
         };
 
-        // Start loading
+        // Start
         loadBooks();
     </script>
 </body>
