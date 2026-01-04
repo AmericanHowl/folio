@@ -8,6 +8,17 @@
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
 
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
@@ -73,7 +84,6 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(to bottom, #ffffff 0%, #faf0ca 100%);
             color: #1f2937;
             -webkit-overflow-scrolling: touch;
@@ -436,35 +446,35 @@
                                     <div class="flex-1 space-y-5 md:space-y-6">
                                         <!-- Title -->
                                         <div>
-                                            <h4 class="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Title</h4>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Title</h4>
                                             <h3 class="text-2xl md:text-3xl font-bold text-gray-900" x-text="selectedBook.title"></h3>
                                         </div>
 
                                         <!-- Author -->
                                         <div x-show="selectedBook.authors">
-                                            <h4 class="text-xs font-semibold text-secondary uppercase tracking-wider mb-2">Author</h4>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Author</h4>
                                             <p class="text-lg md:text-xl font-medium text-gray-900" x-text="Array.isArray(selectedBook.authors) ? selectedBook.authors.join(', ') : selectedBook.authors"></p>
                                         </div>
 
                                         <!-- Year, Pages, Publisher in a row -->
                                         <div class="grid grid-cols-3 gap-4 md:gap-6">
                                             <div x-show="selectedBook.pubdate">
-                                                <h4 class="text-xs font-semibold text-accent uppercase tracking-wider mb-1 md:mb-2">Year</h4>
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 md:mb-2">Year</h4>
                                                 <p class="text-base md:text-lg font-semibold text-gray-900" x-text="new Date(selectedBook.pubdate).getFullYear()"></p>
                                             </div>
                                             <div>
-                                                <h4 class="text-xs font-semibold text-accent uppercase tracking-wider mb-1 md:mb-2">Pages</h4>
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 md:mb-2">Pages</h4>
                                                 <p class="text-base md:text-lg font-semibold text-gray-900">—</p>
                                             </div>
                                             <div x-show="selectedBook.publisher">
-                                                <h4 class="text-xs font-semibold text-accent uppercase tracking-wider mb-1 md:mb-2">Publisher</h4>
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 md:mb-2">Publisher</h4>
                                                 <p class="text-base md:text-lg font-semibold text-gray-900 truncate" x-text="selectedBook.publisher" :title="selectedBook.publisher"></p>
                                             </div>
                                         </div>
 
                                         <!-- Genres -->
                                         <div x-show="selectedBook.tags && selectedBook.tags.length > 0">
-                                            <h4 class="text-xs font-semibold text-primary uppercase tracking-wider mb-2 md:mb-3">Genres</h4>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 md:mb-3">Genres</h4>
                                             <div class="flex flex-wrap gap-2">
                                                 <template x-for="tag in selectedBook.tags" :key="tag">
                                                     <span class="px-3 md:px-4 py-1.5 md:py-2 bg-accent text-dark rounded-lg text-xs md:text-sm font-medium" x-text="tag"></span>
@@ -474,7 +484,7 @@
 
                                         <!-- Description -->
                                         <div x-show="selectedBook.comments">
-                                            <h4 class="text-xs font-semibold text-dark uppercase tracking-wider mb-2 md:mb-3">Description</h4>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 md:mb-3">Description</h4>
                                             <div class="text-sm md:text-base text-gray-700 leading-relaxed prose prose-sm max-w-none" x-html="selectedBook.comments"></div>
                                         </div>
                                     </div>
@@ -485,7 +495,7 @@
                                     <div>
                                         <!-- Cover Upload Section with Overlay -->
                                         <div class="mb-6">
-                                            <label class="block text-sm font-semibold text-secondary mb-3">Book Cover</label>
+                                            <label class="block text-sm font-semibold text-gray-900 mb-3">Book Cover</label>
                                             <div class="w-48 mx-auto">
                                                 <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden relative cursor-pointer shadow-lg group"
                                                      @click="$refs.coverInput.click()"
@@ -524,7 +534,7 @@
                                         <div class="space-y-6">
                                             <!-- Title -->
                                             <div>
-                                                <label class="block text-sm font-semibold text-primary mb-2">Title</label>
+                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Title</label>
                                                 <input type="text"
                                                        x-model="editingBook.title"
                                                        class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -533,7 +543,7 @@
 
                                             <!-- Author -->
                                             <div>
-                                                <label class="block text-sm font-semibold text-secondary mb-2">Author</label>
+                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Author</label>
                                                 <input type="text"
                                                        x-model="editingBook.authors"
                                                        list="authors-list"
@@ -549,7 +559,7 @@
                                             <!-- Year and Publisher -->
                                             <div class="grid grid-cols-2 gap-4">
                                                 <div>
-                                                    <label class="block text-sm font-semibold text-accent mb-2">Year</label>
+                                                    <label class="block text-sm font-semibold text-gray-900 mb-2">Year</label>
                                                     <input type="number"
                                                            x-model="editingBook.pubdate"
                                                            placeholder="YYYY"
@@ -558,7 +568,7 @@
                                                            class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
                                                 </div>
                                                 <div>
-                                                    <label class="block text-sm font-semibold text-accent mb-2">Publisher</label>
+                                                    <label class="block text-sm font-semibold text-gray-900 mb-2">Publisher</label>
                                                     <input type="text"
                                                            x-model="editingBook.publisher"
                                                            list="publishers-list"
@@ -574,7 +584,7 @@
 
                                             <!-- Genres -->
                                             <div>
-                                                <label class="block text-sm font-semibold text-primary mb-2">Genres</label>
+                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Genres</label>
                                                 <input type="text"
                                                        x-model="editingBook.tags"
                                                        list="genres-list"
@@ -589,7 +599,7 @@
 
                                             <!-- Description -->
                                             <div>
-                                                <label class="block text-sm font-semibold text-dark mb-2">Description</label>
+                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Description</label>
                                                 <textarea x-model="editingBook.comments"
                                                           rows="5"
                                                           placeholder="Book description..."
@@ -622,7 +632,7 @@
                         <h3 class="text-2xl font-bold mb-6 text-dark">Settings</h3>
                         <div class="space-y-6">
                             <div>
-                                <label class="block text-sm font-semibold text-primary mb-2">
+                                <label class="block text-sm font-semibold text-gray-900 mb-2">
                                     Calibre Library Path
                                 </label>
                                 <div class="flex gap-2">
@@ -641,7 +651,7 @@
                                 </p>
                             </div>
                             <div>
-                                <label class="block text-sm font-semibold text-secondary mb-2">
+                                <label class="block text-sm font-semibold text-gray-900 mb-2">
                                     calibredb Command Path
                                 </label>
                                 <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
