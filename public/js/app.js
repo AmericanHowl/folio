@@ -462,5 +462,71 @@ function folioApp() {
                 reader.readAsDataURL(file);
             }
         },
+
+        /**
+         * Handle cover art drag & drop
+         */
+        handleCoverDrop(event) {
+            const file = event.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.editingBook.coverData = e.target.result;
+                    console.log('📷 Cover art dropped');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                alert('Please drop an image file');
+            }
+        },
+
+        /**
+         * Search for metadata (placeholder - not implemented yet)
+         */
+        searchMetadata() {
+            console.log('🔍 Search metadata clicked (not yet implemented)');
+            alert('Metadata search will be implemented in a future version. This will allow you to automatically fetch book information from online sources like Hardcover, Google Books, or Open Library.');
+        },
+
+        /**
+         * Get unique authors from all books for autocomplete
+         */
+        getAuthors() {
+            const authorsSet = new Set();
+            this.books.forEach(book => {
+                if (Array.isArray(book.authors)) {
+                    book.authors.forEach(author => authorsSet.add(author));
+                } else if (book.authors) {
+                    authorsSet.add(book.authors);
+                }
+            });
+            return Array.from(authorsSet).sort();
+        },
+
+        /**
+         * Get unique publishers from all books for autocomplete
+         */
+        getPublishers() {
+            const publishersSet = new Set();
+            this.books.forEach(book => {
+                if (book.publisher) {
+                    publishersSet.add(book.publisher);
+                }
+            });
+            return Array.from(publishersSet).sort();
+        },
+
+        /**
+         * Get unique genres/tags from all books for autocomplete
+         */
+        getGenres() {
+            const genresSet = new Set();
+            this.books.forEach(book => {
+                if (Array.isArray(book.tags)) {
+                    book.tags.forEach(tag => genresSet.add(tag));
+                }
+            });
+            return Array.from(genresSet).sort();
+        },
     };
 }
