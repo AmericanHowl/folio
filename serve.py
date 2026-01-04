@@ -392,7 +392,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         tmp_path = tmp_file.name
 
                     # Update cover using calibredb
-                    result = run_calibredb(['set_metadata', book_id, '--cover', tmp_path])
+                    result = run_calibredb(['set_cover', book_id, tmp_path])
 
                     # Clean up temp file
                     os.unlink(tmp_path)

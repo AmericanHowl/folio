@@ -268,8 +268,8 @@
 
                                 <!-- Cover and Details -->
                                 <div class="flex gap-6 mb-6">
-                                    <!-- Cover (fixed width like grid) -->
-                                    <div class="flex-shrink-0" style="width: 140px;">
+                                    <!-- Cover -->
+                                    <div class="flex-shrink-0" style="width: 200px;">
                                         <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border border-gray-200 flex items-center justify-center relative overflow-hidden">
                                             <img :src="`/api/cover/${selectedBook.id}`"
                                                  class="w-full h-full object-cover"
@@ -515,8 +515,8 @@
 
                                 <!-- Cover and Details -->
                                 <div class="flex gap-6 mb-6">
-                                    <!-- Cover (fixed width like grid) with drag & drop -->
-                                    <div class="flex-shrink-0" style="width: 140px;">
+                                    <!-- Cover with drag & drop -->
+                                    <div class="flex-shrink-0" style="width: 200px;">
                                         <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#D66853] flex items-center justify-center relative overflow-hidden cursor-pointer transition-colors"
                                              @click="$refs.coverInput.click()"
                                              @drop.prevent="handleCoverDrop($event); $el.classList.remove('border-[#D66853]')"
