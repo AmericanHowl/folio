@@ -384,23 +384,38 @@
                 <div class="flex-1 overflow-y-auto">
                     <template x-if="selectedBook">
                         <div class="p-6">
-                                <!-- Header with close and edit buttons -->
+                                <!-- Header with close and edit/cancel buttons -->
                                 <div class="flex items-center justify-between mb-6">
-                                    <h3 class="text-2xl font-bold text-gray-900">Book Details</h3>
+                                    <h3 class="text-2xl font-bold text-gray-900" x-text="isEditingMetadata ? 'Edit Metadata' : 'Book Details'"></h3>
                                     <div class="flex items-center gap-2">
-                                        <button @click="openEditMetadata(selectedBook)"
+                                        <!-- Edit button (shown in view mode) -->
+                                        <button x-show="!isEditingMetadata"
+                                                @click="openEditMetadata(selectedBook)"
                                                 class="w-10 h-10 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary-dark active:bg-primary-dark transition-colors">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <button @click="selectedBook = null"
+                                        <!-- Cancel button (shown in edit mode) -->
+                                        <button x-show="isEditingMetadata"
+                                                @click="cancelEditMetadata()"
+                                                class="px-4 h-10 flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300 transition-colors text-sm font-semibold">
+                                            Cancel
+                                        </button>
+                                        <!-- Save button (shown in edit mode) -->
+                                        <button x-show="isEditingMetadata"
+                                                @click="saveMetadata()"
+                                                class="px-4 h-10 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary-dark active:bg-primary-dark transition-colors text-sm font-semibold">
+                                            Save
+                                        </button>
+                                        <!-- Close button (always shown) -->
+                                        <button @click="selectedBook = null; isEditingMetadata = false; editingBook = null"
                                                 class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300 transition-colors">
                                             <i class="bi bi-x-lg"></i>
                                         </button>
                                     </div>
                                 </div>
 
-                                <!-- Cover and Details - Stacked on mobile, side-by-side on desktop -->
-                                <div class="flex flex-col md:flex-row gap-6 md:gap-8">
+                                <!-- VIEW MODE: Cover and Details - Stacked on mobile, side-by-side on desktop -->
+                                <div x-show="!isEditingMetadata" class="flex flex-col md:flex-row gap-6 md:gap-8">
                                     <!-- Cover -->
                                     <div class="flex-shrink-0 mx-auto md:mx-0 w-48 md:w-56">
                                         <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden shadow-2xl">
@@ -463,6 +478,132 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- EDIT MODE: Editable form -->
+                                <template x-if="isEditingMetadata && editingBook">
+                                    <div>
+                                        <!-- Cover Upload Section with Overlay -->
+                                        <div class="mb-6">
+                                            <label class="block text-sm font-semibold text-gray-900 mb-3">Book Cover</label>
+                                            <div class="w-48 mx-auto">
+                                                <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden relative cursor-pointer shadow-lg group"
+                                                     @click="$refs.coverInput.click()"
+                                                     @drop.prevent="handleCoverDrop($event)"
+                                                     @dragover.prevent
+                                                     @dragleave.prevent>
+                                                    <!-- Cover Image -->
+                                                    <img x-show="editingBook.coverData || editingBook.id"
+                                                         :src="editingBook.coverData || `/api/cover/${editingBook.id}`"
+                                                         class="w-full h-full object-cover"
+                                                         @error="$el.style.display='none'">
+
+                                                    <!-- Overlay on hover/tap -->
+                                                    <div class="absolute inset-0 bg-black bg-opacity-60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-white p-4">
+                                                        <i class="bi bi-cloud-upload text-3xl mb-2"></i>
+                                                        <p class="text-xs text-center font-medium">Change cover<br>or drag & drop</p>
+                                                    </div>
+
+                                                    <!-- Fallback for no cover -->
+                                                    <div x-show="!editingBook.coverData && !editingBook.id" class="absolute inset-0 flex flex-col items-center justify-center text-white p-4">
+                                                        <i class="bi bi-cloud-upload text-3xl mb-2"></i>
+                                                        <p class="text-xs text-center">Tap or drop<br>image here</p>
+                                                    </div>
+
+                                                    <input type="file"
+                                                           x-ref="coverInput"
+                                                           accept="image/*"
+                                                           @change="handleCoverUpload($event)"
+                                                           class="hidden">
+                                                </div>
+                                                <p class="text-xs text-gray-500 text-center mt-2">Click or drag & drop to upload</p>
+                                            </div>
+                                        </div>
+
+                                        <!-- Form Fields -->
+                                        <div class="space-y-6">
+                                            <!-- Title -->
+                                            <div>
+                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Title</label>
+                                                <input type="text"
+                                                       x-model="editingBook.title"
+                                                       class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent"
+                                                       placeholder="Book Title">
+                                            </div>
+
+                                            <!-- Author -->
+                                            <div>
+                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Author</label>
+                                                <input type="text"
+                                                       x-model="editingBook.authors"
+                                                       list="authors-list"
+                                                       placeholder="Author name"
+                                                       class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
+                                                <datalist id="authors-list">
+                                                    <template x-for="author in getAuthors()" :key="author">
+                                                        <option :value="author"></option>
+                                                    </template>
+                                                </datalist>
+                                            </div>
+
+                                            <!-- Year and Publisher -->
+                                            <div class="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label class="block text-sm font-semibold text-gray-900 mb-2">Year</label>
+                                                    <input type="number"
+                                                           x-model="editingBook.pubdate"
+                                                           placeholder="YYYY"
+                                                           min="1000"
+                                                           max="9999"
+                                                           class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-semibold text-gray-900 mb-2">Publisher</label>
+                                                    <input type="text"
+                                                           x-model="editingBook.publisher"
+                                                           list="publishers-list"
+                                                           placeholder="Publisher"
+                                                           class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
+                                                    <datalist id="publishers-list">
+                                                        <template x-for="publisher in getPublishers()" :key="publisher">
+                                                            <option :value="publisher"></option>
+                                                        </template>
+                                                    </datalist>
+                                                </div>
+                                            </div>
+
+                                            <!-- Genres -->
+                                            <div>
+                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Genres</label>
+                                                <input type="text"
+                                                       x-model="editingBook.tags"
+                                                       list="genres-list"
+                                                       placeholder="Comma-separated genres"
+                                                       class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
+                                                <datalist id="genres-list">
+                                                    <template x-for="genre in getGenres()" :key="genre">
+                                                        <option :value="genre"></option>
+                                                    </template>
+                                                </datalist>
+                                            </div>
+
+                                            <!-- Description -->
+                                            <div>
+                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Description</label>
+                                                <textarea x-model="editingBook.comments"
+                                                          rows="5"
+                                                          placeholder="Book description..."
+                                                          class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent resize-none"></textarea>
+                                            </div>
+
+                                            <!-- Search Metadata Button -->
+                                            <button @click="searchMetadata()"
+                                                    class="w-full px-4 py-3 text-sm font-medium text-primary bg-cream border border-secondary rounded-xl hover:bg-cream active:bg-cream inline-flex items-center justify-center gap-2">
+                                                <i class="bi bi-search"></i>
+                                                Search for Metadata
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                         </template>
                     </div>
@@ -635,146 +776,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Edit Metadata Modal -->
-        <div x-show="showEditMetadata" x-cloak>
-            <div class="modal-backdrop" @click="showEditMetadata = false"></div>
-            <div class="modal-sheet">
-                <div class="modal-content" @click.stop>
-                    <div class="flex-1 overflow-y-auto">
-                        <template x-if="editingBook">
-                            <div class="p-6">
-                                <h3 class="text-2xl font-bold mb-6 text-gray-900">Edit Metadata</h3>
-
-                                <!-- Cover Upload Section -->
-                                <div class="mb-6">
-                                    <label class="block text-sm font-semibold text-gray-900 mb-3">Book Cover</label>
-                                    <div class="w-48 mx-auto">
-                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 border-dashed border-secondary active:border-primary flex items-center justify-center relative overflow-hidden cursor-pointer transition-colors shadow-lg"
-                                             @click="$refs.coverInput.click()"
-                                             @drop.prevent="handleCoverDrop($event); $el.classList.remove('border-primary')"
-                                             @dragover.prevent="$el.classList.add('border-primary')"
-                                             @dragleave.prevent="$el.classList.remove('border-primary')">
-                                            <img x-show="editingBook.coverData || editingBook.id"
-                                                 :src="editingBook.coverData || `/api/cover/${editingBook.id}`"
-                                                 class="w-full h-full object-cover"
-                                                 @error="$el.style.display='none'">
-                                            <div x-show="!editingBook.coverData && !editingBook.id" class="text-center p-4">
-                                                <i class="bi bi-cloud-upload text-4xl text-gray-400 mb-2 block"></i>
-                                                <p class="text-xs text-gray-300">Tap or drop<br>image here</p>
-                                            </div>
-                                            <input type="file"
-                                                   x-ref="coverInput"
-                                                   accept="image/*"
-                                                   @change="handleCoverUpload($event)"
-                                                   class="hidden">
-                                        </div>
-                                        <p class="text-xs text-gray-500 text-center mt-2">Click or drag & drop to upload</p>
-                                    </div>
-
-                                <!-- Form Fields -->
-                                <div class="space-y-6">
-                                    <!-- Title -->
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-900 mb-2">Title</label>
-                                        <input type="text"
-                                               x-model="editingBook.title"
-                                               class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent"
-                                               placeholder="Book Title">
-                                    </div>
-
-                                    <!-- Author -->
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-900 mb-2">Author</label>
-                                        <input type="text"
-                                               x-model="editingBook.authors"
-                                               list="authors-list"
-                                               placeholder="Author name"
-                                               class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                        <datalist id="authors-list">
-                                            <template x-for="author in getAuthors()" :key="author">
-                                                <option :value="author"></option>
-                                            </template>
-                                        </datalist>
-                                    </div>
-
-                                    <!-- Year and Publisher -->
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-900 mb-2">Year</label>
-                                            <input type="number"
-                                                   x-model="editingBook.pubdate"
-                                                   placeholder="YYYY"
-                                                   min="1000"
-                                                   max="9999"
-                                                   class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-900 mb-2">Publisher</label>
-                                            <input type="text"
-                                                   x-model="editingBook.publisher"
-                                                   list="publishers-list"
-                                                   placeholder="Publisher"
-                                                   class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                            <datalist id="publishers-list">
-                                                <template x-for="publisher in getPublishers()" :key="publisher">
-                                                    <option :value="publisher"></option>
-                                                </template>
-                                            </datalist>
-                                        </div>
-                                    </div>
-
-                                    <!-- Genres -->
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-900 mb-2">Genres</label>
-                                        <input type="text"
-                                               x-model="editingBook.tags"
-                                               list="genres-list"
-                                               placeholder="Comma-separated genres"
-                                               class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                        <datalist id="genres-list">
-                                            <template x-for="genre in getGenres()" :key="genre">
-                                                <option :value="genre"></option>
-                                            </template>
-                                        </datalist>
-                                    </div>
-
-                                    <!-- Description -->
-                                    <div>
-                                        <label class="block text-sm font-semibold text-gray-900 mb-2">Description</label>
-                                        <textarea x-model="editingBook.comments"
-                                                  rows="5"
-                                                  placeholder="Book description..."
-                                                  class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent resize-none"></textarea>
-                                    </div>
-                                </div>
-
-                                <!-- Action Buttons -->
-                                <div class="mt-8 space-y-3">
-                                    <div class="flex gap-3">
-                                        <button @click="showEditMetadata = false"
-                                                class="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 active:bg-gray-300">
-                                            Cancel
-                                        </button>
-                                        <button @click="saveMetadata()"
-                                                class="flex-1 px-6 py-3 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary-dark active:bg-primary-dark shadow-lg">
-                                            Save
-                                        </button>
-                                    </div>
-                                    <button @click="searchMetadata()"
-                                            class="w-full px-4 py-3 text-sm font-medium text-primary bg-cream border border-secondary rounded-xl hover:bg-cream active:bg-cream inline-flex items-center justify-center gap-2">
-                                        <i class="bi bi-search"></i>
-                                        Search for Metadata
-                                    </button>
-                                </div>
-                            </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script src="js/app.js"></script>
 </body>
