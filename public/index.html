@@ -555,9 +555,11 @@
                                         </div>
                                         <div>
                                             <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Year</h4>
-                                            <input type="text"
+                                            <input type="number"
                                                    x-model="editingBook.pubdate"
-                                                   placeholder="Publication year"
+                                                   placeholder="YYYY"
+                                                   min="1000"
+                                                   max="9999"
                                                    class="w-full text-base text-gray-900 bg-white border border-gray-200 rounded px-2 py-1 focus:ring-[#D66853] focus:border-[#D66853]">
                                         </div>
                                         <div>

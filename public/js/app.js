@@ -388,7 +388,8 @@ function folioApp() {
             this.editingBook = {
                 ...book,
                 authors: Array.isArray(book.authors) ? book.authors.join(', ') : (book.authors || ''),
-                tags: Array.isArray(book.tags) ? book.tags.join(', ') : (book.tags || '')
+                tags: Array.isArray(book.tags) ? book.tags.join(', ') : (book.tags || ''),
+                pubdate: book.pubdate ? new Date(book.pubdate).getFullYear().toString() : ''
             };
             this.showEditMetadata = true;
             this.selectedBook = null; // Close book detail modal
