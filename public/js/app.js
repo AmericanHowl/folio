@@ -15,9 +15,9 @@ function folioApp() {
         loading: false,
         loadingMore: false,
         showSettings: false,
-        showEditMetadata: false,
         showBrowser: false,
         showInitialSetup: false,
+        isEditingMetadata: false,
         editingBook: null,
 
         // Pagination
@@ -381,7 +381,7 @@ function folioApp() {
         },
 
         /**
-         * Open edit metadata modal
+         * Enter edit mode for metadata
          */
         openEditMetadata(book) {
             // Copy book data and convert arrays to comma-separated strings for editing
@@ -391,8 +391,16 @@ function folioApp() {
                 tags: Array.isArray(book.tags) ? book.tags.join(', ') : (book.tags || ''),
                 pubdate: book.pubdate ? new Date(book.pubdate).getFullYear().toString() : ''
             };
-            this.showEditMetadata = true;
-            this.selectedBook = null; // Close book detail modal
+            this.isEditingMetadata = true;
+            // Keep selectedBook open - the same modal transforms to edit mode
+        },
+
+        /**
+         * Cancel editing and return to view mode
+         */
+        cancelEditMetadata() {
+            this.isEditingMetadata = false;
+            this.editingBook = null;
         },
 
         /**
@@ -441,7 +449,14 @@ function folioApp() {
                 // Reload books to reflect changes
                 await this.loadBooks();
 
-                this.showEditMetadata = false;
+                // Update the selectedBook with new data
+                const updatedBook = this.books.find(b => b.id === this.editingBook.id);
+                if (updatedBook) {
+                    this.selectedBook = updatedBook;
+                }
+
+                // Return to view mode
+                this.isEditingMetadata = false;
                 this.editingBook = null;
 
                 // Show success message
