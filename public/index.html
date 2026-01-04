@@ -125,31 +125,6 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
-        /* Floating Action Button */
-        .fab {
-            position: fixed;
-            bottom: 24px;
-            right: 16px;
-            width: 56px;
-            height: 56px;
-            border-radius: 16px;
-            background: #6366f1;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3), 0 4px 8px rgba(0, 0, 0, 0.1);
-            font-size: 24px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            z-index: 50;
-        }
-
-        .fab:active {
-            transform: scale(0.95);
-            box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
-        }
-
         /* Native modal animations */
         .modal-backdrop {
             position: fixed;
@@ -194,14 +169,6 @@
                 max-height: 85vh;
                 border-radius: 20px;
             }
-        }
-
-        .modal-handle {
-            width: 36px;
-            height: 4px;
-            background: #d1d5db;
-            border-radius: 2px;
-            margin: 12px auto 8px;
         }
 
         @keyframes fadeIn {
@@ -252,6 +219,11 @@
                    class="inline-flex items-center gap-1 sm:gap-2 text-xs sm:text-sm cursor-pointer hover:text-indigo-600 transition-colors">
                     <i class="bi bi-compass text-lg sm:text-base"></i>
                     <span class="hidden sm:inline">Explore</span>
+                </a>
+                <a @click="showSettings = true"
+                   class="text-gray-600 inline-flex items-center gap-1 sm:gap-2 text-xs sm:text-sm cursor-pointer hover:text-indigo-600 transition-colors">
+                    <i class="bi bi-gear text-lg sm:text-base"></i>
+                    <span class="hidden sm:inline">Settings</span>
                 </a>
             </div>
         </div>
@@ -366,11 +338,6 @@
                 <p class="text-sm text-gray-500">This feature is under development</p>
             </div>
         </main>
-
-        <!-- Floating Action Button (Settings) -->
-        <div class="fab" @click="showSettings = true">
-            <i class="bi bi-gear-fill"></i>
-        </div>
     </div>
 
     <!-- Book Modal -->
@@ -378,20 +345,26 @@
         <div class="modal-backdrop" @click="selectedBook = null"></div>
         <div class="modal-sheet">
             <div class="modal-content" @click.stop>
-                <div class="modal-handle"></div>
                 <div class="flex-1 overflow-y-auto">
                     <template x-if="selectedBook">
                         <div class="p-6">
-                                <!-- Edit button in top right -->
-                                <div class="absolute top-6 right-6 z-10">
-                                    <button @click="openEditMetadata(selectedBook)"
-                                            class="w-10 h-10 flex items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg active:scale-95 transition-transform">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
+                                <!-- Header with close and edit buttons -->
+                                <div class="flex items-center justify-between mb-6">
+                                    <h3 class="text-2xl font-bold text-gray-900">Book Details</h3>
+                                    <div class="flex items-center gap-2">
+                                        <button @click="openEditMetadata(selectedBook)"
+                                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 transition-colors">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button @click="selectedBook = null"
+                                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300 transition-colors">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <!-- Cover and Details - Stacked on mobile, side-by-side on desktop -->
-                                <div class="flex flex-col md:flex-row gap-6 md:gap-8 mt-4">
+                                <div class="flex flex-col md:flex-row gap-6 md:gap-8">
                                     <!-- Cover -->
                                     <div class="flex-shrink-0 mx-auto md:mx-0 w-48 md:w-56">
                                         <div class="aspect-[2/3] bg-gradient-to-br from-indigo-900 to-purple-900 rounded-2xl overflow-hidden shadow-2xl">
@@ -466,7 +439,6 @@
         <div class="modal-backdrop" @click="showSettings = false"></div>
         <div class="modal-sheet">
             <div class="modal-content" @click.stop>
-                <div class="modal-handle"></div>
                 <div class="flex-1 overflow-y-auto">
                     <div class="p-6">
                         <h3 class="text-2xl font-bold mb-6 text-gray-900">Settings</h3>
@@ -523,7 +495,6 @@
         <div class="modal-backdrop" @click="showBrowser = false"></div>
         <div class="modal-sheet">
             <div class="modal-content" @click.stop>
-                <div class="modal-handle"></div>
                 <div class="flex-1 overflow-y-auto">
                     <div class="p-6">
                         <h3 class="text-2xl font-bold mb-6 text-gray-900">Select Calibre Library</h3>
@@ -634,7 +605,6 @@
             <div class="modal-backdrop" @click="showEditMetadata = false"></div>
             <div class="modal-sheet">
                 <div class="modal-content" @click.stop>
-                    <div class="modal-handle"></div>
                     <div class="flex-1 overflow-y-auto">
                         <template x-if="editingBook">
                             <div class="p-6">
