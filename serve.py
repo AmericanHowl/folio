@@ -239,6 +239,27 @@ def list_directories(path):
 
 
 class FolioHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory="public", **kwargs)
+
+    def guess_type(self, path):
+        """Override to provide correct MIME types for PWA files"""
+        if path.endswith('.manifest') or path.endswith('manifest.json'):
+            return 'application/manifest+json'
+        if path.endswith('.webmanifest'):
+            return 'application/manifest+json'
+        if path.endswith('service-worker.js') or path.endswith('.js'):
+            return 'application/javascript'
+        if path.endswith('.json'):
+            return 'application/json'
+        if path.endswith('.png'):
+            return 'image/png'
+        if path.endswith('.ico'):
+            return 'image/x-icon'
+        if path.endswith('.svg'):
+            return 'image/svg+xml'
+        return super().guess_type(path)
+
     def do_GET(self):
         # Parse URL
         parsed_url = urlparse(self.path)
@@ -297,8 +318,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(404, "Cover not found")
             return
 
-        # Serve static files from public/
-        self.directory = "public"
+        # Serve static files from public/ (directory set in __init__)
         super().do_GET()
 
     def do_POST(self):

@@ -2,8 +2,22 @@
 <html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>folio - Your Personal Library</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="A modern interface for browsing and managing your Calibre library">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Folio">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -22,13 +36,36 @@
     <style>
         [x-cloak] { display: none !important; }
 
+        /* PWA Safe Area Support */
+        :root {
+            --safe-area-inset-top: env(safe-area-inset-top);
+            --safe-area-inset-right: env(safe-area-inset-right);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom);
+            --safe-area-inset-left: env(safe-area-inset-left);
+        }
+
+        html {
+            /* Prevent pull-to-refresh on mobile */
+            overscroll-behavior-y: contain;
+        }
+
         body {
             background-color: #ffffff;
             color: #1f2937;
+            /* Prevent iOS bounce scrolling */
+            -webkit-overflow-scrolling: touch;
+            /* Safe area padding for notched devices */
+            padding-top: var(--safe-area-inset-top);
+            padding-bottom: var(--safe-area-inset-bottom);
         }
 
         .font-calsans {
             font-family: 'Cal Sans', sans-serif;
+        }
+
+        /* App-like transitions */
+        * {
+            -webkit-tap-highlight-color: transparent;
         }
 
         /* Book grid - fixed width covers */
@@ -53,6 +90,17 @@
 
         .book-card:hover {
             transform: scale(1.02);
+        }
+
+        .book-card:active {
+            transform: scale(0.98);
+        }
+
+        /* iOS-style modal */
+        @supports (-webkit-touch-callout: none) {
+            .modal-safe-area {
+                padding-bottom: calc(1.5rem + var(--safe-area-inset-bottom));
+            }
         }
     </style>
 </head>
@@ -655,5 +703,34 @@
     </div>
 
     <script src="js/app.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered successfully:', registration.scope);
+
+                        // Check for updates periodically
+                        setInterval(() => {
+                            registration.update();
+                        }, 60000); // Check every minute
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+
+            // Handle service worker updates
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                }
+            });
+        }
+    </script>
 </body>
 </html>
