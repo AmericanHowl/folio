@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>My Books - Folio</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <style>
+        [x-cloak] { display: none !important; }
+
+        /* E-ink optimized styles */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #e8e8e8;
+            color: #2a2a2a;
+        }
+
+        /* Book grid - 4 columns like Kobo */
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+            padding: 0.75rem;
+        }
+
+        @media (max-width: 640px) {
+            .book-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 1rem;
+            }
+        }
+
+        .book-card {
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .book-card:active {
+            opacity: 0.7;
+        }
+
+        .book-cover {
+            aspect-ratio: 2/3;
+            background: #d0d0d0;
+            border: 1px solid #999;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .book-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .book-info {
+            font-size: 0.75rem;
+            line-height: 1.2;
+            color: #444;
+        }
+
+        /* Truncate text */
+        .truncate-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Navigation */
+        .nav-tabs {
+            display: flex;
+            gap: 1.5rem;
+            border-bottom: 1px solid #999;
+            padding: 0 1rem;
+        }
+
+        .nav-tab {
+            padding: 0.75rem 0.25rem;
+            border-bottom: 2px solid transparent;
+            color: #666;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+
+        .nav-tab.active {
+            border-bottom-color: #2a2a2a;
+            color: #2a2a2a;
+            font-weight: 500;
+        }
+
+        /* Bottom navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #f5f5f5;
+            border-top: 1px solid #999;
+            display: flex;
+            justify-content: space-around;
+            padding: 0.75rem 0;
+        }
+
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.7rem;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .bottom-nav-item.active {
+            color: #2a2a2a;
+        }
+
+        .bottom-nav-item i {
+            font-size: 1.25rem;
+        }
+
+        /* Filters */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #ccc;
+            background: #f5f5f5;
+        }
+
+        select {
+            background: #fff;
+            border: 1px solid #999;
+            border-radius: 4px;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+            color: #2a2a2a;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 50;
+        }
+
+        .modal-content {
+            position: fixed;
+            inset: 0;
+            z-index: 51;
+            overflow-y: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .modal-box {
+            background: #fff;
+            border: 2px solid #2a2a2a;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 100%;
+            padding: 1.5rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: 1px solid #2a2a2a;
+            border-radius: 4px;
+            background: #fff;
+            color: #2a2a2a;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .btn:active {
+            background: #e8e8e8;
+        }
+
+        .btn-primary {
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        .btn-primary:active {
+            background: #444;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            border: 2px solid #ccc;
+            border-top: 2px solid #2a2a2a;
+            border-radius: 50%;
+            width: 2rem;
+            height: 2rem;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="h-full" x-data="einkApp()" x-init="init()">
+    <div class="min-h-full pb-16">
+        <!-- Header -->
+        <div class="bg-white border-b border-gray-400">
+            <div class="flex items-center justify-between px-4 py-3">
+                <div class="text-sm text-gray-600" x-text="currentTime"></div>
+                <div class="flex items-center gap-3">
+                    <i class="bi bi-wifi text-lg"></i>
+                    <i class="bi bi-battery-full text-lg"></i>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="nav-tabs">
+                <div class="nav-tab active">Books</div>
+                <div class="nav-tab">Authors</div>
+                <div class="nav-tab">Series</div>
+                <div class="nav-tab">Collections</div>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="flex items-center gap-2 flex-1">
+                <span class="text-xs text-gray-600">Filter:</span>
+                <select x-model="filterBy" class="flex-1 max-w-32">
+                    <option value="all">All</option>
+                    <option value="reading">Reading</option>
+                    <option value="unread">Unread</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2 flex-1">
+                <span class="text-xs text-gray-600">Sort:</span>
+                <select x-model="sortBy" @change="updateDisplayedBooks()" class="flex-1 max-w-32">
+                    <option value="recent">Recent</option>
+                    <option value="title">Title</option>
+                    <option value="author">Author</option>
+                </select>
+            </div>
+            <button @click="showSettings = true" class="p-1">
+                <i class="bi bi-three-dots-vertical text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="loading" class="flex justify-center items-center py-12">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Book Grid -->
+        <div x-show="!loading" x-cloak class="book-grid">
+            <template x-for="book in displayedBooks" :key="book.id">
+                <div class="book-card" @click="openBookModal(book)">
+                    <div class="book-cover">
+                        <img :src="`/api/cover/${book.id}`"
+                             :alt="book.title"
+                             loading="lazy"
+                             @error="$el.style.display='none'">
+                    </div>
+                    <div class="book-info">
+                        <div class="truncate-2 font-medium mb-0.5" x-text="book.title"></div>
+                        <div class="truncate-2 text-gray-600" x-text="getAuthorText(book)"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- No Books -->
+        <div x-show="!loading && books.length === 0" x-cloak class="text-center py-12 px-4">
+            <i class="bi bi-book text-4xl text-gray-400 mb-2"></i>
+            <p class="text-gray-600">No books found</p>
+            <p class="text-xs text-gray-500 mt-1">Configure your library in Settings</p>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <div class="bottom-nav-item">
+                <i class="bi bi-house"></i>
+                <span>Home</span>
+            </div>
+            <div class="bottom-nav-item active">
+                <i class="bi bi-book-fill"></i>
+                <span>My Books</span>
+            </div>
+            <div class="bottom-nav-item">
+                <i class="bi bi-journal"></i>
+                <span>My Notebooks</span>
+            </div>
+            <div class="bottom-nav-item">
+                <i class="bi bi-compass"></i>
+                <span>Discover</span>
+            </div>
+            <div class="bottom-nav-item" @click="showSettings = true">
+                <i class="bi bi-three-dots"></i>
+                <span>More</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Book Detail Modal -->
+    <div x-show="selectedBook" x-cloak>
+        <div class="modal-overlay" @click="selectedBook = null"></div>
+        <div class="modal-content">
+            <div class="modal-box" @click.stop>
+                <template x-if="selectedBook">
+                    <div>
+                        <!-- Close button -->
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-lg font-bold text-gray-900" x-text="selectedBook.title"></h3>
+                            <button @click="selectedBook = null" class="p-1">
+                                <i class="bi bi-x-lg text-xl"></i>
+                            </button>
+                        </div>
+
+                        <!-- Cover and Info -->
+                        <div class="flex gap-4 mb-4">
+                            <div style="width: 120px; flex-shrink: 0;">
+                                <div class="book-cover">
+                                    <img :src="`/api/cover/${selectedBook.id}`"
+                                         :alt="selectedBook.title"
+                                         @error="$el.style.display='none'">
+                                </div>
+                            </div>
+                            <div class="flex-1 text-sm space-y-2">
+                                <div>
+                                    <div class="text-xs text-gray-500 uppercase">Author</div>
+                                    <div class="font-medium" x-text="getAuthorText(selectedBook)"></div>
+                                </div>
+                                <div x-show="selectedBook.pubdate">
+                                    <div class="text-xs text-gray-500 uppercase">Year</div>
+                                    <div x-text="new Date(selectedBook.pubdate).getFullYear()"></div>
+                                </div>
+                                <div x-show="selectedBook.formats && selectedBook.formats.length > 0">
+                                    <div class="text-xs text-gray-500 uppercase">Formats</div>
+                                    <div x-text="selectedBook.formats.join(', ')"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tags -->
+                        <div x-show="selectedBook.tags && selectedBook.tags.length > 0" class="mb-4">
+                            <div class="text-xs text-gray-500 uppercase mb-1">Genres</div>
+                            <div class="flex flex-wrap gap-1">
+                                <template x-for="tag in selectedBook.tags" :key="tag">
+                                    <span class="text-xs px-2 py-1 bg-gray-200 rounded" x-text="tag"></span>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div x-show="selectedBook.comments" class="mb-4">
+                            <div class="text-xs text-gray-500 uppercase mb-1">Description</div>
+                            <div class="text-sm text-gray-700 leading-relaxed"
+                                 x-html="selectedBook.comments"
+                                 style="max-height: 200px; overflow-y: auto;"></div>
+                        </div>
+
+                        <!-- Download Button -->
+                        <div class="flex gap-2 mt-4">
+                            <button @click="downloadBook(selectedBook)" class="btn btn-primary flex-1">
+                                <i class="bi bi-download mr-2"></i>
+                                Download to Kobo
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div x-show="showSettings" x-cloak>
+        <div class="modal-overlay" @click="showSettings = false"></div>
+        <div class="modal-content">
+            <div class="modal-box" @click.stop>
+                <h3 class="text-lg font-bold mb-4">Settings</h3>
+
+                <div class="space-y-3 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Calibre Library</label>
+                        <input type="text"
+                               x-model="calibreLibraryPath"
+                               class="w-full px-3 py-2 border border-gray-400 rounded text-sm"
+                               placeholder="~/Calibre Library">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Books per page</label>
+                        <select x-model="booksPerPage" class="w-full">
+                            <option value="20">20</option>
+                            <option value="40">40</option>
+                            <option value="60">60</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button @click="showSettings = false" class="btn flex-1">Cancel</button>
+                    <button @click="saveSettings()" class="btn btn-primary flex-1">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function einkApp() {
+            return {
+                // State
+                books: [],
+                displayedBooks: [],
+                selectedBook: null,
+                loading: false,
+                showSettings: false,
+                currentTime: '',
+
+                // Filters
+                filterBy: 'all',
+                sortBy: 'recent',
+                booksPerPage: 40,
+
+                // Config
+                calibreLibraryPath: '',
+
+                /**
+                 * Initialize
+                 */
+                async init() {
+                    console.log('📚 E-ink interface loading...');
+                    this.updateClock();
+                    setInterval(() => this.updateClock(), 60000); // Update every minute
+
+                    await this.loadConfig();
+                    await this.loadBooks();
+                },
+
+                /**
+                 * Update clock
+                 */
+                updateClock() {
+                    const now = new Date();
+                    this.currentTime = now.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                },
+
+                /**
+                 * Load books from API
+                 */
+                async loadBooks() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch(`/api/books?limit=${this.booksPerPage}&offset=0`);
+                        this.books = await response.json();
+                        this.updateDisplayedBooks();
+                        console.log(`📖 Loaded ${this.books.length} books`);
+                    } catch (error) {
+                        console.error('Failed to load books:', error);
+                        this.books = [];
+                        this.displayedBooks = [];
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                /**
+                 * Update displayed books based on filters and sort
+                 */
+                updateDisplayedBooks() {
+                    let filtered = [...this.books];
+
+                    // Apply filter
+                    if (this.filterBy !== 'all') {
+                        // For now, show all books since we don't track read status
+                        // This can be extended in the future
+                    }
+
+                    // Apply sort
+                    switch (this.sortBy) {
+                        case 'title':
+                            filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                            break;
+                        case 'author':
+                            filtered.sort((a, b) => {
+                                const authorA = this.getAuthorText(a);
+                                const authorB = this.getAuthorText(b);
+                                return authorA.localeCompare(authorB);
+                            });
+                            break;
+                        case 'recent':
+                        default:
+                            filtered.sort((a, b) => {
+                                const dateA = a.pubdate ? new Date(a.pubdate) : new Date(0);
+                                const dateB = b.pubdate ? new Date(b.pubdate) : new Date(0);
+                                return dateB - dateA;
+                            });
+                            break;
+                    }
+
+                    this.displayedBooks = filtered;
+                },
+
+                /**
+                 * Get author text for display
+                 */
+                getAuthorText(book) {
+                    if (!book.authors) return 'Unknown';
+                    return Array.isArray(book.authors)
+                        ? book.authors.join(', ')
+                        : book.authors;
+                },
+
+                /**
+                 * Open book modal
+                 */
+                openBookModal(book) {
+                    this.selectedBook = book;
+                },
+
+                /**
+                 * Download book to Kobo
+                 */
+                async downloadBook(book) {
+                    if (!book.formats || book.formats.length === 0) {
+                        alert('No formats available for download');
+                        return;
+                    }
+
+                    // Prefer EPUB format for Kobo
+                    const format = book.formats.includes('EPUB')
+                        ? 'EPUB'
+                        : book.formats[0];
+
+                    try {
+                        // Create download link
+                        const downloadUrl = `/api/download/${book.id}/${format}`;
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        link.download = `${book.title}.${format.toLowerCase()}`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        console.log(`📥 Downloading ${book.title} (${format})`);
+
+                        // Close modal after initiating download
+                        setTimeout(() => {
+                            this.selectedBook = null;
+                        }, 500);
+                    } catch (error) {
+                        console.error('Download failed:', error);
+                        alert('Failed to download book');
+                    }
+                },
+
+                /**
+                 * Load configuration
+                 */
+                async loadConfig() {
+                    try {
+                        const response = await fetch('/api/config');
+                        const data = await response.json();
+                        this.calibreLibraryPath = data.calibre_library || '';
+                    } catch (error) {
+                        console.error('Failed to load config:', error);
+                    }
+                },
+
+                /**
+                 * Save settings
+                 */
+                async saveSettings() {
+                    try {
+                        const response = await fetch('/api/config', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                calibre_library: this.calibreLibraryPath
+                            }),
+                        });
+
+                        const result = await response.json();
+                        if (result.success) {
+                            console.log('✅ Settings saved');
+                            this.showSettings = false;
+                            await this.loadBooks();
+                        } else {
+                            alert('Failed to save settings: ' + result.error);
+                        }
+                    } catch (error) {
+                        console.error('Failed to save settings:', error);
+                        alert('Failed to save settings');
+                    }
+                },
+            };
+        }
+    </script>
+</body>
+</html>
