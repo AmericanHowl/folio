@@ -42,21 +42,21 @@
             --safe-area-inset-right: env(safe-area-inset-right);
             --safe-area-inset-bottom: env(safe-area-inset-bottom);
             --safe-area-inset-left: env(safe-area-inset-left);
+            --bottom-nav-height: 65px;
         }
 
         html {
-            /* Prevent pull-to-refresh on mobile */
             overscroll-behavior-y: contain;
+            height: 100%;
         }
 
         body {
-            background-color: #ffffff;
+            background: linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%);
             color: #1f2937;
-            /* Prevent iOS bounce scrolling */
             -webkit-overflow-scrolling: touch;
-            /* Safe area padding for notched devices */
-            padding-top: var(--safe-area-inset-top);
-            padding-bottom: var(--safe-area-inset-bottom);
+            height: 100%;
+            margin: 0;
+            padding: 0;
         }
 
         .font-calsans {
@@ -68,262 +68,460 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* Book grid - fixed width covers */
-        .book-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 1.5rem;
+        /* Native app container */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding-top: var(--safe-area-inset-top);
         }
 
-        @media (max-width: 640px) {
+        /* Top bar - minimal, native style */
+        .top-bar {
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+        }
+
+        /* Main content area */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: calc(var(--bottom-nav-height) + var(--safe-area-inset-bottom) + 16px);
+        }
+
+        /* Bottom navigation - iOS/Android style */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: calc(var(--bottom-nav-height) + var(--safe-area-inset-bottom));
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 0.5px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            padding-top: 8px;
+            padding-bottom: var(--safe-area-inset-bottom);
+            z-index: 100;
+        }
+
+        .bottom-nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            color: #6b7280;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .bottom-nav-item.active {
+            color: #6366f1;
+        }
+
+        .bottom-nav-item i {
+            font-size: 24px;
+        }
+
+        .bottom-nav-item span {
+            font-size: 10px;
+            font-weight: 500;
+            letter-spacing: -0.2px;
+        }
+
+        /* Book grid - native card style */
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 16px;
+        }
+
+        @media (min-width: 640px) {
             .book-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 1rem;
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                gap: 20px;
+                padding: 24px;
             }
         }
 
         .book-card {
             position: relative;
-            overflow: hidden;
-            transition: transform 0.15s ease-out;
-        }
-
-        .book-card:hover {
-            transform: scale(1.02);
+            overflow: visible;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
         }
 
         .book-card:active {
-            transform: scale(0.98);
+            transform: scale(0.95);
         }
 
-        /* iOS-style modal */
-        @supports (-webkit-touch-callout: none) {
-            .modal-safe-area {
-                padding-bottom: calc(1.5rem + var(--safe-area-inset-bottom));
+        .book-cover-wrapper {
+            position: relative;
+            aspect-ratio: 2/3;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .book-card:active .book-cover-wrapper {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: calc(var(--bottom-nav-height) + var(--safe-area-inset-bottom) + 16px);
+            right: 16px;
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: #6366f1;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3), 0 4px 8px rgba(0, 0, 0, 0.1);
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 50;
+        }
+
+        .fab:active {
+            transform: scale(0.95);
+            box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        /* Native modal animations */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 200;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-sheet {
+            position: fixed;
+            inset: 0;
+            z-index: 201;
+            display: flex;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        @media (min-width: 640px) {
+            .modal-sheet {
+                align-items: center;
+                justify-content: center;
+                padding: 16px;
             }
+        }
+
+        .modal-content {
+            width: 100%;
+            max-height: 90vh;
+            background: white;
+            border-radius: 16px 16px 0 0;
+            overflow: hidden;
+            pointer-events: auto;
+            animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (min-width: 640px) {
+            .modal-content {
+                max-width: 680px;
+                max-height: 85vh;
+                border-radius: 20px;
+            }
+        }
+
+        .modal-handle {
+            width: 36px;
+            height: 4px;
+            background: #d1d5db;
+            border-radius: 2px;
+            margin: 12px auto 8px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        /* Pull to refresh indicator */
+        .pull-refresh {
+            position: absolute;
+            top: -60px;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6366f1;
+            font-size: 24px;
+            transition: all 0.2s ease;
+        }
+
+        /* Hide desktop navigation on mobile */
+        @media (max-width: 639px) {
+            .desktop-nav {
+                display: none;
+            }
+        }
+
+        /* Hide bottom nav on desktop */
+        @media (min-width: 640px) {
+            .bottom-nav {
+                display: none;
+            }
+
+            .main-content {
+                padding-bottom: 24px;
+            }
+
+            .fab {
+                bottom: 24px;
+            }
+        }
+
+        /* Hide scrollbar for horizontal scroll */
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
         }
     </style>
 </head>
-<body class="h-full bg-gray-50" x-data="folioApp()" x-init="init()">
-    <div class="min-h-full">
-        <!-- Navigation -->
-        <nav class="bg-white border-b border-gray-200" x-data="{ mobileMenuOpen: false }">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0 flex items-center">
-                            <span class="text-4xl font-calsans text-[#D66853]">folio</span>
-                        </div>
-                        <div class="hidden sm:ml-8 sm:flex sm:space-x-8">
-                            <a @click="currentTab = 'library'"
-                               :class="currentTab === 'library' ? 'border-[#D66853] text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-                               class="inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
-                                <i class="bi bi-collection"></i>
-                                Library
-                            </a>
-                            <a @click="currentTab = 'requests'"
-                               :class="currentTab === 'requests' ? 'border-[#D66853] text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-                               class="inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
-                                <i class="bi bi-inbox"></i>
-                                Requests
-                            </a>
-                            <a @click="currentTab = 'explore'"
-                               :class="currentTab === 'explore' ? 'border-[#D66853] text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-                               class="inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium cursor-pointer">
-                                <i class="bi bi-compass"></i>
-                                Explore
-                            </a>
-                        </div>
-                    </div>
-                    <div class="flex items-center">
-                        <div class="hidden sm:ml-6 sm:flex sm:items-center">
-                            <button @click="showSettings = true"
-                                    class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium inline-flex items-center gap-2">
-                                <i class="bi bi-gear"></i>
-                                Settings
-                            </button>
-                        </div>
-                        <!-- Mobile menu button -->
-                        <div class="flex items-center sm:hidden">
-                            <button @click="mobileMenuOpen = !mobileMenuOpen"
-                                    class="text-gray-500 hover:text-gray-700 p-2">
-                                <i class="bi text-2xl" :class="mobileMenuOpen ? 'bi-x' : 'bi-list'"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+<body x-data="folioApp()" x-init="init()">
+    <!-- Native App Container -->
+    <div class="app-container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-calsans text-gray-900">folio</h1>
             </div>
-
-            <!-- Mobile menu -->
-            <div x-show="mobileMenuOpen"
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 x-transition:leave="transition ease-in duration-150"
-                 x-transition:leave-start="opacity-100 scale-100"
-                 x-transition:leave-end="opacity-0 scale-95"
-                 class="sm:hidden"
-                 @click.away="mobileMenuOpen = false">
-                <div class="pt-2 pb-3 space-y-1 border-t border-gray-200 bg-gray-50">
-                    <a @click="currentTab = 'library'; mobileMenuOpen = false"
-                       :class="currentTab === 'library' ? 'bg-[#D66853]/10 border-[#D66853] text-gray-900' : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
-                       class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
-                        <i class="bi bi-collection"></i>
-                        Library
-                    </a>
-                    <a @click="currentTab = 'requests'; mobileMenuOpen = false"
-                       :class="currentTab === 'requests' ? 'bg-[#D66853]/10 border-[#D66853] text-gray-900' : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
-                       class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
-                        <i class="bi bi-inbox"></i>
-                        Requests
-                    </a>
-                    <a @click="currentTab = 'explore'; mobileMenuOpen = false"
-                       :class="currentTab === 'explore' ? 'bg-[#D66853]/10 border-[#D66853] text-gray-900' : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
-                       class="border-l-4 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
-                        <i class="bi bi-compass"></i>
-                        Explore
-                    </a>
-                    <a @click="showSettings = true; mobileMenuOpen = false"
-                       class="border-l-4 border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-2 pl-3 pr-4 text-base font-medium flex items-center gap-2 cursor-pointer">
-                        <i class="bi bi-gear"></i>
-                        Settings
-                    </a>
-                </div>
+            <!-- Desktop navigation -->
+            <div class="desktop-nav hidden sm:flex items-center gap-6">
+                <a @click="currentTab = 'library'"
+                   :class="currentTab === 'library' ? 'text-indigo-600 font-semibold' : 'text-gray-600'"
+                   class="inline-flex items-center gap-2 text-sm cursor-pointer hover:text-indigo-600 transition-colors">
+                    <i class="bi bi-collection"></i>
+                    Library
+                </a>
+                <a @click="currentTab = 'requests'"
+                   :class="currentTab === 'requests' ? 'text-indigo-600 font-semibold' : 'text-gray-600'"
+                   class="inline-flex items-center gap-2 text-sm cursor-pointer hover:text-indigo-600 transition-colors">
+                    <i class="bi bi-inbox"></i>
+                    Requests
+                </a>
+                <a @click="currentTab = 'explore'"
+                   :class="currentTab === 'explore' ? 'text-indigo-600 font-semibold' : 'text-gray-600'"
+                   class="inline-flex items-center gap-2 text-sm cursor-pointer hover:text-indigo-600 transition-colors">
+                    <i class="bi bi-compass"></i>
+                    Explore
+                </a>
             </div>
-        </nav>
+        </div>
 
         <!-- Main Content -->
-        <main class="py-10">
+        <main class="main-content">
             <!-- Library Tab -->
             <div x-show="currentTab === 'library'" x-cloak>
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="md:flex md:items-center md:justify-between mb-8">
-                        <div class="flex-1 min-w-0">
-                            <h1 class="text-3xl font-bold leading-tight text-gray-900">Library</h1>
-                            <p class="mt-1 text-sm text-gray-600" x-text="`${books.length} books`"></p>
+                <!-- New Books Notification -->
+                <div x-show="hasNewBooks" x-cloak class="mx-4 mb-4 bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                            <i class="bi bi-info-circle text-indigo-600 text-xl flex-shrink-0"></i>
+                            <p class="text-sm text-indigo-900 font-medium">New books available!</p>
                         </div>
+                        <button @click="refreshLibrary()"
+                                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 active:bg-indigo-800 flex-shrink-0">
+                            Refresh
+                        </button>
                     </div>
+                </div>
 
-                    <!-- New Books Notification (hidden on Kobo) -->
-                    <div x-show="hasNewBooks" x-cloak class="mb-6 bg-[#D66853]/10 border-l-4 border-[#D66853] p-4 rounded">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <i class="bi bi-info-circle text-[#D66853]"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm text-gray-700">
-                                        New books have been added to your library!
-                                    </p>
-                                </div>
-                            </div>
-                            <button @click="refreshLibrary()"
-                                    class="px-4 py-2 bg-[#D66853] text-white text-sm rounded-md hover:bg-[#c15743]">
-                                Refresh Library
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Search and Sort -->
-                    <div class="mb-6 flex flex-col sm:flex-row gap-4">
+                <!-- Search Bar -->
+                <div class="px-4 pb-4">
+                    <div class="relative">
+                        <i class="bi bi-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg"></i>
                         <input type="text"
                                x-model="searchQuery"
                                @input.debounce.500ms="searchBooks()"
-                               placeholder="Search books by title, author, or tags..."
-                               class="flex-1 bg-white text-gray-900 placeholder-gray-400 shadow-sm focus:ring-[#D66853] focus:border-[#D66853] block sm:text-sm border-gray-200 rounded-md px-4 py-2 border">
-                        <select x-model="sortBy"
-                                @change="changeSortOrder(sortBy)"
-                                class="bg-white text-gray-900 shadow-sm focus:ring-[#D66853] focus:border-[#D66853] block sm:text-sm border-gray-200 rounded-md px-4 py-2 border">
-                            <option value="title-asc">Title (A-Z)</option>
-                            <option value="title-desc">Title (Z-A)</option>
-                            <option value="author-asc">Author (A-Z)</option>
-                            <option value="author-desc">Author (Z-A)</option>
-                            <option value="date-desc">Newest First</option>
-                            <option value="date-asc">Oldest First</option>
-                        </select>
+                               placeholder="Search books..."
+                               class="w-full pl-12 pr-4 py-3 bg-white text-gray-900 placeholder-gray-400 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm">
                     </div>
+                </div>
 
-                    <!-- Loading -->
-                    <div x-show="loading" class="text-center py-12">
-                        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#D66853]"></div>
+                <!-- Sort Controls - Horizontal scroll on mobile -->
+                <div class="px-4 pb-4 overflow-x-auto hide-scrollbar">
+                    <div class="flex gap-2 min-w-max">
+                        <button @click="changeSortOrder('title-asc')"
+                                :class="sortBy === 'title-asc' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                            A-Z
+                        </button>
+                        <button @click="changeSortOrder('title-desc')"
+                                :class="sortBy === 'title-desc' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                            Z-A
+                        </button>
+                        <button @click="changeSortOrder('author-asc')"
+                                :class="sortBy === 'author-asc' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                            Author
+                        </button>
+                        <button @click="changeSortOrder('date-desc')"
+                                :class="sortBy === 'date-desc' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                            Newest
+                        </button>
+                        <button @click="changeSortOrder('date-asc')"
+                                :class="sortBy === 'date-asc' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                            Oldest
+                        </button>
                     </div>
+                </div>
 
-                    <!-- Book Grid -->
-                    <div x-show="!loading && displayedBooks.length > 0" x-cloak>
-                        <div class="book-grid">
-                            <template x-for="book in displayedBooks" :key="book.id">
-                                <div @click="openBookModal(book)" class="cursor-pointer">
-                                    <div class="book-card">
-                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg overflow-hidden relative border border-gray-200">
-                                            <img :src="`/api/cover/${book.id}`"
-                                                 :alt="book.title"
-                                                 class="w-full h-full object-cover"
-                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23374151%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                        </div>
-                                    </div>
+                <!-- Loading -->
+                <div x-show="loading" class="flex justify-center items-center py-20">
+                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
+                </div>
+
+                <!-- Book Grid -->
+                <div x-show="!loading && displayedBooks.length > 0" x-cloak>
+                    <div class="book-grid">
+                        <template x-for="book in displayedBooks" :key="book.id">
+                            <div @click="openBookModal(book)" class="book-card">
+                                <div class="book-cover-wrapper">
+                                    <img :src="`/api/cover/${book.id}`"
+                                         :alt="book.title"
+                                         class="w-full h-full object-cover"
+                                         loading="lazy"
+                                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23374151%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
                                 </div>
-                            </template>
-                        </div>
-
-                        <!-- Load More Button -->
-                        <div class="mt-8 text-center">
-                            <button @click="loadMoreBooks()"
-                                    x-show="!loadingMore && displayedBooks.length >= booksPerPage"
-                                    class="px-6 py-3 bg-[#D66853] text-white rounded-md hover:bg-[#c15743] focus:outline-none focus:ring-2 focus:ring-[#D66853]">
-                                Load More Books
-                            </button>
-                            <div x-show="loadingMore" class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#D66853]"></div>
-                        </div>
+                            </div>
+                        </template>
                     </div>
 
-                    <!-- No Books -->
-                    <div x-show="!loading && books.length === 0" x-cloak class="text-center py-12">
-                        <h3 class="text-lg font-medium text-gray-900">No books found</h3>
-                        <p class="text-gray-600">Check your Calibre Content Server connection</p>
+                    <!-- Load More Button -->
+                    <div class="px-4 mt-6 mb-4">
+                        <button @click="loadMoreBooks()"
+                                x-show="!loadingMore && displayedBooks.length >= booksPerPage"
+                                class="w-full py-3 bg-white text-indigo-600 font-semibold rounded-xl border-2 border-indigo-600 hover:bg-indigo-50 active:bg-indigo-100">
+                            Load More Books
+                        </button>
+                        <div x-show="loadingMore" class="flex justify-center py-4">
+                            <div class="animate-spin rounded-full h-8 w-8 border-4 border-indigo-200 border-t-indigo-600"></div>
+                        </div>
                     </div>
+                </div>
+
+                <!-- No Books -->
+                <div x-show="!loading && books.length === 0" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
+                    <i class="bi bi-book text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">No books found</h3>
+                    <p class="text-sm text-gray-500 text-center">Check your Calibre library connection</p>
                 </div>
             </div>
 
             <!-- Requests/Explore Tabs (Coming Soon) -->
-            <div x-show="currentTab !== 'library'" x-cloak class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="text-center py-12 bg-white rounded-lg border border-gray-200">
-                    <div class="text-6xl mb-4"><i class="bi bi-hourglass-split text-[#D66853]"></i></div>
-                    <h2 class="text-2xl font-bold text-gray-900">Coming Soon</h2>
-                </div>
+            <div x-show="currentTab !== 'library'" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
+                <i class="bi bi-hourglass-split text-6xl text-indigo-200 mb-6"></i>
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Coming Soon</h2>
+                <p class="text-sm text-gray-500">This feature is under development</p>
             </div>
         </main>
 
-        <!-- Book Modal -->
-        <div x-show="selectedBook" x-cloak>
-            <div class="fixed inset-0 bg-black bg-opacity-80 z-50" @click="selectedBook = null"></div>
-            <div class="fixed inset-0 z-50 overflow-y-auto">
-                <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div class="relative bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-3xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto" @click.stop>
-                        <template x-if="selectedBook">
-                            <div class="p-6 sm:p-8">
-                                <!-- Close and Edit buttons in top right -->
-                                <div class="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 z-10">
-                                    <button @click="openEditMetadata(selectedBook)" class="text-gray-600 hover:text-[#D66853] p-2 rounded-full hover:bg-gray-100 bg-white shadow-sm" title="Edit Metadata">
-                                        <i class="bi bi-pencil text-xl"></i>
-                                    </button>
-                                    <button @click="selectedBook = null" class="text-gray-600 hover:text-gray-900 p-2 bg-white rounded-full shadow-sm">
-                                        <i class="bi bi-x-lg text-xl"></i>
+        <!-- Floating Action Button (Settings) -->
+        <div class="fab" @click="showSettings = true">
+            <i class="bi bi-gear-fill"></i>
+        </div>
+
+        <!-- Bottom Navigation (Mobile Only) -->
+        <nav class="bottom-nav">
+            <a @click="currentTab = 'library'"
+               :class="currentTab === 'library' ? 'active' : ''"
+               class="bottom-nav-item">
+                <i class="bi" :class="currentTab === 'library' ? 'bi-collection-fill' : 'bi-collection'"></i>
+                <span>Library</span>
+            </a>
+            <a @click="currentTab = 'requests'"
+               :class="currentTab === 'requests' ? 'active' : ''"
+               class="bottom-nav-item">
+                <i class="bi" :class="currentTab === 'requests' ? 'bi-inbox-fill' : 'bi-inbox'"></i>
+                <span>Requests</span>
+            </a>
+            <a @click="currentTab = 'explore'"
+               :class="currentTab === 'explore' ? 'active' : ''"
+               class="bottom-nav-item">
+                <i class="bi" :class="currentTab === 'explore' ? 'bi-compass-fill' : 'bi-compass'"></i>
+                <span>Explore</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Book Modal -->
+    <div x-show="selectedBook" x-cloak>
+        <div class="modal-backdrop" @click="selectedBook = null"></div>
+        <div class="modal-sheet">
+            <div class="modal-content" @click.stop>
+                <div class="modal-handle"></div>
+                <div class="flex-1 overflow-y-auto">
+                    <template x-if="selectedBook">
+                        <div class="p-6">
+                                <!-- Edit button in top right -->
+                                <div class="absolute top-6 right-6 z-10">
+                                    <button @click="openEditMetadata(selectedBook)"
+                                            class="w-10 h-10 flex items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg active:scale-95 transition-transform">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
                                 </div>
 
                                 <!-- Cover and Details - Stacked on mobile, side-by-side on desktop -->
-                                <div class="flex flex-col md:flex-row gap-6 md:gap-8">
+                                <div class="flex flex-col md:flex-row gap-6 md:gap-8 mt-4">
                                     <!-- Cover -->
-                                    <div class="flex-shrink-0 mx-auto md:mx-0" style="width: 180px; sm:width: 200px; md:width: 220px;">
-                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-200 flex items-center justify-center relative overflow-hidden shadow-lg">
+                                    <div class="flex-shrink-0 mx-auto md:mx-0 w-48 md:w-56">
+                                        <div class="aspect-[2/3] bg-gradient-to-br from-indigo-900 to-purple-900 rounded-2xl overflow-hidden shadow-2xl">
                                             <img :src="`/api/cover/${selectedBook.id}`"
                                                  class="w-full h-full object-cover"
                                                  @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23D1D5DB%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
                                         </div>
                                         <!-- Formats badge -->
-                                        <div x-show="selectedBook.formats && selectedBook.formats.length > 0" class="mt-3 flex flex-wrap gap-2 justify-center md:justify-start">
+                                        <div x-show="selectedBook.formats && selectedBook.formats.length > 0" class="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
                                             <template x-for="format in selectedBook.formats" :key="format">
-                                                <span class="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-md text-xs font-medium" x-text="format"></span>
+                                                <span class="inline-block px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold" x-text="format"></span>
                                             </template>
                                         </div>
                                     </div>
@@ -382,76 +580,72 @@
             </div>
         </div>
 
-        <!-- Settings Modal -->
-        <div x-show="showSettings" x-cloak>
-            <div class="fixed inset-0 bg-black bg-opacity-80 z-50" @click="showSettings = false"></div>
-            <div class="fixed inset-0 z-50 overflow-y-auto">
-                <div class="flex min-h-full items-center justify-center p-4">
-                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-md" @click.stop>
-                        <div class="p-6">
-                            <h3 class="text-lg font-medium mb-4 text-gray-900 flex items-center gap-2">
-                                <i class="bi bi-gear"></i>
-                                Settings
-                            </h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                                        Calibre Library Path
-                                    </label>
-                                    <div class="flex gap-2">
-                                        <input type="text"
-                                               x-model="calibreLibraryPath"
-                                               placeholder="~/Calibre Library"
-                                               class="flex-1 bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-[#D66853] focus:border-[#D66853]">
-                                        <button @click="openBrowser()"
-                                                class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100 inline-flex items-center gap-2">
-                                            <i class="bi bi-folder2-open"></i>
-                                            Browse
-                                        </button>
-                                    </div>
-                                    <p class="mt-1 text-xs text-gray-500">
-                                        Path to your Calibre library directory (contains metadata.db)
-                                    </p>
+    <!-- Settings Modal -->
+    <div x-show="showSettings" x-cloak>
+        <div class="modal-backdrop" @click="showSettings = false"></div>
+        <div class="modal-sheet">
+            <div class="modal-content" @click.stop>
+                <div class="modal-handle"></div>
+                <div class="flex-1 overflow-y-auto">
+                    <div class="p-6">
+                        <h3 class="text-2xl font-bold mb-6 text-gray-900">Settings</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-900 mb-2">
+                                    Calibre Library Path
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="text"
+                                           x-model="calibreLibraryPath"
+                                           placeholder="~/Calibre Library"
+                                           class="flex-1 bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                                    <button @click="openBrowser()"
+                                            class="px-4 py-3 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 active:bg-indigo-200 inline-flex items-center gap-2">
+                                        <i class="bi bi-folder2-open"></i>
+                                        Browse
+                                    </button>
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                                        calibredb Command Path
-                                    </label>
-                                    <div class="p-2 bg-gray-50 rounded border border-gray-200">
-                                        <code class="text-xs text-gray-600">/Applications/calibre.app/Contents/MacOS/calibredb</code>
-                                    </div>
-                                    <p class="mt-1 text-xs text-gray-500">
-                                        Hardcoded for macOS. Edit serve.py to change.
-                                    </p>
+                                <p class="mt-2 text-xs text-gray-500">
+                                    Path to your Calibre library directory (contains metadata.db)
+                                </p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-900 mb-2">
+                                    calibredb Command Path
+                                </label>
+                                <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                                    <code class="text-xs text-gray-600">/Applications/calibre.app/Contents/MacOS/calibredb</code>
                                 </div>
+                                <p class="mt-2 text-xs text-gray-500">
+                                    Hardcoded for macOS. Edit serve.py to change.
+                                </p>
                             </div>
-                            <div class="mt-6 flex justify-end gap-3">
-                                <button @click="showSettings = false"
-                                        class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100">
-                                    Cancel
-                                </button>
-                                <button @click="saveSettings(); showSettings = false"
-                                        class="px-4 py-2 text-sm text-white bg-[#D66853] rounded-md hover:bg-[#c15743]">
-                                    Save
-                                </button>
-                            </div>
+                        </div>
+                        <div class="mt-8 flex gap-3">
+                            <button @click="showSettings = false"
+                                    class="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 active:bg-gray-300">
+                                Cancel
+                            </button>
+                            <button @click="saveSettings(); showSettings = false"
+                                    class="flex-1 px-6 py-3 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 active:bg-indigo-800 shadow-lg">
+                                Save
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Directory Browser Modal -->
-        <div x-show="showBrowser" x-cloak>
-            <div class="fixed inset-0 bg-black bg-opacity-80 z-50" @click="showBrowser = false"></div>
-            <div class="fixed inset-0 z-50 overflow-y-auto">
-                <div class="flex min-h-full items-center justify-center p-4">
-                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-2xl" @click.stop>
-                        <div class="p-6">
-                            <h3 class="text-lg font-medium mb-4 text-gray-900 flex items-center gap-2">
-                                <i class="bi bi-folder2-open"></i>
-                                Select Calibre Library
-                            </h3>
+    <!-- Directory Browser Modal -->
+    <div x-show="showBrowser" x-cloak>
+        <div class="modal-backdrop" @click="showBrowser = false"></div>
+        <div class="modal-sheet">
+            <div class="modal-content" @click.stop>
+                <div class="modal-handle"></div>
+                <div class="flex-1 overflow-y-auto">
+                    <div class="p-6">
+                        <h3 class="text-2xl font-bold mb-6 text-gray-900">Select Calibre Library</h3>
 
                             <!-- Current path -->
                             <div class="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
