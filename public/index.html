@@ -252,68 +252,80 @@
                 <div class="flex min-h-full items-center justify-center p-4">
                     <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-3xl" @click.stop>
                         <template x-if="selectedBook">
-                            <div class="p-6">
-                                <!-- Header with title and close/edit buttons -->
-                                <div class="flex justify-between items-start mb-6">
-                                    <h3 class="text-2xl font-bold text-gray-900 flex-1" x-text="selectedBook.title"></h3>
-                                    <div class="flex items-center gap-2 ml-4">
-                                        <button @click="openEditMetadata(selectedBook)" class="text-gray-600 hover:text-[#D66853] p-2 rounded-full hover:bg-gray-100" title="Edit Metadata">
-                                            <i class="bi bi-pencil text-xl"></i>
-                                        </button>
-                                        <button @click="selectedBook = null" class="text-gray-600 hover:text-gray-900 p-2">
-                                            <i class="bi bi-x-lg text-xl"></i>
-                                        </button>
-                                    </div>
+                            <div class="p-8">
+                                <!-- Close and Edit buttons in top right -->
+                                <div class="absolute top-6 right-6 flex items-center gap-2">
+                                    <button @click="openEditMetadata(selectedBook)" class="text-gray-600 hover:text-[#D66853] p-2 rounded-full hover:bg-gray-100" title="Edit Metadata">
+                                        <i class="bi bi-pencil text-xl"></i>
+                                    </button>
+                                    <button @click="selectedBook = null" class="text-gray-600 hover:text-gray-900 p-2">
+                                        <i class="bi bi-x-lg text-xl"></i>
+                                    </button>
                                 </div>
 
                                 <!-- Cover and Details -->
-                                <div class="flex gap-6 mb-6">
+                                <div class="flex gap-8">
                                     <!-- Cover -->
-                                    <div class="flex-shrink-0" style="width: 200px;">
-                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border border-gray-200 flex items-center justify-center relative overflow-hidden">
+                                    <div class="flex-shrink-0" style="width: 220px;">
+                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-200 flex items-center justify-center relative overflow-hidden shadow-lg">
                                             <img :src="`/api/cover/${selectedBook.id}`"
                                                  class="w-full h-full object-cover"
                                                  @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23D1D5DB%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
                                         </div>
+                                        <!-- Formats badge -->
+                                        <div x-show="selectedBook.formats && selectedBook.formats.length > 0" class="mt-3 flex flex-wrap gap-2">
+                                            <template x-for="format in selectedBook.formats" :key="format">
+                                                <span class="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-md text-xs font-medium" x-text="format"></span>
+                                            </template>
+                                        </div>
                                     </div>
 
                                     <!-- Details -->
-                                    <div class="flex-1 space-y-3">
+                                    <div class="flex-1 space-y-6">
+                                        <!-- Title -->
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Title</h4>
+                                            <h3 class="text-3xl font-bold text-gray-900" x-text="selectedBook.title"></h3>
+                                        </div>
+
+                                        <!-- Author -->
                                         <div x-show="selectedBook.authors">
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Author</h4>
-                                            <p class="text-base text-gray-900" x-text="Array.isArray(selectedBook.authors) ? selectedBook.authors.join(', ') : selectedBook.authors"></p>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Author</h4>
+                                            <p class="text-xl font-medium text-gray-900" x-text="Array.isArray(selectedBook.authors) ? selectedBook.authors.join(', ') : selectedBook.authors"></p>
                                         </div>
-                                        <div x-show="selectedBook.pubdate">
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Year</h4>
-                                            <p class="text-base text-gray-900" x-text="new Date(selectedBook.pubdate).getFullYear()"></p>
+
+                                        <!-- Year, Pages, Publisher in a row -->
+                                        <div class="grid grid-cols-3 gap-6">
+                                            <div x-show="selectedBook.pubdate">
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Year</h4>
+                                                <p class="text-lg font-semibold text-gray-900" x-text="new Date(selectedBook.pubdate).getFullYear()"></p>
+                                            </div>
+                                            <div>
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pages</h4>
+                                                <p class="text-lg font-semibold text-gray-900">—</p>
+                                            </div>
+                                            <div x-show="selectedBook.publisher">
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Publisher</h4>
+                                                <p class="text-lg font-semibold text-gray-900" x-text="selectedBook.publisher"></p>
+                                            </div>
                                         </div>
-                                        <div x-show="selectedBook.publisher">
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Publisher</h4>
-                                            <p class="text-base text-gray-900" x-text="selectedBook.publisher"></p>
-                                        </div>
+
+                                        <!-- Genres -->
                                         <div x-show="selectedBook.tags && selectedBook.tags.length > 0">
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Genres</h4>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Genres</h4>
                                             <div class="flex flex-wrap gap-2">
                                                 <template x-for="tag in selectedBook.tags" :key="tag">
-                                                    <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs" x-text="tag"></span>
+                                                    <span class="px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium" x-text="tag"></span>
                                                 </template>
                                             </div>
                                         </div>
-                                        <div x-show="selectedBook.formats && selectedBook.formats.length > 0">
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Formats</h4>
-                                            <div class="flex flex-wrap gap-2">
-                                                <template x-for="format in selectedBook.formats" :key="format">
-                                                    <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs" x-text="format"></span>
-                                                </template>
-                                            </div>
+
+                                        <!-- Description -->
+                                        <div x-show="selectedBook.comments">
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Description</h4>
+                                            <div class="text-base text-gray-700 leading-relaxed prose prose-sm max-w-none" x-html="selectedBook.comments"></div>
                                         </div>
                                     </div>
-                                </div>
-
-                                <!-- Description below -->
-                                <div x-show="selectedBook.comments">
-                                    <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Description</h4>
-                                    <div class="text-sm text-gray-700 prose prose-sm max-w-none" x-html="selectedBook.comments"></div>
                                 </div>
                             </div>
                         </template>
@@ -501,23 +513,19 @@
                 <div class="flex min-h-full items-center justify-center p-4">
                     <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-3xl" @click.stop>
                         <template x-if="editingBook">
-                            <div class="p-6">
-                                <!-- Header with title (editable) and close button -->
-                                <div class="flex justify-between items-start mb-6">
-                                    <input type="text"
-                                           x-model="editingBook.title"
-                                           class="flex-1 text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-300 focus:border-[#D66853] focus:outline-none px-0 py-1"
-                                           placeholder="Book Title">
-                                    <button @click="showEditMetadata = false" class="text-gray-600 hover:text-gray-900 p-2 ml-4">
+                            <div class="p-8">
+                                <!-- Close button in top right -->
+                                <div class="absolute top-6 right-6">
+                                    <button @click="showEditMetadata = false" class="text-gray-600 hover:text-gray-900 p-2">
                                         <i class="bi bi-x-lg text-xl"></i>
                                     </button>
                                 </div>
 
                                 <!-- Cover and Details -->
-                                <div class="flex gap-6 mb-6">
+                                <div class="flex gap-8">
                                     <!-- Cover with drag & drop -->
-                                    <div class="flex-shrink-0" style="width: 200px;">
-                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#D66853] flex items-center justify-center relative overflow-hidden cursor-pointer transition-colors"
+                                    <div class="flex-shrink-0" style="width: 220px;">
+                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border-2 border-dashed border-gray-300 hover:border-[#D66853] flex items-center justify-center relative overflow-hidden cursor-pointer transition-colors shadow-lg"
                                              @click="$refs.coverInput.click()"
                                              @drop.prevent="handleCoverDrop($event); $el.classList.remove('border-[#D66853]')"
                                              @dragover.prevent="$el.classList.add('border-[#D66853]')"
@@ -539,83 +547,103 @@
                                     </div>
 
                                     <!-- Details (editable) -->
-                                    <div class="flex-1 space-y-3">
+                                    <div class="flex-1 space-y-6">
+                                        <!-- Title -->
                                         <div>
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Author</h4>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Title</h4>
+                                            <input type="text"
+                                                   x-model="editingBook.title"
+                                                   class="w-full text-3xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-300 focus:border-[#D66853] focus:outline-none px-0 py-1"
+                                                   placeholder="Book Title">
+                                        </div>
+
+                                        <!-- Author -->
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Author</h4>
                                             <input type="text"
                                                    x-model="editingBook.authors"
                                                    list="authors-list"
-                                                   placeholder="Author name(s)"
-                                                   class="w-full text-base text-gray-900 bg-white border border-gray-200 rounded px-2 py-1 focus:ring-[#D66853] focus:border-[#D66853]">
+                                                   placeholder="Author name"
+                                                   class="w-full text-xl font-medium text-gray-900 bg-white border-b-2 border-gray-300 focus:border-[#D66853] focus:outline-none px-0 py-1">
                                             <datalist id="authors-list">
                                                 <template x-for="author in getAuthors()" :key="author">
                                                     <option :value="author"></option>
                                                 </template>
                                             </datalist>
                                         </div>
-                                        <div>
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Year</h4>
-                                            <input type="number"
-                                                   x-model="editingBook.pubdate"
-                                                   placeholder="YYYY"
-                                                   min="1000"
-                                                   max="9999"
-                                                   class="w-full text-base text-gray-900 bg-white border border-gray-200 rounded px-2 py-1 focus:ring-[#D66853] focus:border-[#D66853]">
+
+                                        <!-- Year, Pages, Publisher in a row -->
+                                        <div class="grid grid-cols-3 gap-6">
+                                            <div>
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Year</h4>
+                                                <input type="number"
+                                                       x-model="editingBook.pubdate"
+                                                       placeholder="YYYY"
+                                                       min="1000"
+                                                       max="9999"
+                                                       class="w-full text-lg font-semibold text-gray-900 bg-white border-b-2 border-gray-300 focus:border-[#D66853] focus:outline-none px-0 py-1">
+                                            </div>
+                                            <div>
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pages</h4>
+                                                <p class="text-lg font-semibold text-gray-400">—</p>
+                                            </div>
+                                            <div>
+                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Publisher</h4>
+                                                <input type="text"
+                                                       x-model="editingBook.publisher"
+                                                       list="publishers-list"
+                                                       placeholder="Publisher"
+                                                       class="w-full text-lg font-semibold text-gray-900 bg-white border-b-2 border-gray-300 focus:border-[#D66853] focus:outline-none px-0 py-1">
+                                                <datalist id="publishers-list">
+                                                    <template x-for="publisher in getPublishers()" :key="publisher">
+                                                        <option :value="publisher"></option>
+                                                    </template>
+                                                </datalist>
+                                            </div>
                                         </div>
+
+                                        <!-- Genres -->
                                         <div>
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Publisher</h4>
-                                            <input type="text"
-                                                   x-model="editingBook.publisher"
-                                                   list="publishers-list"
-                                                   placeholder="Publisher name"
-                                                   class="w-full text-base text-gray-900 bg-white border border-gray-200 rounded px-2 py-1 focus:ring-[#D66853] focus:border-[#D66853]">
-                                            <datalist id="publishers-list">
-                                                <template x-for="publisher in getPublishers()" :key="publisher">
-                                                    <option :value="publisher"></option>
-                                                </template>
-                                            </datalist>
-                                        </div>
-                                        <div>
-                                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Genres</h4>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Genres</h4>
                                             <input type="text"
                                                    x-model="editingBook.tags"
                                                    list="genres-list"
                                                    placeholder="Comma-separated genres"
-                                                   class="w-full text-base text-gray-900 bg-white border border-gray-200 rounded px-2 py-1 focus:ring-[#D66853] focus:border-[#D66853]">
+                                                   class="w-full text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#D66853] focus:border-[#D66853] focus:outline-none">
                                             <datalist id="genres-list">
                                                 <template x-for="genre in getGenres()" :key="genre">
                                                     <option :value="genre"></option>
                                                 </template>
                                             </datalist>
                                         </div>
-                                    </div>
-                                </div>
 
-                                <!-- Description (editable) -->
-                                <div class="mb-6">
-                                    <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Description</h4>
-                                    <textarea x-model="editingBook.comments"
-                                              rows="6"
-                                              placeholder="Book description..."
-                                              class="w-full text-sm text-gray-700 bg-white border border-gray-200 rounded px-3 py-2 focus:ring-[#D66853] focus:border-[#D66853]"></textarea>
-                                </div>
+                                        <!-- Description -->
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Description</h4>
+                                            <textarea x-model="editingBook.comments"
+                                                      rows="6"
+                                                      placeholder="Book description..."
+                                                      class="w-full text-base text-gray-700 leading-relaxed bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#D66853] focus:border-[#D66853] focus:outline-none resize-none"></textarea>
+                                        </div>
 
-                                <!-- Action Buttons -->
-                                <div class="flex justify-between items-center">
-                                    <button @click="searchMetadata()"
-                                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100 inline-flex items-center gap-2">
-                                        <i class="bi bi-search"></i>
-                                        Search for Metadata
-                                    </button>
-                                    <div class="flex gap-3">
-                                        <button @click="showEditMetadata = false"
-                                                class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100">
-                                            Cancel
-                                        </button>
-                                        <button @click="saveMetadata()"
-                                                class="px-4 py-2 text-sm text-white bg-[#D66853] rounded-md hover:bg-[#c15743]">
-                                            Save Changes
-                                        </button>
+                                        <!-- Action Buttons -->
+                                        <div class="flex justify-between items-center pt-4">
+                                            <button @click="searchMetadata()"
+                                                    class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 inline-flex items-center gap-2">
+                                                <i class="bi bi-search"></i>
+                                                Search for Metadata
+                                            </button>
+                                            <div class="flex gap-3">
+                                                <button @click="showEditMetadata = false"
+                                                        class="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                                    Cancel
+                                                </button>
+                                                <button @click="saveMetadata()"
+                                                        class="px-5 py-2.5 text-sm font-medium text-white bg-[#D66853] rounded-lg hover:bg-[#c15743] shadow-sm">
+                                                    Save Changes
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

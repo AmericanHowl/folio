@@ -357,7 +357,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         errors = []
 
         # Update metadata fields
-        metadata_fields = ['title', 'authors', 'publisher', 'comments']
+        metadata_fields = ['title', 'authors', 'publisher', 'comments', 'tags', 'pubdate']
         for field in metadata_fields:
             if field in data and data[field]:
                 value = data[field]
@@ -367,6 +367,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 result = run_calibredb(['set_metadata', book_id, '--field', f'{field}:{value}'])
                 if not result['success']:
                     errors.append(f'Failed to update {field}: {result.get("error", "Unknown error")}')
+                else:
+                    print(f"✅ Updated {field} for book {book_id}")
 
         # Update cover if provided
         if 'coverData' in data and data['coverData']:
