@@ -384,7 +384,12 @@ function folioApp() {
          * Open edit metadata modal
          */
         openEditMetadata(book) {
-            this.editingBook = { ...book };
+            // Copy book data and convert arrays to comma-separated strings for editing
+            this.editingBook = {
+                ...book,
+                authors: Array.isArray(book.authors) ? book.authors.join(', ') : (book.authors || ''),
+                tags: Array.isArray(book.tags) ? book.tags.join(', ') : (book.tags || '')
+            };
             this.showEditMetadata = true;
             this.selectedBook = null; // Close book detail modal
         },

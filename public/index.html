@@ -519,7 +519,7 @@
                                     <div class="flex-shrink-0" style="width: 140px;">
                                         <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#D66853] flex items-center justify-center relative overflow-hidden cursor-pointer transition-colors"
                                              @click="$refs.coverInput.click()"
-                                             @drop.prevent="handleCoverDrop($event)"
+                                             @drop.prevent="handleCoverDrop($event); $el.classList.remove('border-[#D66853]')"
                                              @dragover.prevent="$el.classList.add('border-[#D66853]')"
                                              @dragleave.prevent="$el.classList.remove('border-[#D66853]')">
                                             <img x-show="editingBook.coverData || editingBook.id"
