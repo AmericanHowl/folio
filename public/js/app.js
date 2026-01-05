@@ -46,8 +46,11 @@ function folioApp() {
         browserEntries: [],
 
         // Hardcover integration
+        includeHardcover: false,
         hardcoverSearchQuery: '',
         hardcoverBooks: [],
+        hardcoverTrending: [],
+        hardcoverRecentReleases: [],
         hardcoverSections: [],
         hardcoverLoading: false,
         selectedHardcoverBook: null,
@@ -289,6 +292,93 @@ function folioApp() {
                 console.log('📖 Loaded config:', data);
             } catch (error) {
                 console.error('Failed to load config:', error);
+            }
+        },
+
+        /**
+         * Toggle Hardcover mode
+         */
+        async toggleHardcoverMode() {
+            this.includeHardcover = !this.includeHardcover;
+
+            if (this.includeHardcover) {
+                console.log('🌍 Hardcover mode enabled');
+                if (!this.hardcoverToken) {
+                    alert('Please configure your Hardcover API token in Settings to use this feature.');
+                    this.includeHardcover = false;
+                    this.showSettings = true;
+                    return;
+                }
+                await this.loadHardcoverData();
+            } else {
+                console.log('📚 Local-only mode');
+            }
+        },
+
+        /**
+         * Load all Hardcover data
+         */
+        async loadHardcoverData() {
+            if (!this.hardcoverToken) return;
+
+            this.hardcoverLoading = true;
+
+            try {
+                // Load trending books
+                await this.loadHardcoverTrending();
+
+                console.log('✅ Hardcover data loaded');
+            } catch (error) {
+                console.error('❌ Failed to load Hardcover data:', error);
+            } finally {
+                this.hardcoverLoading = false;
+            }
+        },
+
+        /**
+         * Load trending books from Hardcover
+         */
+        async loadHardcoverTrending() {
+            try {
+                const response = await fetch('/api/hardcover/trending?limit=20');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Hardcover trending error:', data.error);
+                    this.hardcoverTrending = [];
+                } else {
+                    this.hardcoverTrending = data.books || [];
+                    console.log(`📈 Loaded ${this.hardcoverTrending.length} trending books`);
+                }
+            } catch (error) {
+                console.error('Failed to load Hardcover trending:', error);
+                this.hardcoverTrending = [];
+            }
+        },
+
+        /**
+         * Search Hardcover for books
+         */
+        async searchHardcover(query) {
+            if (!query) return [];
+            if (!this.hardcoverToken) {
+                alert('Please configure your Hardcover API token in Settings.');
+                return [];
+            }
+
+            try {
+                const response = await fetch(`/api/hardcover/search?q=${encodeURIComponent(query)}&limit=20`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Hardcover search error:', data.error);
+                    return [];
+                }
+
+                return data.books || [];
+            } catch (error) {
+                console.error('Failed to search Hardcover:', error);
+                return [];
             }
         },
 
