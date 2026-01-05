@@ -36,12 +36,14 @@
 
         /* Custom Color Palette */
         :root {
-            --color-primary: #5eb1bf;
-            --color-primary-dark: #4a8f9a;
-            --color-secondary: #ef7b45;
-            --color-accent: #d84727;
+            --color-primary: #55D6BE;
+            --color-primary-dark: #3fb8a3;
+            --color-secondary: #FC6471;
+            --color-accent: #FC6471;
             --color-dark: #042a2b;
             --color-cream: #cdedf6;
+            --color-header: #7D5BA6;
+            --color-border: #ACFCD9;
         }
 
         /* Custom color classes */
@@ -57,10 +59,12 @@
         .text-secondary { color: var(--color-secondary); }
         .text-accent { color: var(--color-accent); }
         .text-dark { color: var(--color-dark); }
+        .text-header { color: var(--color-header); }
 
         .border-primary { border-color: var(--color-primary); }
         .border-secondary { border-color: var(--color-secondary); }
         .border-accent { border-color: var(--color-accent); }
+        .border-mint { border-color: var(--color-border); }
 
         .hover\:bg-primary-dark:hover { background-color: var(--color-primary-dark); }
         .hover\:bg-secondary:hover { background-color: var(--color-secondary); }
@@ -69,7 +73,7 @@
 
         .focus\:ring-primary:focus {
             --tw-ring-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(94, 177, 191, 0.3);
+            box-shadow: 0 0 0 3px rgba(85, 214, 190, 0.3);
         }
 
         /* Safe Area Support */
@@ -165,7 +169,7 @@
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
-            background: linear-gradient(135deg, #ef7b45 0%, #d84727 100%);
+            background: linear-gradient(135deg, #55D6BE 0%, #FC6471 100%);
         }
 
         .book-card:active .book-cover-wrapper {
@@ -280,7 +284,7 @@
             <!-- Library Tab -->
             <div x-show="currentTab === 'library'" x-cloak>
                 <!-- New Books Notification -->
-                <div x-show="hasNewBooks" x-cloak class="mx-4 mb-4 bg-cream border border-secondary rounded-xl p-4">
+                <div x-show="hasNewBooks" x-cloak class="mx-4 mb-4 bg-cream border border-mint rounded-xl p-4">
                     <div class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-3 flex-1 min-w-0">
                             <i class="bi bi-info-circle text-primary text-xl flex-shrink-0"></i>
@@ -338,7 +342,7 @@
 
                 <!-- Loading -->
                 <div x-show="loading" class="flex justify-center items-center py-20">
-                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-secondary border-t-indigo-600"></div>
+                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-mint border-t-primary"></div>
                 </div>
 
                 <!-- Book Grid -->
@@ -365,7 +369,7 @@
                             Load More Books
                         </button>
                         <div x-show="loadingMore" class="flex justify-center py-4">
-                            <div class="animate-spin rounded-full h-8 w-8 border-4 border-secondary border-t-indigo-600"></div>
+                            <div class="animate-spin rounded-full h-8 w-8 border-4 border-mint border-t-primary"></div>
                         </div>
                     </div>
                 </div>
@@ -381,7 +385,7 @@
             <!-- Requests/Explore Tabs (Coming Soon) -->
             <div x-show="currentTab !== 'library'" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
                 <i class="bi bi-hourglass-split text-6xl text-gray-300 mb-6"></i>
-                <h2 class="text-2xl font-bold text-accent mb-2">Coming Soon</h2>
+                <h2 class="text-lg font-semibold text-header mb-2">Coming Soon</h2>
                 <p class="text-sm text-gray-500">This feature is under development</p>
             </div>
         </main>
@@ -397,7 +401,7 @@
                         <div class="p-6">
                                 <!-- Header with close and edit/cancel buttons -->
                                 <div class="flex items-center justify-between mb-6">
-                                    <h3 class="text-2xl font-bold" :class="isEditingMetadata ? 'text-secondary' : 'text-dark'" x-text="isEditingMetadata ? 'Edit Metadata' : 'Book Details'"></h3>
+                                    <h3 class="text-lg font-semibold text-header" x-text="isEditingMetadata ? 'Edit Metadata' : 'Book Details'"></h3>
                                     <div class="flex items-center gap-2">
                                         <!-- Edit button (shown in view mode) -->
                                         <button x-show="!isEditingMetadata"
@@ -477,7 +481,7 @@
                                             <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 md:mb-3">Genres</h4>
                                             <div class="flex flex-wrap gap-2">
                                                 <template x-for="tag in selectedBook.tags" :key="tag">
-                                                    <span class="px-3 md:px-4 py-1.5 md:py-2 bg-accent text-dark rounded-lg text-xs md:text-sm font-medium" x-text="tag"></span>
+                                                    <span class="px-3 md:px-4 py-1.5 md:py-2 bg-secondary text-white rounded-lg text-xs md:text-sm font-medium" x-text="tag"></span>
                                                 </template>
                                             </div>
                                         </div>
@@ -608,7 +612,7 @@
 
                                             <!-- Search Metadata Button -->
                                             <button @click="searchMetadata()"
-                                                    class="w-full px-4 py-3 text-sm font-medium text-primary bg-cream border border-secondary rounded-xl hover:bg-cream active:bg-cream inline-flex items-center justify-center gap-2">
+                                                    class="w-full px-4 py-3 text-sm font-medium text-primary bg-cream border border-mint rounded-xl hover:bg-cream active:bg-cream inline-flex items-center justify-center gap-2">
                                                 <i class="bi bi-search"></i>
                                                 Search for Metadata
                                             </button>
@@ -629,7 +633,7 @@
             <div class="modal-content" @click.stop>
                 <div class="flex-1 overflow-y-auto">
                     <div class="p-6">
-                        <h3 class="text-2xl font-bold mb-6 text-dark">Settings</h3>
+                        <h3 class="text-lg font-semibold mb-6 text-header">Settings</h3>
                         <div class="space-y-6">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-900 mb-2">
@@ -641,7 +645,7 @@
                                            placeholder="~/Calibre Library"
                                            class="flex-1 bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
                                     <button @click="openBrowser()"
-                                            class="px-4 py-3 text-sm font-medium text-primary bg-cream border border-secondary rounded-xl hover:bg-cream active:bg-cream inline-flex items-center gap-2">
+                                            class="px-4 py-3 text-sm font-medium text-primary bg-cream border border-mint rounded-xl hover:bg-cream active:bg-cream inline-flex items-center gap-2">
                                         <i class="bi bi-folder2-open"></i>
                                         Browse
                                     </button>
@@ -685,7 +689,7 @@
             <div class="modal-content" @click.stop>
                 <div class="flex-1 overflow-y-auto">
                     <div class="p-6">
-                        <h3 class="text-2xl font-bold mb-6 text-primary">Select Calibre Library</h3>
+                        <h3 class="text-lg font-semibold mb-6 text-header">Select Calibre Library</h3>
 
                             <!-- Current path -->
                             <div class="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
