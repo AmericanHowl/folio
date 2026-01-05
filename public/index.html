@@ -781,6 +781,87 @@
                             </div>
                         </div>
                     </template>
+
+                    <!-- Hardcover Sections (only shown when includeHardcover is true) -->
+                    <template x-if="includeHardcover">
+                        <div>
+                            <!-- Trending -->
+                            <div x-show="hardcoverTrending.length > 0" class="section">
+                                <div class="section-header">
+                                    <h2 class="section-title">Trending This Month</h2>
+                                </div>
+                                <div class="books-scroll">
+                                    <template x-for="book in hardcoverTrending" :key="'trending-'+book.id">
+                                        <div class="book-card cursor-pointer">
+                                            <div class="book-cover-wrapper">
+                                                <div class="status-badge badge-requested">Trending</div>
+                                                <img :src="book.image"
+                                                     :alt="book.title"
+                                                     class="w-full h-full object-cover"
+                                                     loading="lazy"
+                                                     @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23593c8f%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22white%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                            </div>
+                                            <div class="book-info">
+                                                <div class="book-title-small" x-text="book.title"></div>
+                                                <div class="book-author-small" x-text="book.author || 'Unknown'"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Recent Releases -->
+                            <div x-show="hardcoverRecentReleases.length > 0" class="section">
+                                <div class="section-header">
+                                    <h2 class="section-title">Recent Releases</h2>
+                                </div>
+                                <div class="books-scroll">
+                                    <template x-for="book in hardcoverRecentReleases" :key="'recent-'+book.id">
+                                        <div class="book-card cursor-pointer">
+                                            <div class="book-cover-wrapper">
+                                                <div class="status-badge badge-requested">New</div>
+                                                <img :src="book.image"
+                                                     :alt="book.title"
+                                                     class="w-full h-full object-cover"
+                                                     loading="lazy"
+                                                     @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23593c8f%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22white%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                            </div>
+                                            <div class="book-info">
+                                                <div class="book-title-small" x-text="book.title"></div>
+                                                <div class="book-author-small" x-text="book.author || 'Unknown'"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Curated Lists -->
+                            <template x-for="(section, index) in hardcoverSections" :key="'section-'+index">
+                                <div x-show="section.books.length > 0" class="section">
+                                    <div class="section-header">
+                                        <h2 class="section-title" x-text="section.name"></h2>
+                                    </div>
+                                    <div class="books-scroll">
+                                        <template x-for="book in section.books" :key="'list-'+index+'-'+book.id">
+                                            <div class="book-card cursor-pointer">
+                                                <div class="book-cover-wrapper">
+                                                    <img :src="book.image"
+                                                         :alt="book.title"
+                                                         class="w-full h-full object-cover"
+                                                         loading="lazy"
+                                                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23593c8f%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22white%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                                </div>
+                                                <div class="book-info">
+                                                    <div class="book-title-small" x-text="book.title"></div>
+                                                    <div class="book-author-small" x-text="book.author || 'Unknown'"></div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
                 </div>
 
                 <!-- No Books -->
