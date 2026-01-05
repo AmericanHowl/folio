@@ -320,32 +320,36 @@ def search_hardcover(query, token, limit=20):
 
 
 def get_trending_hardcover(token, limit=20):
-    """Get trending books from Hardcover"""
+    """Get trending books from Hardcover using search with popularity sort"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
-    # GraphQL query for trending books
+    # GraphQL query for trending books using search sorted by activities_count
     graphql_query = """
     query TrendingBooks($limit: Int) {
-        trending_books(limit: $limit) {
-            id
-            title
-            slug
-            release_year
-            pages
-            description
-            cached_image
-            cached_contributors
-            rating
-            ratings_count
-            default_physical_edition {
-                publisher {
-                    name
-                }
-            }
-            taggings(limit: 5) {
-                tag {
-                    tag
+        search(query: "", limit: $limit, query_type: "Book", sort: "activities_count:desc") {
+            results {
+                ... on Book {
+                    id
+                    title
+                    slug
+                    release_year
+                    pages
+                    description
+                    cached_image
+                    cached_contributors
+                    rating
+                    ratings_count
+                    default_physical_edition {
+                        publisher {
+                            name
+                        }
+                    }
+                    taggings(limit: 5) {
+                        tag {
+                            tag
+                        }
+                    }
                 }
             }
         }
@@ -377,7 +381,7 @@ def get_trending_hardcover(token, limit=20):
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
-            results = data.get('data', {}).get('trending_books', [])
+            results = data.get('data', {}).get('search', {}).get('results', [])
 
             # Transform results (same format as search)
             books = []
@@ -534,20 +538,29 @@ def get_recent_releases_hardcover(token, limit=20):
         return {'error': str(e)}
 
 
-def get_list_hardcover(token, list_id, limit=20):
-    """Get books from a specific Hardcover list"""
+def get_list_hardcover(token, theme, limit=20):
+    """Get books from Hardcover based on a theme/genre using search"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
-    # GraphQL query for list books
+    # Define themes and their queries
+    themes_map = {
+        'fantasy': {'query': 'fantasy', 'name': 'Fantasy Favorites'},
+        'scifi': {'query': 'science fiction', 'name': 'Sci-Fi Adventures'},
+        'mystery': {'query': 'mystery thriller', 'name': 'Mystery & Thriller'},
+        'romance': {'query': 'romance', 'name': 'Romance Reads'},
+        'classics': {'query': 'classic literature', 'name': 'Classic Literature'},
+        'contemporary': {'query': 'contemporary fiction', 'name': 'Contemporary Fiction'}
+    }
+
+    theme_info = themes_map.get(theme, {'query': theme, 'name': theme.title()})
+
+    # GraphQL query using search with rating sort
     graphql_query = """
-    query ListBooks($listId: Int!, $limit: Int) {
-        list(id: $listId) {
-            id
-            name
-            description
-            list_books(limit: $limit) {
-                book {
+    query ThemeBooks($query: String!, $limit: Int) {
+        search(query: $query, limit: $limit, query_type: "Book", sort: "rating:desc") {
+            results {
+                ... on Book {
                     id
                     title
                     slug
@@ -577,7 +590,7 @@ def get_list_hardcover(token, list_id, limit=20):
     payload = json.dumps({
         'query': graphql_query,
         'variables': {
-            'listId': int(list_id),
+            'query': theme_info['query'],
             'limit': limit
         }
     })
@@ -600,13 +613,11 @@ def get_list_hardcover(token, list_id, limit=20):
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
-            list_data = data.get('data', {}).get('list', {})
-            list_books = list_data.get('list_books', [])
+            results = data.get('data', {}).get('search', {}).get('results', [])
 
             # Transform results
             books = []
-            for item in list_books:
-                book = item.get('book')
+            for book in results:
                 if book:
                     author = ''
                     contributors = book.get('cached_contributors', [])
@@ -644,12 +655,12 @@ def get_list_hardcover(token, list_id, limit=20):
 
             return {
                 'books': books,
-                'list_name': list_data.get('name', ''),
-                'list_description': list_data.get('description', '')
+                'list_name': theme_info['name'],
+                'list_description': f"Top-rated {theme_info['query']} books"
             }
 
     except Exception as e:
-        print(f"❌ Hardcover list error: {e}")
+        print(f"❌ Hardcover theme error: {e}")
         return {'error': str(e)}
 
 
@@ -787,20 +798,20 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Get books from a Hardcover list
+        # API: Get books from a Hardcover theme/genre
         if path == '/api/hardcover/list':
-            list_id = query_params.get('id', [''])[0]
-            if not list_id:
+            theme = query_params.get('theme', [''])[0]
+            if not theme:
                 self.send_response(400)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                response = json.dumps({'error': 'List ID parameter is required'})
+                response = json.dumps({'error': 'Theme parameter is required'})
                 self.wfile.write(response.encode('utf-8'))
                 return
 
             limit = int(query_params.get('limit', [20])[0])
             token = config.get('hardcover_token', '')
-            result = get_list_hardcover(token, list_id, limit)
+            result = get_list_hardcover(token, theme, limit)
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
