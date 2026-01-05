@@ -424,6 +424,235 @@ def get_trending_hardcover(token, limit=20):
         return {'error': str(e)}
 
 
+def get_recent_releases_hardcover(token, limit=20):
+    """Get recent book releases from Hardcover"""
+    if not token:
+        return {'error': 'No Hardcover API token configured'}
+
+    # GraphQL query for recent releases
+    graphql_query = """
+    query RecentReleases($limit: Int) {
+        books(
+            where: { release_year: { _gte: 2024 } }
+            order_by: { release_date: desc }
+            limit: $limit
+        ) {
+            id
+            title
+            slug
+            release_year
+            release_date
+            pages
+            description
+            cached_image
+            cached_contributors
+            rating
+            ratings_count
+            default_physical_edition {
+                publisher {
+                    name
+                }
+            }
+            taggings(limit: 5) {
+                tag {
+                    tag
+                }
+            }
+        }
+    }
+    """
+
+    payload = json.dumps({
+        'query': graphql_query,
+        'variables': {
+            'limit': limit
+        }
+    })
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {token}'
+    }
+
+    try:
+        req = urllib.request.Request(
+            HARDCOVER_API_URL,
+            data=payload.encode('utf-8'),
+            headers=headers,
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+
+            if 'errors' in data:
+                return {'error': data['errors'][0].get('message', 'GraphQL error')}
+
+            results = data.get('data', {}).get('books', [])
+
+            # Transform results (same format as trending)
+            books = []
+            for book in results:
+                if book:
+                    author = ''
+                    contributors = book.get('cached_contributors', [])
+                    if contributors and isinstance(contributors, list):
+                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
+                        if author_entry:
+                            author = author_entry.get('author', {}).get('name', '')
+                        elif contributors:
+                            author = contributors[0].get('author', {}).get('name', '')
+
+                    genres = []
+                    taggings = book.get('taggings', [])
+                    if taggings:
+                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
+
+                    publisher = ''
+                    default_edition = book.get('default_physical_edition')
+                    if default_edition and default_edition.get('publisher'):
+                        publisher = default_edition['publisher'].get('name', '')
+
+                    books.append({
+                        'id': book.get('id'),
+                        'title': book.get('title', ''),
+                        'author': author,
+                        'year': book.get('release_year'),
+                        'pages': book.get('pages'),
+                        'description': book.get('description', ''),
+                        'image': book.get('cached_image', ''),
+                        'rating': book.get('rating'),
+                        'ratings_count': book.get('ratings_count', 0),
+                        'publisher': publisher,
+                        'genres': genres,
+                        'slug': book.get('slug', '')
+                    })
+
+            return {'books': books}
+
+    except Exception as e:
+        print(f"❌ Hardcover recent releases error: {e}")
+        return {'error': str(e)}
+
+
+def get_list_hardcover(token, list_id, limit=20):
+    """Get books from a specific Hardcover list"""
+    if not token:
+        return {'error': 'No Hardcover API token configured'}
+
+    # GraphQL query for list books
+    graphql_query = """
+    query ListBooks($listId: Int!, $limit: Int) {
+        list(id: $listId) {
+            id
+            name
+            description
+            list_books(limit: $limit) {
+                book {
+                    id
+                    title
+                    slug
+                    release_year
+                    pages
+                    description
+                    cached_image
+                    cached_contributors
+                    rating
+                    ratings_count
+                    default_physical_edition {
+                        publisher {
+                            name
+                        }
+                    }
+                    taggings(limit: 5) {
+                        tag {
+                            tag
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """
+
+    payload = json.dumps({
+        'query': graphql_query,
+        'variables': {
+            'listId': int(list_id),
+            'limit': limit
+        }
+    })
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {token}'
+    }
+
+    try:
+        req = urllib.request.Request(
+            HARDCOVER_API_URL,
+            data=payload.encode('utf-8'),
+            headers=headers,
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+
+            if 'errors' in data:
+                return {'error': data['errors'][0].get('message', 'GraphQL error')}
+
+            list_data = data.get('data', {}).get('list', {})
+            list_books = list_data.get('list_books', [])
+
+            # Transform results
+            books = []
+            for item in list_books:
+                book = item.get('book')
+                if book:
+                    author = ''
+                    contributors = book.get('cached_contributors', [])
+                    if contributors and isinstance(contributors, list):
+                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
+                        if author_entry:
+                            author = author_entry.get('author', {}).get('name', '')
+                        elif contributors:
+                            author = contributors[0].get('author', {}).get('name', '')
+
+                    genres = []
+                    taggings = book.get('taggings', [])
+                    if taggings:
+                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
+
+                    publisher = ''
+                    default_edition = book.get('default_physical_edition')
+                    if default_edition and default_edition.get('publisher'):
+                        publisher = default_edition['publisher'].get('name', '')
+
+                    books.append({
+                        'id': book.get('id'),
+                        'title': book.get('title', ''),
+                        'author': author,
+                        'year': book.get('release_year'),
+                        'pages': book.get('pages'),
+                        'description': book.get('description', ''),
+                        'image': book.get('cached_image', ''),
+                        'rating': book.get('rating'),
+                        'ratings_count': book.get('ratings_count', 0),
+                        'publisher': publisher,
+                        'genres': genres,
+                        'slug': book.get('slug', '')
+                    })
+
+            return {
+                'books': books,
+                'list_name': list_data.get('name', ''),
+                'list_description': list_data.get('description', '')
+            }
+
+    except Exception as e:
+        print(f"❌ Hardcover list error: {e}")
+        return {'error': str(e)}
+
+
 def list_directories(path):
     """List directories at the given path"""
     try:
@@ -537,6 +766,41 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             limit = int(query_params.get('limit', [20])[0])
             token = config.get('hardcover_token', '')
             result = get_trending_hardcover(token, limit)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = json.dumps(result)
+            self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Get recent releases from Hardcover
+        if path == '/api/hardcover/recent':
+            limit = int(query_params.get('limit', [20])[0])
+            token = config.get('hardcover_token', '')
+            result = get_recent_releases_hardcover(token, limit)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = json.dumps(result)
+            self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Get books from a Hardcover list
+        if path == '/api/hardcover/list':
+            list_id = query_params.get('id', [''])[0]
+            if not list_id:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'error': 'List ID parameter is required'})
+                self.wfile.write(response.encode('utf-8'))
+                return
+
+            limit = int(query_params.get('limit', [20])[0])
+            token = config.get('hardcover_token', '')
+            result = get_list_hardcover(token, list_id, limit)
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')

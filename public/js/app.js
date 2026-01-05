@@ -324,8 +324,12 @@ function folioApp() {
             this.hardcoverLoading = true;
 
             try {
-                // Load trending books
-                await this.loadHardcoverTrending();
+                // Load all Hardcover sections in parallel
+                await Promise.all([
+                    this.loadHardcoverTrending(),
+                    this.loadHardcoverRecent(),
+                    this.loadHardcoverLists()
+                ]);
 
                 console.log('✅ Hardcover data loaded');
             } catch (error) {
@@ -333,6 +337,32 @@ function folioApp() {
             } finally {
                 this.hardcoverLoading = false;
             }
+        },
+
+        /**
+         * Load curated lists from Hardcover
+         */
+        async loadHardcoverLists() {
+            // List IDs from Hardcover (these are popular curated lists)
+            // You can find more at https://hardcover.app/@hardcover/lists
+            const listIds = [
+                286,  // Books Everyone Should Read
+                1204, // Best Books of the Year
+                523,  // Award Winners
+                892,  // Fantasy Favorites
+                745   // Mystery & Thriller Must-Reads
+            ];
+
+            // Randomly select 2 lists
+            const shuffled = listIds.sort(() => 0.5 - Math.random());
+            const selectedLists = shuffled.slice(0, 2);
+
+            // Load the selected lists
+            const listPromises = selectedLists.map(id => this.loadHardcoverList(id));
+            const results = await Promise.all(listPromises);
+
+            // Store the results
+            this.hardcoverSections = results.filter(result => result.books.length > 0);
         },
 
         /**
@@ -353,6 +383,52 @@ function folioApp() {
             } catch (error) {
                 console.error('Failed to load Hardcover trending:', error);
                 this.hardcoverTrending = [];
+            }
+        },
+
+        /**
+         * Load recent releases from Hardcover
+         */
+        async loadHardcoverRecent() {
+            try {
+                const response = await fetch('/api/hardcover/recent?limit=20');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Hardcover recent releases error:', data.error);
+                    this.hardcoverRecentReleases = [];
+                } else {
+                    this.hardcoverRecentReleases = data.books || [];
+                    console.log(`🆕 Loaded ${this.hardcoverRecentReleases.length} recent releases`);
+                }
+            } catch (error) {
+                console.error('Failed to load Hardcover recent releases:', error);
+                this.hardcoverRecentReleases = [];
+            }
+        },
+
+        /**
+         * Load books from a Hardcover list
+         */
+        async loadHardcoverList(listId) {
+            try {
+                const response = await fetch(`/api/hardcover/list?id=${listId}&limit=20`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error(`Hardcover list ${listId} error:`, data.error);
+                    return { books: [], name: '', description: '' };
+                } else {
+                    console.log(`📚 Loaded ${data.books?.length || 0} books from list: ${data.list_name}`);
+                    return {
+                        books: data.books || [],
+                        name: data.list_name || '',
+                        description: data.list_description || ''
+                    };
+                }
+            } catch (error) {
+                console.error(`Failed to load Hardcover list ${listId}:`, error);
+                return { books: [], name: '', description: '' };
             }
         },
 
