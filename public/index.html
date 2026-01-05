@@ -638,6 +638,21 @@
 
                 <!-- Grid View -->
                 <div x-show="!loading && displayedBooks.length > 0 && viewMode === 'grid'" x-cloak>
+                    <!-- Back Button -->
+                    <div class="flex items-center gap-3 mb-6 px-4">
+                        <button @click="viewMode = 'rows'; searchQuery = ''; loadBooks()"
+                                class="flex items-center gap-2 px-4 py-2 text-secondary hover:bg-accent hover:bg-opacity-10 rounded-lg transition-colors">
+                            <i class="bi bi-arrow-left text-xl"></i>
+                            <span class="font-medium">Back to Browse</span>
+                        </button>
+                        <div class="flex-1">
+                            <h2 class="text-2xl font-semibold text-dark">
+                                <span x-show="!searchQuery">All Books</span>
+                                <span x-show="searchQuery" x-text="'Results for \"' + searchQuery + '\"'"></span>
+                            </h2>
+                        </div>
+                    </div>
+
                     <div class="book-grid">
                         <template x-for="book in displayedBooks" :key="book.id">
                             <div @click="openBookModal(book)" class="book-card">
