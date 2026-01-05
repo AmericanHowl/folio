@@ -34,7 +34,7 @@
     <style>
         [x-cloak] { display: none !important; }
 
-        /* Custom Color Palette */
+        /* Custom Color Palette - Warm Library Theme */
         :root {
             /* Primary: Rose/Pink */
             --color-primary: #db5461;
@@ -161,7 +161,7 @@
         /* Top bar - minimal, native style */
         .top-bar {
             flex-shrink: 0;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(253, 249, 243, 0.95);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-bottom: 2px solid var(--color-accent);
@@ -667,6 +667,52 @@
                             <div class="animate-spin rounded-full h-8 w-8 border-4 spinner-warm"></div>
                         </div>
                     </div>
+
+                    <!-- Genre Banner -->
+                    <div class="genre-banner">
+                        <h3>Browse by Genre</h3>
+                        <div class="genre-pills">
+                            <template x-for="genre in getTopGenres()" :key="genre">
+                                <div class="genre-pill"
+                                     :class="selectedGenre === genre ? 'active' : ''"
+                                     @click="filterByGenre(genre)"
+                                     x-text="genre"></div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- By Author (first few authors with most books) -->
+                    <template x-for="author in getTopAuthors()" :key="'author-'+author">
+                        <div class="section">
+                            <div class="section-header">
+                                <h2 class="section-title" x-text="author"></h2>
+                                <a @click="searchQuery = author; searchBooks(); viewMode = 'grid'" class="view-all cursor-pointer">
+                                    View All
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </div>
+                            <div class="books-scroll">
+                                <template x-for="book in getBooksByAuthor(author)" :key="'auth-'+book.id">
+                                    <div @click="openBookModal(book)" class="book-card">
+                                        <div class="book-cover-wrapper">
+                                            <div class="status-badge badge-library">In Library</div>
+                                            <img :src="`/api/cover/${book.id}`"
+                                                 :alt="book.title"
+                                                 class="w-full h-full object-cover"
+                                                 loading="lazy"
+                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                            <div class="book-overlay">
+                                                <button class="overlay-button in-library">View Details</button>
+                                            </div>
+                                        </div>
+                                        <div class="book-info">
+                                            <div class="book-title-small" x-text="book.title"></div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
                 </div>
 
                 <!-- Row View (Sections) -->
