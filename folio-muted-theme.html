@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folio - Your Library</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #25171a;
+        }
+
+        .header {
+            background: white;
+            padding: 2rem 3rem;
+            border-bottom: 2px solid #533a7b;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            box-shadow: 0 2px 8px rgba(37, 23, 26, 0.06);
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6969b3 0%, #533a7b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            white-space: nowrap;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 600px;
+            padding: 1rem 1.5rem 1rem 3.5rem;
+            background: #fafafa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1rem;
+            color: #25171a;
+            transition: all 0.2s;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23533a7b" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>');
+            background-repeat: no-repeat;
+            background-position: 1.25rem center;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #98c1d9;
+            background-color: white;
+        }
+
+        .search-box::placeholder {
+            color: #999;
+        }
+
+        .content {
+            padding: 2rem 3rem 4rem 3rem;
+        }
+
+        .section {
+            margin-bottom: 3.5rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #25171a;
+        }
+
+        .view-all {
+            color: #6969b3;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: opacity 0.2s;
+        }
+
+        .view-all:hover {
+            opacity: 0.7;
+        }
+
+        .books-scroll {
+            display: flex;
+            gap: 1.25rem;
+            overflow-x: auto;
+            padding-bottom: 1rem;
+            scrollbar-width: thin;
+            scrollbar-color: #98c1d9 #f0f0f0;
+        }
+
+        .books-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .books-scroll::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+
+        .books-scroll::-webkit-scrollbar-thumb {
+            background: #98c1d9;
+            border-radius: 10px;
+        }
+
+        .book-card {
+            flex: 0 0 auto;
+            width: 180px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .book-card:hover {
+            transform: translateY(-8px);
+        }
+
+        .book-card:hover .book-overlay {
+            opacity: 1;
+        }
+
+        .book-cover-wrapper {
+            position: relative;
+            width: 180px;
+            height: 270px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 4px 12px rgba(46, 41, 78, 0.2);
+        }
+
+        .book-cover {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .book-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 1rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .overlay-button {
+            background: #98c1d9;
+            color: #25171a;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .overlay-button:hover {
+            background: #84b0c8;
+            transform: scale(1.05);
+        }
+
+        .overlay-button.in-library {
+            background: #533a7b;
+            color: white;
+        }
+
+        .overlay-button.in-library:hover {
+            background: #432f63;
+        }
+
+        .overlay-button.requested {
+            background: #4b244a;
+            color: white;
+        }
+
+        .overlay-button.requested:hover {
+            background: #3a1c38;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-library {
+            background: rgba(83, 58, 123, 0.9);
+            color: white;
+        }
+
+        .badge-requested {
+            background: rgba(75, 36, 74, 0.9);
+            color: white;
+        }
+
+        .badge-available {
+            background: white;
+            color: #98c1d9;
+            border: 2px solid #98c1d9;
+        }
+
+        .book-info {
+            padding: 0 0.25rem;
+        }
+
+        .book-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+            color: #25171a;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .book-author {
+            color: #666;
+            font-size: 0.8rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .book-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.35rem;
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .rating {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: #6969b3;
+        }
+
+        .year {
+            color: #888;
+        }
+
+        .hero-section {
+            background: linear-gradient(135deg, #533a7b 0%, #4b244a 100%);
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(83, 58, 123, 0.2);
+        }
+
+        .hero-content h1 {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            color: white;
+        }
+
+        .hero-content p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .view-library-link {
+            display: inline-block;
+            color: #98c1d9;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: opacity 0.2s;
+        }
+
+        .view-library-link:hover {
+            opacity: 0.8;
+        }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #98c1d9;
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        .genre-banner {
+            background: linear-gradient(135deg, #6969b3 0%, #533a7b 100%);
+            padding: 1.5rem 2rem;
+            border-radius: 12px;
+            margin: 3rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 12px rgba(105, 105, 179, 0.2);
+        }
+
+        .genre-banner h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .genre-pills {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .genre-pill {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .genre-pill:hover {
+            background: rgba(152, 193, 217, 0.4);
+            border-color: #98c1d9;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">folio</div>
+        <input type="text" class="search-box" placeholder="Search your library or discover new books...">
+    </div>
+
+    <div class="content">
+        <div class="hero-section">
+            <div class="hero-content">
+                <h1>Your Library</h1>
+                <p>342 books • 215 unread</p>
+                <a href="#" class="view-library-link">View Full Library →</a>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">52</div>
+                    <div class="stat-label">Requested</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Releases -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">New Releases</h2>
+                <a href="#" class="view-all">
+                    View All
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14m-7-7l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="books-scroll">
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1691620655i/123172674.jpg" class="book-cover" alt="Lilli">
+                        <div class="status-badge badge-requested">Requested</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button requested">Pending</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Lilli</div>
+                        <div class="book-author">Ava Reid</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.2</span>
+                            <span class="year">2024</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1699913974i/199790007.jpg" class="book-cover" alt="Jackdaw">
+                        <div class="status-badge badge-available">Available</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button">Request</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Jackdaw</div>
+                        <div class="book-author">Tade Thompson</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.1</span>
+                            <span class="year">2024</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1718722211i/210901696.jpg" class="book-cover" alt="Knock Knock, Open Wide">
+                        <div class="status-badge badge-library">In Library</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button in-library">Read Now</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Knock Knock, Open Wide</div>
+                        <div class="book-author">Neil Sharpson</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.4</span>
+                            <span class="year">2024</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1634053362i/58357693.jpg" class="book-cover" alt="Heavy Oceans">
+                        <div class="status-badge badge-available">Available</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button">Request</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Heavy Oceans</div>
+                        <div class="book-author">Tyler Jones</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.0</span>
+                            <span class="year">2023</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trending Now -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Trending Now</h2>
+                <a href="#" class="view-all">
+                    View All
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14m-7-7l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="books-scroll">
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1166574495i/830502.jpg" class="book-cover" alt="Carrie">
+                        <div class="status-badge badge-library">In Library</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button in-library">Read Now</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Carrie</div>
+                        <div class="book-author">Stephen King</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 3.9</span>
+                            <span class="year">1974</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1327942880i/41033.jpg" class="book-cover" alt="Planet of the Apes">
+                        <div class="status-badge badge-available">Available</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button">Request</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Planet of the Apes</div>
+                        <div class="book-author">Pierre Boulle</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 3.8</span>
+                            <span class="year">1963</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Genre Banner -->
+        <div class="genre-banner">
+            <h3>Explore by Genre</h3>
+            <div class="genre-pills">
+                <div class="genre-pill">Horror</div>
+                <div class="genre-pill">Sci-Fi</div>
+                <div class="genre-pill">Mystery</div>
+                <div class="genre-pill">Fantasy</div>
+                <div class="genre-pill">Literary Fiction</div>
+            </div>
+        </div>
+
+        <!-- Horror -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Horror</h2>
+                <a href="#" class="view-all">
+                    View All
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14m-7-7l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="books-scroll">
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1166574495i/830502.jpg" class="book-cover" alt="Carrie">
+                        <div class="status-badge badge-library">In Library</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button in-library">Read Now</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Carrie</div>
+                        <div class="book-author">Stephen King</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 3.9</span>
+                            <span class="year">1974</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1718722211i/210901696.jpg" class="book-cover" alt="Knock Knock, Open Wide">
+                        <div class="status-badge badge-library">In Library</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button in-library">Read Now</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Knock Knock, Open Wide</div>
+                        <div class="book-author">Neil Sharpson</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.4</span>
+                            <span class="year">2024</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1691620655i/123172674.jpg" class="book-cover" alt="Lilli">
+                        <div class="status-badge badge-requested">Requested</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button requested">Pending</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Lilli</div>
+                        <div class="book-author">Ava Reid</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.2</span>
+                            <span class="year">2024</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Science Fiction -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Science Fiction</h2>
+                <a href="#" class="view-all">
+                    View All
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14m-7-7l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="books-scroll">
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1327942880i/41033.jpg" class="book-cover" alt="Planet of the Apes">
+                        <div class="status-badge badge-available">Available</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button">Request</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Planet of the Apes</div>
+                        <div class="book-author">Pierre Boulle</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 3.8</span>
+                            <span class="year">1963</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1699913974i/199790007.jpg" class="book-cover" alt="Jackdaw">
+                        <div class="status-badge badge-available">Available</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button">Request</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Jackdaw</div>
+                        <div class="book-author">Tade Thompson</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.1</span>
+                            <span class="year">2024</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1634053362i/58357693.jpg" class="book-cover" alt="Heavy Oceans">
+                        <div class="status-badge badge-available">Available</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button">Request</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Heavy Oceans</div>
+                        <div class="book-author">Tyler Jones</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.0</span>
+                            <span class="year">2023</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recently Added to Library -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Recently Added to Library</h2>
+                <a href="#" class="view-all">
+                    View All
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14m-7-7l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="books-scroll">
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1718722211i/210901696.jpg" class="book-cover" alt="Knock Knock, Open Wide">
+                        <div class="status-badge badge-library">In Library</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button in-library">Read Now</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Knock Knock, Open Wide</div>
+                        <div class="book-author">Neil Sharpson</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.4</span>
+                            <span class="year">2024</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="book-card">
+                    <div class="book-cover-wrapper">
+                        <img src="https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1394533954i/18407564.jpg" class="book-cover" alt="Say Nothing">
+                        <div class="status-badge badge-library">In Library</div>
+                        <div class="book-overlay">
+                            <button class="overlay-button in-library">Read Now</button>
+                        </div>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">Say Nothing</div>
+                        <div class="book-author">Patrick Radden Keefe</div>
+                        <div class="book-meta">
+                            <span class="rating">★ 4.5</span>
+                            <span class="year">2018</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
