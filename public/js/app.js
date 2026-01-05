@@ -20,6 +20,9 @@ function folioApp() {
         isEditingMetadata: false,
         editingBook: null,
 
+        // View mode
+        viewMode: 'rows', // 'grid' or 'rows'
+
         // Pagination
         booksPerPage: 30,
         currentPage: 0,
@@ -35,11 +38,25 @@ function folioApp() {
 
         // Configuration
         calibreLibraryPath: '',
+        hardcoverToken: false, // Boolean indicating if token is set
 
         // Directory Browser
         browserPath: '',
         browserParent: null,
         browserEntries: [],
+
+        // Hardcover integration
+        hardcoverSearchQuery: '',
+        hardcoverBooks: [],
+        hardcoverSections: [],
+        hardcoverLoading: false,
+        selectedHardcoverBook: null,
+
+        // Requests
+        requestedBooks: [],
+
+        // Genre filtering
+        selectedGenre: null,
 
         /**
          * Initialize the application
@@ -59,6 +76,9 @@ function folioApp() {
 
             // Load books
             await this.loadBooks();
+
+            // Load requested books
+            await this.loadRequestedBooks();
 
             // Start auto-update check
             this.startAutoUpdate();
@@ -265,6 +285,7 @@ function folioApp() {
                 const response = await fetch('/api/config');
                 const data = await response.json();
                 this.calibreLibraryPath = data.calibre_library || '';
+                this.hardcoverToken = data.hardcover_token || false;
                 console.log('📖 Loaded config:', data);
             } catch (error) {
                 console.error('Failed to load config:', error);
@@ -272,24 +293,33 @@ function folioApp() {
         },
 
         /**
-         * Save settings (library path to server)
+         * Save settings (library path and Hardcover token to server)
          */
         async saveSettings() {
-            // Save library path to server
             try {
+                // Build payload with all settings
+                const payload = {
+                    calibre_library: this.calibreLibraryPath
+                };
+
+                // Only send token if it's a non-empty string (not a boolean)
+                if (typeof this.hardcoverToken === 'string' && this.hardcoverToken.trim()) {
+                    payload.hardcover_token = this.hardcoverToken.trim();
+                }
+
                 const response = await fetch('/api/config', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        calibre_library: this.calibreLibraryPath
-                    }),
+                    body: JSON.stringify(payload),
                 });
 
                 const result = await response.json();
                 if (result.success) {
                     console.log('✅ Settings saved');
+                    // Update local state with returned config
+                    this.hardcoverToken = result.config.hardcover_token;
                     this.loadBooks();
                 } else {
                     console.error('Failed to save settings:', result.error);
@@ -548,6 +578,325 @@ function folioApp() {
                 }
             });
             return Array.from(genresSet).sort();
+        },
+
+        // ============================================
+        // Hardcover Integration
+        // ============================================
+
+        /**
+         * Search Hardcover for books
+         */
+        async searchHardcover() {
+            if (!this.hardcoverSearchQuery.trim()) {
+                return;
+            }
+
+            this.hardcoverLoading = true;
+            this.hardcoverBooks = [];
+
+            try {
+                const response = await fetch(`/api/hardcover/search?q=${encodeURIComponent(this.hardcoverSearchQuery)}&limit=30`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Hardcover search error:', data.error);
+                    alert('Hardcover search failed: ' + data.error);
+                    return;
+                }
+
+                // Add library matching to results
+                this.hardcoverBooks = this.matchWithLibrary(data.books || []);
+                console.log(`🔍 Found ${this.hardcoverBooks.length} books on Hardcover`);
+            } catch (error) {
+                console.error('Failed to search Hardcover:', error);
+                alert('Failed to search Hardcover: ' + error.message);
+            } finally {
+                this.hardcoverLoading = false;
+            }
+        },
+
+        /**
+         * Load trending books from Hardcover
+         */
+        async loadTrendingBooks() {
+            if (!this.hardcoverToken) return;
+
+            this.hardcoverLoading = true;
+
+            try {
+                const response = await fetch('/api/hardcover/trending?limit=20');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Failed to load trending:', data.error);
+                    return;
+                }
+
+                this.hardcoverBooks = this.matchWithLibrary(data.books || []);
+                console.log(`📈 Loaded ${this.hardcoverBooks.length} trending books`);
+            } catch (error) {
+                console.error('Failed to load trending books:', error);
+            } finally {
+                this.hardcoverLoading = false;
+            }
+        },
+
+        /**
+         * Match Hardcover books with local library using fuzzy matching
+         */
+        matchWithLibrary(hardcoverBooks) {
+            return hardcoverBooks.map(book => {
+                // Check if already requested
+                const isRequested = this.requestedBooks.some(r => r.id === book.id);
+
+                // Fuzzy match with library
+                const libraryMatch = this.findLibraryMatch(book);
+
+                return {
+                    ...book,
+                    inLibrary: !!libraryMatch,
+                    libraryBookId: libraryMatch?.id,
+                    requested: isRequested
+                };
+            });
+        },
+
+        /**
+         * Find a matching book in the local library using fuzzy logic
+         */
+        findLibraryMatch(hardcoverBook) {
+            const hcTitle = this.normalizeForMatching(hardcoverBook.title);
+            const hcAuthor = this.normalizeForMatching(hardcoverBook.author);
+
+            for (const book of this.books) {
+                const libTitle = this.normalizeForMatching(book.title);
+                const libAuthor = this.normalizeForMatching(
+                    Array.isArray(book.authors) ? book.authors.join(' ') : book.authors
+                );
+
+                // Check for title match
+                const titleSimilarity = this.calculateSimilarity(hcTitle, libTitle);
+
+                // Check for author match
+                const authorSimilarity = this.calculateSimilarity(hcAuthor, libAuthor);
+
+                // Consider it a match if title is very similar and author has some similarity
+                if (titleSimilarity > 0.85 && authorSimilarity > 0.5) {
+                    return book;
+                }
+
+                // Also match if both title and author are reasonably similar
+                if (titleSimilarity > 0.7 && authorSimilarity > 0.7) {
+                    return book;
+                }
+            }
+
+            return null;
+        },
+
+        /**
+         * Normalize a string for fuzzy matching
+         */
+        normalizeForMatching(str) {
+            if (!str) return '';
+            return str
+                .toLowerCase()
+                .replace(/[^a-z0-9\s]/g, '') // Remove punctuation
+                .replace(/\s+/g, ' ')         // Normalize whitespace
+                .trim();
+        },
+
+        /**
+         * Calculate similarity between two strings (0-1)
+         * Uses a simple approach based on common words
+         */
+        calculateSimilarity(str1, str2) {
+            if (!str1 || !str2) return 0;
+            if (str1 === str2) return 1;
+
+            const words1 = new Set(str1.split(' ').filter(w => w.length > 2));
+            const words2 = new Set(str2.split(' ').filter(w => w.length > 2));
+
+            if (words1.size === 0 || words2.size === 0) {
+                // Fallback to substring matching for short strings
+                if (str1.includes(str2) || str2.includes(str1)) return 0.8;
+                return 0;
+            }
+
+            const intersection = [...words1].filter(w => words2.has(w));
+            const union = new Set([...words1, ...words2]);
+
+            return intersection.length / union.size;
+        },
+
+        /**
+         * Open modal for Hardcover book
+         */
+        openHardcoverModal(book) {
+            this.selectedHardcoverBook = book;
+        },
+
+        /**
+         * View a book in the library
+         */
+        viewInLibrary(hardcoverBook) {
+            if (hardcoverBook.libraryBookId) {
+                const book = this.books.find(b => b.id === hardcoverBook.libraryBookId);
+                if (book) {
+                    this.selectedHardcoverBook = null;
+                    this.currentTab = 'library';
+                    this.openBookModal(book);
+                }
+            }
+        },
+
+        // ============================================
+        // Request Management
+        // ============================================
+
+        /**
+         * Load requested books from server
+         */
+        async loadRequestedBooks() {
+            try {
+                const response = await fetch('/api/requests');
+                const data = await response.json();
+                this.requestedBooks = data.books || [];
+                console.log(`📋 Loaded ${this.requestedBooks.length} book requests`);
+            } catch (error) {
+                console.error('Failed to load requests:', error);
+            }
+        },
+
+        /**
+         * Request a book from Hardcover
+         */
+        async requestBook(book) {
+            try {
+                const response = await fetch('/api/requests', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ book }),
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.requestedBooks = data.books;
+                    book.requested = true;
+                    console.log(`📬 Requested: ${book.title}`);
+                } else {
+                    alert('Failed to request book: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to request book:', error);
+                alert('Failed to request book: ' + error.message);
+            }
+        },
+
+        /**
+         * Cancel a book request
+         */
+        async cancelRequest(book) {
+            try {
+                const response = await fetch(`/api/requests/${book.id}`, {
+                    method: 'DELETE',
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.requestedBooks = data.books;
+                    book.requested = false;
+                    console.log(`🗑️ Cancelled request: ${book.title}`);
+                }
+            } catch (error) {
+                console.error('Failed to cancel request:', error);
+            }
+        },
+
+        // ============================================
+        // Section View Helpers
+        // ============================================
+
+        /**
+         * Get recently added books (sorted by timestamp)
+         */
+        getRecentBooks() {
+            return [...this.books]
+                .sort((a, b) => {
+                    const dateA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+                    const dateB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+                    return dateB - dateA;
+                })
+                .slice(0, 15);
+        },
+
+        /**
+         * Get top genres from the library
+         */
+        getTopGenres() {
+            const genreCounts = {};
+            this.books.forEach(book => {
+                if (Array.isArray(book.tags)) {
+                    book.tags.forEach(tag => {
+                        genreCounts[tag] = (genreCounts[tag] || 0) + 1;
+                    });
+                }
+            });
+
+            return Object.entries(genreCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6)
+                .map(([genre]) => genre);
+        },
+
+        /**
+         * Get top authors (those with most books)
+         */
+        getTopAuthors() {
+            const authorCounts = {};
+            this.books.forEach(book => {
+                const author = Array.isArray(book.authors) ? book.authors[0] : book.authors;
+                if (author) {
+                    authorCounts[author] = (authorCounts[author] || 0) + 1;
+                }
+            });
+
+            return Object.entries(authorCounts)
+                .filter(([_, count]) => count >= 2) // Only authors with 2+ books
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([author]) => author);
+        },
+
+        /**
+         * Get books by a specific author
+         */
+        getBooksByAuthor(authorName) {
+            return this.books.filter(book => {
+                const author = Array.isArray(book.authors) ? book.authors[0] : book.authors;
+                return author === authorName;
+            }).slice(0, 10);
+        },
+
+        /**
+         * Filter books by genre
+         */
+        filterByGenre(genre) {
+            if (this.selectedGenre === genre) {
+                // Deselect
+                this.selectedGenre = null;
+                this.filteredBooks = this.books;
+            } else {
+                this.selectedGenre = genre;
+                this.filteredBooks = this.books.filter(book =>
+                    Array.isArray(book.tags) && book.tags.includes(genre)
+                );
+            }
+            this.updateDisplayedBooks();
+            this.viewMode = 'grid'; // Switch to grid to show filtered results
         },
     };
 }

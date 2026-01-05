@@ -18,10 +18,13 @@ from pathlib import Path
 
 PORT = 9099
 CONFIG_FILE = "config.json"
+HARDCOVER_API_URL = "https://api.hardcover.app/v1/graphql"
 
 # Global config
 config = {
-    'calibre_library': os.getenv('CALIBRE_LIBRARY', os.path.expanduser('~/Calibre Library'))
+    'calibre_library': os.getenv('CALIBRE_LIBRARY', os.path.expanduser('~/Calibre Library')),
+    'hardcover_token': os.getenv('HARDCOVER_TOKEN', ''),
+    'requested_books': []  # Store requested book IDs
 }
 
 
@@ -195,6 +198,232 @@ def run_calibredb(args):
         return {'success': False, 'error': error_msg}
 
 
+def search_hardcover(query, token, limit=20):
+    """Search Hardcover API for books"""
+    if not token:
+        return {'error': 'No Hardcover API token configured'}
+
+    # GraphQL query for searching books
+    graphql_query = """
+    query SearchBooks($query: String!, $limit: Int) {
+        search(query: $query, limit: $limit, query_type: "Book") {
+            results {
+                ... on Book {
+                    id
+                    title
+                    slug
+                    release_year
+                    pages
+                    description
+                    cached_image
+                    cached_contributors
+                    rating
+                    ratings_count
+                    default_physical_edition {
+                        publisher {
+                            name
+                        }
+                    }
+                    taggings(limit: 5) {
+                        tag {
+                            tag
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """
+
+    payload = json.dumps({
+        'query': graphql_query,
+        'variables': {
+            'query': query,
+            'limit': limit
+        }
+    })
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {token}'
+    }
+
+    try:
+        req = urllib.request.Request(
+            HARDCOVER_API_URL,
+            data=payload.encode('utf-8'),
+            headers=headers,
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+
+            if 'errors' in data:
+                return {'error': data['errors'][0].get('message', 'GraphQL error')}
+
+            results = data.get('data', {}).get('search', {}).get('results', [])
+
+            # Transform results to a simpler format
+            books = []
+            for book in results:
+                if book:  # Filter out null results
+                    # Extract author from cached_contributors
+                    author = ''
+                    contributors = book.get('cached_contributors', [])
+                    if contributors and isinstance(contributors, list):
+                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
+                        if author_entry:
+                            author = author_entry.get('author', {}).get('name', '')
+                        elif contributors:
+                            # Fallback to first contributor
+                            author = contributors[0].get('author', {}).get('name', '')
+
+                    # Extract genres/tags
+                    genres = []
+                    taggings = book.get('taggings', [])
+                    if taggings:
+                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
+
+                    # Get publisher
+                    publisher = ''
+                    default_edition = book.get('default_physical_edition')
+                    if default_edition and default_edition.get('publisher'):
+                        publisher = default_edition['publisher'].get('name', '')
+
+                    books.append({
+                        'id': book.get('id'),
+                        'title': book.get('title', ''),
+                        'author': author,
+                        'year': book.get('release_year'),
+                        'pages': book.get('pages'),
+                        'description': book.get('description', ''),
+                        'image': book.get('cached_image', ''),
+                        'rating': book.get('rating'),
+                        'ratings_count': book.get('ratings_count', 0),
+                        'publisher': publisher,
+                        'genres': genres,
+                        'slug': book.get('slug', '')
+                    })
+
+            return {'books': books}
+
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8') if e.fp else ''
+        print(f"❌ Hardcover API error: {e.code} - {error_body}")
+        return {'error': f'API error: {e.code}'}
+    except urllib.error.URLError as e:
+        print(f"❌ Hardcover connection error: {e.reason}")
+        return {'error': f'Connection error: {e.reason}'}
+    except Exception as e:
+        print(f"❌ Hardcover search error: {e}")
+        return {'error': str(e)}
+
+
+def get_trending_hardcover(token, limit=20):
+    """Get trending books from Hardcover"""
+    if not token:
+        return {'error': 'No Hardcover API token configured'}
+
+    # GraphQL query for trending books
+    graphql_query = """
+    query TrendingBooks($limit: Int) {
+        trending_books(limit: $limit) {
+            id
+            title
+            slug
+            release_year
+            pages
+            description
+            cached_image
+            cached_contributors
+            rating
+            ratings_count
+            default_physical_edition {
+                publisher {
+                    name
+                }
+            }
+            taggings(limit: 5) {
+                tag {
+                    tag
+                }
+            }
+        }
+    }
+    """
+
+    payload = json.dumps({
+        'query': graphql_query,
+        'variables': {
+            'limit': limit
+        }
+    })
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {token}'
+    }
+
+    try:
+        req = urllib.request.Request(
+            HARDCOVER_API_URL,
+            data=payload.encode('utf-8'),
+            headers=headers,
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+
+            if 'errors' in data:
+                return {'error': data['errors'][0].get('message', 'GraphQL error')}
+
+            results = data.get('data', {}).get('trending_books', [])
+
+            # Transform results (same format as search)
+            books = []
+            for book in results:
+                if book:
+                    author = ''
+                    contributors = book.get('cached_contributors', [])
+                    if contributors and isinstance(contributors, list):
+                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
+                        if author_entry:
+                            author = author_entry.get('author', {}).get('name', '')
+                        elif contributors:
+                            author = contributors[0].get('author', {}).get('name', '')
+
+                    genres = []
+                    taggings = book.get('taggings', [])
+                    if taggings:
+                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
+
+                    publisher = ''
+                    default_edition = book.get('default_physical_edition')
+                    if default_edition and default_edition.get('publisher'):
+                        publisher = default_edition['publisher'].get('name', '')
+
+                    books.append({
+                        'id': book.get('id'),
+                        'title': book.get('title', ''),
+                        'author': author,
+                        'year': book.get('release_year'),
+                        'pages': book.get('pages'),
+                        'description': book.get('description', ''),
+                        'image': book.get('cached_image', ''),
+                        'rating': book.get('rating'),
+                        'ratings_count': book.get('ratings_count', 0),
+                        'publisher': publisher,
+                        'genres': genres,
+                        'slug': book.get('slug', '')
+                    })
+
+            return {'books': books}
+
+    except Exception as e:
+        print(f"❌ Hardcover trending error: {e}")
+        return {'error': str(e)}
+
+
 def list_directories(path):
     """List directories at the given path"""
     try:
@@ -271,7 +500,57 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
-            response = json.dumps(config)
+            # Don't expose the full token, just whether it's set
+            safe_config = {
+                **config,
+                'hardcover_token': bool(config.get('hardcover_token'))
+            }
+            response = json.dumps(safe_config)
+            self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Search Hardcover
+        if path == '/api/hardcover/search':
+            query = query_params.get('q', [''])[0]
+            limit = int(query_params.get('limit', [20])[0])
+
+            if not query:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'error': 'Query parameter q is required'})
+                self.wfile.write(response.encode('utf-8'))
+                return
+
+            token = config.get('hardcover_token', '')
+            result = search_hardcover(query, token, limit)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = json.dumps(result)
+            self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Get trending from Hardcover
+        if path == '/api/hardcover/trending':
+            limit = int(query_params.get('limit', [20])[0])
+            token = config.get('hardcover_token', '')
+            result = get_trending_hardcover(token, limit)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = json.dumps(result)
+            self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Get requested books
+        if path == '/api/requests':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = json.dumps({'books': config.get('requested_books', [])})
             self.wfile.write(response.encode('utf-8'))
             return
 
@@ -391,13 +670,20 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 # Update config
                 if 'calibre_library' in data:
                     config['calibre_library'] = os.path.expanduser(data['calibre_library'])
+                if 'hardcover_token' in data:
+                    config['hardcover_token'] = data['hardcover_token']
 
                 # Save to file
                 if save_config():
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
-                    response = json.dumps({'success': True, 'config': config})
+                    # Return safe config (without full token)
+                    safe_config = {
+                        **config,
+                        'hardcover_token': bool(config.get('hardcover_token'))
+                    }
+                    response = json.dumps({'success': True, 'config': safe_config})
                     self.wfile.write(response.encode('utf-8'))
                 else:
                     self.send_response(500)
@@ -407,6 +693,59 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(response.encode('utf-8'))
             except Exception as e:
                 self.send_error(400, f"Bad Request: {e}")
+            return
+
+        # API: Add book request
+        if self.path == '/api/requests':
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length)
+
+            try:
+                data = json.loads(body.decode('utf-8'))
+                book = data.get('book')
+
+                if not book:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'error': 'Book data is required'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                # Add to requested books if not already there
+                requested_books = config.get('requested_books', [])
+                if not any(b.get('id') == book.get('id') for b in requested_books):
+                    requested_books.append(book)
+                    config['requested_books'] = requested_books
+                    save_config()
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': True, 'books': requested_books})
+                self.wfile.write(response.encode('utf-8'))
+            except Exception as e:
+                self.send_error(400, f"Bad Request: {e}")
+            return
+
+        self.send_error(404, "Not Found")
+
+    def do_DELETE(self):
+        """Handle DELETE requests"""
+        # API: Remove book request
+        match = re.match(r'/api/requests/(\d+)', self.path)
+        if match:
+            book_id = int(match.group(1))
+
+            requested_books = config.get('requested_books', [])
+            config['requested_books'] = [b for b in requested_books if b.get('id') != book_id]
+            save_config()
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = json.dumps({'success': True, 'books': config['requested_books']})
+            self.wfile.write(response.encode('utf-8'))
             return
 
         self.send_error(404, "Not Found")
@@ -504,14 +843,14 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         """Handle CORS preflight requests"""
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, PUT, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
     def end_headers(self):
         # Add CORS headers
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, PUT, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         super().end_headers()
 
@@ -523,10 +862,17 @@ if __name__ == "__main__":
     with socketserver.TCPServer(("", PORT), FolioHandler) as httpd:
         print(f"🚀 Folio server running at http://localhost:{PORT}")
         print(f"📖 Calibre Library: {get_calibre_library()}")
-        print(f"\n   /api/books → Book list from metadata.db")
+        print(f"🔑 Hardcover API: {'Configured' if config.get('hardcover_token') else 'Not configured'}")
+        print(f"\n   Library APIs:")
+        print(f"   /api/books → Book list from metadata.db")
         print(f"   /api/cover/* → Book covers")
-        print(f"   /api/download/{id}/{format} → Download book files")
+        print(f"   /api/download/{{id}}/{{format}} → Download book files")
         print(f"   /api/metadata-and-cover/* → Metadata editing")
+        print(f"\n   Hardcover APIs:")
+        print(f"   /api/hardcover/search?q=query → Search Hardcover")
+        print(f"   /api/hardcover/trending → Trending books")
+        print(f"   /api/requests → Manage book requests")
+        print(f"\n   Config:")
         print(f"   /api/config → Configuration")
         print(f"   /api/browse → Directory browser")
         print(f"\n   📱 E-ink interface: http://localhost:{PORT}/eink.html")
