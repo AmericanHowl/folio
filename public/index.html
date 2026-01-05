@@ -596,34 +596,34 @@
     <div class="app-container">
         <!-- Top Bar -->
         <div class="top-bar">
-            <div class="flex items-center gap-3">
-                <h1 class="text-2xl font-calsans text-primary">folio</h1>
+            <!-- Logo -->
+            <h1 class="text-2xl font-calsans text-primary flex-shrink-0">folio</h1>
+
+            <!-- Search Bar -->
+            <div class="flex-1 max-w-2xl relative">
+                <i class="bi bi-search absolute left-4 top-1/2 transform -translate-y-1/2 text-secondary text-lg"></i>
+                <input type="text"
+                       x-model="searchQuery"
+                       @input.debounce.500ms="searchBooks()"
+                       placeholder="Search your library or discover new books..."
+                       class="w-full pl-12 pr-4 py-2 bg-white text-dark placeholder-gray-400 rounded-lg border-2 border-accent focus:ring-2 focus:ring-secondary focus:border-secondary shadow-sm">
             </div>
-            <!-- Navigation -->
-            <div class="flex items-center gap-4 sm:gap-6">
-                <a @click="currentTab = 'library'"
-                   :class="currentTab === 'library' ? 'text-primary font-semibold' : 'text-gray-600'"
-                   class="inline-flex items-center gap-1 sm:gap-2 text-xs sm:text-sm cursor-pointer hover:text-primary transition-colors">
-                    <i class="bi bi-collection text-lg sm:text-base"></i>
-                    <span class="hidden sm:inline">Library</span>
-                </a>
-                <a @click="currentTab = 'requests'"
-                   :class="currentTab === 'requests' ? 'text-primary font-semibold' : 'text-gray-600'"
-                   class="inline-flex items-center gap-1 sm:gap-2 text-xs sm:text-sm cursor-pointer hover:text-primary transition-colors">
-                    <i class="bi bi-inbox text-lg sm:text-base"></i>
-                    <span class="hidden sm:inline">Requests</span>
-                </a>
-                <a @click="currentTab = 'explore'"
-                   :class="currentTab === 'explore' ? 'text-primary font-semibold' : 'text-gray-600'"
-                   class="inline-flex items-center gap-1 sm:gap-2 text-xs sm:text-sm cursor-pointer hover:text-primary transition-colors">
-                    <i class="bi bi-compass text-lg sm:text-base"></i>
-                    <span class="hidden sm:inline">Explore</span>
-                </a>
-                <a @click="showSettings = true"
-                   class="text-gray-600 inline-flex items-center gap-1 sm:gap-2 text-xs sm:text-sm cursor-pointer hover:text-primary transition-colors">
-                    <i class="bi bi-gear text-lg sm:text-base"></i>
-                    <span class="hidden sm:inline">Settings</span>
-                </a>
+
+            <!-- Controls -->
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <!-- Toggle between local only and local + Hardcover -->
+                <button @click="toggleHardcoverMode()"
+                        :class="includeHardcover ? 'bg-secondary text-white' : 'bg-white text-secondary border-2 border-secondary'"
+                        class="p-2 rounded-lg transition-colors hover:opacity-80"
+                        title="Toggle Hardcover books">
+                    <i class="bi bi-globe text-lg"></i>
+                </button>
+
+                <!-- Settings -->
+                <button @click="showSettings = true"
+                        class="p-2 text-secondary hover:bg-accent hover:bg-opacity-10 rounded-lg transition-colors">
+                    <i class="bi bi-gear text-lg"></i>
+                </button>
             </div>
         </div>
 
@@ -631,81 +631,6 @@
         <main class="main-content">
             <!-- Library Tab -->
             <div x-show="currentTab === 'library'" x-cloak>
-                <!-- New Books Notification -->
-                <div x-show="hasNewBooks" x-cloak class="mx-4 mt-4 bg-cream border border-warm rounded-xl p-4">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-3 flex-1 min-w-0">
-                            <i class="bi bi-info-circle text-primary text-xl flex-shrink-0"></i>
-                            <p class="text-sm text-dark font-medium">New books available!</p>
-                        </div>
-                        <button @click="refreshLibrary()"
-                                class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark active:bg-primary-dark flex-shrink-0">
-                            Refresh
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Hero Section -->
-                <div class="hero-section">
-                    <div class="hero-content">
-                        <h1>Your Library</h1>
-                        <p x-text="`${books.length} books`"></p>
-                    </div>
-                    <div class="hero-stats">
-                        <div class="stat">
-                            <div class="stat-number" x-text="requestedBooks.length">0</div>
-                            <div class="stat-label">Requested</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Search Bar -->
-                <div class="px-4 pb-4">
-                    <div class="relative">
-                        <i class="bi bi-search absolute left-4 top-1/2 transform -translate-y-1/2 text-secondary text-lg"></i>
-                        <input type="text"
-                               x-model="searchQuery"
-                               @input.debounce.500ms="searchBooks()"
-                               placeholder="Search your library or discover new books..."
-                               class="w-full pl-12 pr-4 py-3 bg-white text-dark placeholder-gray-400 rounded-xl border-2 border-warm focus:ring-2 focus:ring-primary focus:border-primary shadow-sm">
-                    </div>
-                </div>
-
-                <!-- Sort Controls - Horizontal scroll on mobile -->
-                <div class="px-4 pb-4 overflow-x-auto hide-scrollbar">
-                    <div class="flex gap-2 min-w-max">
-                        <button @click="changeSortOrder('title-asc')"
-                                :class="sortBy === 'title-asc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
-                            A-Z
-                        </button>
-                        <button @click="changeSortOrder('title-desc')"
-                                :class="sortBy === 'title-desc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
-                            Z-A
-                        </button>
-                        <button @click="changeSortOrder('author-asc')"
-                                :class="sortBy === 'author-asc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
-                            Author
-                        </button>
-                        <button @click="changeSortOrder('date-desc')"
-                                :class="sortBy === 'date-desc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
-                            Newest
-                        </button>
-                        <button @click="changeSortOrder('date-asc')"
-                                :class="sortBy === 'date-asc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
-                            Oldest
-                        </button>
-                        <button @click="viewMode = viewMode === 'grid' ? 'rows' : 'grid'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border-2 border-warm bg-white text-gray-700 whitespace-nowrap transition-all">
-                            <i :class="viewMode === 'grid' ? 'bi-list' : 'bi-grid-3x3-gap-fill'" class="bi"></i>
-                        </button>
-                    </div>
-                </div>
-
                 <!-- Loading -->
                 <div x-show="loading" class="flex justify-center items-center py-20">
                     <div class="animate-spin rounded-full h-12 w-12 border-4 spinner-warm"></div>
@@ -774,19 +699,6 @@
                                         <div class="book-author-small" x-text="Array.isArray(book.authors) ? book.authors[0] : book.authors"></div>
                                     </div>
                                 </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- Genre Banner -->
-                    <div class="genre-banner">
-                        <h3>Browse by Genre</h3>
-                        <div class="genre-pills">
-                            <template x-for="genre in getTopGenres()" :key="genre">
-                                <div class="genre-pill"
-                                     :class="selectedGenre === genre ? 'active' : ''"
-                                     @click="filterByGenre(genre)"
-                                     x-text="genre"></div>
                             </template>
                         </div>
                     </div>
