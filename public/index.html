@@ -36,44 +36,89 @@
 
         /* Custom Color Palette */
         :root {
-            --color-primary: #55D6BE;
-            --color-primary-dark: #3fb8a3;
-            --color-secondary: #FC6471;
-            --color-accent: #FC6471;
-            --color-dark: #042a2b;
-            --color-cream: #cdedf6;
-            --color-header: #7D5BA6;
-            --color-border: #ACFCD9;
+            /* Primary: Rose/Pink */
+            --color-primary: #db5461;
+            --color-primary-dark: #c03d4a;
+            --color-primary-light: #ff7e8a;
+
+            /* Secondary: Purple */
+            --color-secondary: #593c8f;
+            --color-secondary-dark: #3f2a65;
+            --color-secondary-light: #7a5fb0;
+
+            /* Accent: Cyan */
+            --color-accent: #8ef9f3;
+            --color-accent-dark: #6dd9d3;
+            --color-accent-light: #b0fcf8;
+
+            /* Tertiary: Peach */
+            --color-peach: #ffd9ce;
+            --color-peach-dark: #ffbfad;
+
+            /* Neutrals */
+            --color-dark: #171738;
+            --color-cream: #ffd9ce;
+            --color-warm-white: #ffffff;
+            --color-parchment: #ffd9ce;
+
+            /* Header & UI */
+            --color-header: #593c8f;
+            --color-border: #8ef9f3;
+            --color-border-dark: #6dd9d3;
+
+            /* Status Colors */
+            --color-in-library: #593c8f;
+            --color-requested: #db5461;
+            --color-available: #8ef9f3;
         }
 
         /* Custom color classes */
         .bg-primary { background-color: var(--color-primary); }
         .bg-primary-dark { background-color: var(--color-primary-dark); }
+        .bg-primary-light { background-color: var(--color-primary-light); }
         .bg-secondary { background-color: var(--color-secondary); }
+        .bg-secondary-dark { background-color: var(--color-secondary-dark); }
+        .bg-secondary-light { background-color: var(--color-secondary-light); }
         .bg-accent { background-color: var(--color-accent); }
+        .bg-accent-light { background-color: var(--color-accent-light); }
         .bg-dark { background-color: var(--color-dark); }
         .bg-cream { background-color: var(--color-cream); }
+        .bg-warm-white { background-color: var(--color-warm-white); }
+        .bg-parchment { background-color: var(--color-parchment); }
+        .bg-peach { background-color: var(--color-peach); }
 
         .text-primary { color: var(--color-primary); }
         .text-primary-dark { color: var(--color-primary-dark); }
         .text-secondary { color: var(--color-secondary); }
+        .text-secondary-light { color: var(--color-secondary-light); }
         .text-accent { color: var(--color-accent); }
         .text-dark { color: var(--color-dark); }
         .text-header { color: var(--color-header); }
+        .text-gold { color: var(--color-gold); }
 
         .border-primary { border-color: var(--color-primary); }
         .border-secondary { border-color: var(--color-secondary); }
         .border-accent { border-color: var(--color-accent); }
-        .border-mint { border-color: var(--color-border); }
+        .border-warm { border-color: var(--color-border); }
+        .border-warm-dark { border-color: var(--color-border-dark); }
 
         .hover\:bg-primary-dark:hover { background-color: var(--color-primary-dark); }
         .hover\:bg-secondary:hover { background-color: var(--color-secondary); }
+        .hover\:bg-secondary-dark:hover { background-color: var(--color-secondary-dark); }
         .hover\:text-primary:hover { color: var(--color-primary); }
         .active\:bg-primary-dark:active { background-color: var(--color-primary-dark); }
 
         .focus\:ring-primary:focus {
             --tw-ring-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(85, 214, 190, 0.3);
+            box-shadow: 0 0 0 3px rgba(196, 93, 53, 0.3);
+        }
+
+        /* Gradient backgrounds */
+        .bg-gradient-hero {
+            background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-accent) 100%);
+        }
+        .bg-gradient-warm {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
         }
 
         /* Safe Area Support */
@@ -88,8 +133,8 @@
         }
 
         body {
-            background: linear-gradient(to bottom, #ffffff 0%, #cdedf6 100%);
-            color: #1f2937;
+            background: #ffffff;
+            color: var(--color-dark);
             -webkit-overflow-scrolling: touch;
             height: 100%;
             margin: 0;
@@ -119,12 +164,14 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+            border-bottom: 2px solid var(--color-accent);
             padding: 12px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 16px;
             height: 56px;
+            box-shadow: 0 2px 8px rgba(89, 60, 143, 0.08);
         }
 
         /* Main content area */
@@ -168,8 +215,8 @@
             aspect-ratio: 2/3;
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
-            background: linear-gradient(135deg, #55D6BE 0%, #FC6471 100%);
+            box-shadow: 0 4px 12px rgba(89, 60, 143, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
         }
 
         .book-card:active .book-cover-wrapper {
@@ -241,6 +288,307 @@
         .hide-scrollbar::-webkit-scrollbar {
             display: none;
         }
+
+        /* Horizontal scrolling book rows */
+        .books-scroll {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding: 0.5rem 1rem 1rem 1rem;
+            padding-left: 1rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-accent) transparent;
+            scroll-snap-type: x proximity;
+        }
+
+        .books-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .books-scroll::-webkit-scrollbar-track {
+            background: var(--color-parchment);
+            border-radius: 10px;
+        }
+
+        .books-scroll::-webkit-scrollbar-thumb {
+            background: var(--color-border-dark);
+            border-radius: 10px;
+        }
+
+        .books-scroll .book-card {
+            flex: 0 0 auto;
+            width: 140px;
+            scroll-snap-align: start;
+        }
+
+        @media (min-width: 640px) {
+            .books-scroll .book-card {
+                width: 160px;
+            }
+        }
+
+        /* Section styling */
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--color-dark);
+        }
+
+        .view-all {
+            color: var(--color-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: opacity 0.2s;
+        }
+
+        .view-all:hover {
+            opacity: 0.7;
+        }
+
+        /* Status badges */
+        .status-badge {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 8px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            z-index: 10;
+        }
+
+        .badge-library {
+            background: rgba(83, 58, 123, 0.95);
+            color: white;
+        }
+
+        .badge-requested {
+            background: rgba(139, 38, 53, 0.95);
+            color: white;
+        }
+
+        .badge-available {
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--color-primary);
+            border: 1.5px solid var(--color-primary);
+        }
+
+        /* Book overlay on hover */
+        .book-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .book-card:hover .book-overlay {
+            opacity: 1;
+        }
+
+        .overlay-button {
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .overlay-button:hover {
+            background: var(--color-primary-dark);
+            transform: scale(1.02);
+        }
+
+        .overlay-button.in-library {
+            background: var(--color-secondary);
+        }
+
+        .overlay-button.in-library:hover {
+            background: var(--color-secondary-dark);
+        }
+
+        .overlay-button.requested {
+            background: var(--color-accent);
+        }
+
+        .overlay-button.requested:hover {
+            background: var(--color-accent-dark);
+        }
+
+        /* Hero section */
+        .hero-section {
+            background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-accent) 100%);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(83, 58, 123, 0.25);
+        }
+
+        .hero-content h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            color: white;
+        }
+
+        .hero-content p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.875rem;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-gold);
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.7rem;
+            margin-top: 0.1rem;
+        }
+
+        /* Genre pills */
+        .genre-banner {
+            background: linear-gradient(135deg, var(--color-secondary-light) 0%, var(--color-secondary) 100%);
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            margin: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            box-shadow: 0 4px 12px rgba(83, 58, 123, 0.15);
+        }
+
+        .genre-banner h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .genre-pills {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .genre-pill {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.35rem 0.75rem;
+            border-radius: 16px;
+            font-size: 0.75rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .genre-pill:hover {
+            background: rgba(212, 165, 116, 0.4);
+            border-color: var(--color-gold);
+        }
+
+        .genre-pill.active {
+            background: var(--color-gold);
+            color: var(--color-dark);
+            border-color: var(--color-gold);
+        }
+
+        /* Book info under card */
+        .book-info {
+            padding: 0.5rem 0.25rem 0;
+        }
+
+        .book-title-small {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--color-dark);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.2;
+        }
+
+        .book-author-small {
+            color: #666;
+            font-size: 0.7rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-top: 0.15rem;
+        }
+
+        .book-meta-small {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+            font-size: 0.65rem;
+            color: #888;
+        }
+
+        .rating {
+            display: flex;
+            align-items: center;
+            gap: 0.15rem;
+            color: var(--color-gold);
+        }
+
+        /* Tabs styling */
+        .tab-active {
+            color: var(--color-primary) !important;
+            font-weight: 600 !important;
+        }
+
+        /* Loading spinner */
+        .spinner-warm {
+            border-color: var(--color-border);
+            border-top-color: var(--color-primary);
+        }
     </style>
 </head>
 <body x-data="folioApp()" x-init="init()">
@@ -284,7 +632,7 @@
             <!-- Library Tab -->
             <div x-show="currentTab === 'library'" x-cloak>
                 <!-- New Books Notification -->
-                <div x-show="hasNewBooks" x-cloak class="mx-4 mb-4 bg-cream border border-mint rounded-xl p-4">
+                <div x-show="hasNewBooks" x-cloak class="mx-4 mt-4 bg-cream border border-warm rounded-xl p-4">
                     <div class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-3 flex-1 min-w-0">
                             <i class="bi bi-info-circle text-primary text-xl flex-shrink-0"></i>
@@ -297,15 +645,29 @@
                     </div>
                 </div>
 
+                <!-- Hero Section -->
+                <div class="hero-section">
+                    <div class="hero-content">
+                        <h1>Your Library</h1>
+                        <p x-text="`${books.length} books`"></p>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat">
+                            <div class="stat-number" x-text="requestedBooks.length">0</div>
+                            <div class="stat-label">Requested</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Search Bar -->
                 <div class="px-4 pb-4">
                     <div class="relative">
-                        <i class="bi bi-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg"></i>
+                        <i class="bi bi-search absolute left-4 top-1/2 transform -translate-y-1/2 text-secondary text-lg"></i>
                         <input type="text"
                                x-model="searchQuery"
                                @input.debounce.500ms="searchBooks()"
-                               placeholder="Search books..."
-                               class="w-full pl-12 pr-4 py-3 bg-white text-gray-900 placeholder-gray-400 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm">
+                               placeholder="Search your library or discover new books..."
+                               class="w-full pl-12 pr-4 py-3 bg-white text-dark placeholder-gray-400 rounded-xl border-2 border-warm focus:ring-2 focus:ring-primary focus:border-primary shadow-sm">
                     </div>
                 </div>
 
@@ -313,49 +675,57 @@
                 <div class="px-4 pb-4 overflow-x-auto hide-scrollbar">
                     <div class="flex gap-2 min-w-max">
                         <button @click="changeSortOrder('title-asc')"
-                                :class="sortBy === 'title-asc' ? 'bg-primary text-white' : 'bg-white text-gray-700'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                                :class="sortBy === 'title-asc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
                             A-Z
                         </button>
                         <button @click="changeSortOrder('title-desc')"
-                                :class="sortBy === 'title-desc' ? 'bg-primary text-white' : 'bg-white text-gray-700'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                                :class="sortBy === 'title-desc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
                             Z-A
                         </button>
                         <button @click="changeSortOrder('author-asc')"
-                                :class="sortBy === 'author-asc' ? 'bg-primary text-white' : 'bg-white text-gray-700'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                                :class="sortBy === 'author-asc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
                             Author
                         </button>
                         <button @click="changeSortOrder('date-desc')"
-                                :class="sortBy === 'date-desc' ? 'bg-primary text-white' : 'bg-white text-gray-700'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                                :class="sortBy === 'date-desc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
                             Newest
                         </button>
                         <button @click="changeSortOrder('date-asc')"
-                                :class="sortBy === 'date-asc' ? 'bg-primary text-white' : 'bg-white text-gray-700'"
-                                class="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 whitespace-nowrap">
+                                :class="sortBy === 'date-asc' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 border-warm'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border-2 whitespace-nowrap transition-all">
                             Oldest
+                        </button>
+                        <button @click="viewMode = viewMode === 'grid' ? 'rows' : 'grid'"
+                                class="px-4 py-2 rounded-full text-sm font-medium border-2 border-warm bg-white text-gray-700 whitespace-nowrap transition-all">
+                            <i :class="viewMode === 'grid' ? 'bi-list' : 'bi-grid-3x3-gap-fill'" class="bi"></i>
                         </button>
                     </div>
                 </div>
 
                 <!-- Loading -->
                 <div x-show="loading" class="flex justify-center items-center py-20">
-                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-mint border-t-primary"></div>
+                    <div class="animate-spin rounded-full h-12 w-12 border-4 spinner-warm"></div>
                 </div>
 
-                <!-- Book Grid -->
-                <div x-show="!loading && displayedBooks.length > 0" x-cloak>
+                <!-- Grid View -->
+                <div x-show="!loading && displayedBooks.length > 0 && viewMode === 'grid'" x-cloak>
                     <div class="book-grid">
                         <template x-for="book in displayedBooks" :key="book.id">
                             <div @click="openBookModal(book)" class="book-card">
                                 <div class="book-cover-wrapper">
+                                    <div class="status-badge badge-library">In Library</div>
                                     <img :src="`/api/cover/${book.id}`"
                                          :alt="book.title"
                                          class="w-full h-full object-cover"
                                          loading="lazy"
-                                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23374151%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                    <div class="book-overlay">
+                                        <button class="overlay-button in-library">View Details</button>
+                                    </div>
                                 </div>
                             </div>
                         </template>
@@ -365,28 +735,274 @@
                     <div class="px-4 mt-6 mb-4">
                         <button @click="loadMoreBooks()"
                                 x-show="!loadingMore && displayedBooks.length >= booksPerPage"
-                                class="w-full py-3 bg-white text-primary font-semibold rounded-xl border-2 border-primary hover:bg-cream active:bg-cream">
+                                class="w-full py-3 bg-white text-secondary font-semibold rounded-xl border-2 border-secondary hover:bg-parchment active:bg-parchment transition-all">
                             Load More Books
                         </button>
                         <div x-show="loadingMore" class="flex justify-center py-4">
-                            <div class="animate-spin rounded-full h-8 w-8 border-4 border-mint border-t-primary"></div>
+                            <div class="animate-spin rounded-full h-8 w-8 border-4 spinner-warm"></div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Row View (Sections) -->
+                <div x-show="!loading && displayedBooks.length > 0 && viewMode === 'rows'" x-cloak>
+                    <!-- Recently Added -->
+                    <div class="section">
+                        <div class="section-header">
+                            <h2 class="section-title">Recently Added</h2>
+                            <a @click="viewMode = 'grid'; changeSortOrder('date-desc')" class="view-all cursor-pointer">
+                                View All
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </div>
+                        <div class="books-scroll">
+                            <template x-for="book in getRecentBooks()" :key="'recent-'+book.id">
+                                <div @click="openBookModal(book)" class="book-card">
+                                    <div class="book-cover-wrapper">
+                                        <div class="status-badge badge-library">In Library</div>
+                                        <img :src="`/api/cover/${book.id}`"
+                                             :alt="book.title"
+                                             class="w-full h-full object-cover"
+                                             loading="lazy"
+                                             @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                        <div class="book-overlay">
+                                            <button class="overlay-button in-library">View Details</button>
+                                        </div>
+                                    </div>
+                                    <div class="book-info">
+                                        <div class="book-title-small" x-text="book.title"></div>
+                                        <div class="book-author-small" x-text="Array.isArray(book.authors) ? book.authors[0] : book.authors"></div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Genre Banner -->
+                    <div class="genre-banner">
+                        <h3>Browse by Genre</h3>
+                        <div class="genre-pills">
+                            <template x-for="genre in getTopGenres()" :key="genre">
+                                <div class="genre-pill"
+                                     :class="selectedGenre === genre ? 'active' : ''"
+                                     @click="filterByGenre(genre)"
+                                     x-text="genre"></div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- By Author (first few authors with most books) -->
+                    <template x-for="author in getTopAuthors()" :key="'author-'+author">
+                        <div class="section">
+                            <div class="section-header">
+                                <h2 class="section-title" x-text="author"></h2>
+                                <a @click="searchQuery = author; searchBooks(); viewMode = 'grid'" class="view-all cursor-pointer">
+                                    View All
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </div>
+                            <div class="books-scroll">
+                                <template x-for="book in getBooksByAuthor(author)" :key="'auth-'+book.id">
+                                    <div @click="openBookModal(book)" class="book-card">
+                                        <div class="book-cover-wrapper">
+                                            <div class="status-badge badge-library">In Library</div>
+                                            <img :src="`/api/cover/${book.id}`"
+                                                 :alt="book.title"
+                                                 class="w-full h-full object-cover"
+                                                 loading="lazy"
+                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                            <div class="book-overlay">
+                                                <button class="overlay-button in-library">View Details</button>
+                                            </div>
+                                        </div>
+                                        <div class="book-info">
+                                            <div class="book-title-small" x-text="book.title"></div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
                 <!-- No Books -->
                 <div x-show="!loading && books.length === 0" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
-                    <i class="bi bi-book text-6xl text-gray-300 mb-4"></i>
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">No books found</h3>
+                    <i class="bi bi-book text-6xl text-secondary-light mb-4"></i>
+                    <h3 class="text-lg font-semibold text-dark mb-2">No books found</h3>
                     <p class="text-sm text-gray-500 text-center">Check your Calibre library connection</p>
                 </div>
             </div>
 
-            <!-- Requests/Explore Tabs (Coming Soon) -->
-            <div x-show="currentTab !== 'library'" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
-                <i class="bi bi-hourglass-split text-6xl text-gray-300 mb-6"></i>
-                <h2 class="text-lg font-semibold text-header mb-2">Coming Soon</h2>
-                <p class="text-sm text-gray-500">This feature is under development</p>
+            <!-- Explore Tab -->
+            <div x-show="currentTab === 'explore'" x-cloak>
+                <!-- Search Bar for Hardcover -->
+                <div class="px-4 py-4">
+                    <div class="relative">
+                        <i class="bi bi-search absolute left-4 top-1/2 transform -translate-y-1/2 text-secondary text-lg"></i>
+                        <input type="text"
+                               x-model="hardcoverSearchQuery"
+                               @keyup.enter="searchHardcover()"
+                               placeholder="Search Hardcover for books..."
+                               class="w-full pl-12 pr-24 py-3 bg-white text-dark placeholder-gray-400 rounded-xl border-2 border-warm focus:ring-2 focus:ring-primary focus:border-primary shadow-sm">
+                        <button @click="searchHardcover()"
+                                class="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-all">
+                            Search
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Hardcover API Status -->
+                <div x-show="!hardcoverToken" class="mx-4 mb-4 bg-parchment border-2 border-warm rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <i class="bi bi-key text-primary text-xl flex-shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="text-sm text-dark font-medium mb-1">Hardcover API not configured</p>
+                            <p class="text-xs text-gray-500 mb-2">Add your Hardcover API token in Settings to search and discover books.</p>
+                            <a @click="showSettings = true" class="text-xs text-primary font-medium cursor-pointer hover:underline">Configure API Token</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div x-show="hardcoverLoading" class="flex justify-center items-center py-20">
+                    <div class="animate-spin rounded-full h-12 w-12 border-4 spinner-warm"></div>
+                </div>
+
+                <!-- Hardcover Results -->
+                <div x-show="!hardcoverLoading && hardcoverBooks.length > 0" x-cloak>
+                    <!-- Trending Section -->
+                    <div class="section">
+                        <div class="section-header">
+                            <h2 class="section-title" x-text="hardcoverSearchQuery ? 'Search Results' : 'Trending Now'"></h2>
+                        </div>
+                        <div class="books-scroll">
+                            <template x-for="book in hardcoverBooks" :key="'hc-'+book.id">
+                                <div @click="openHardcoverModal(book)" class="book-card">
+                                    <div class="book-cover-wrapper">
+                                        <div class="status-badge"
+                                             :class="book.inLibrary ? 'badge-library' : (book.requested ? 'badge-requested' : 'badge-available')"
+                                             x-text="book.inLibrary ? 'In Library' : (book.requested ? 'Requested' : 'Available')"></div>
+                                        <img :src="book.image"
+                                             :alt="book.title"
+                                             class="w-full h-full object-cover"
+                                             loading="lazy"
+                                             @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23C45D35%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                        <div class="book-overlay">
+                                            <button class="overlay-button"
+                                                    :class="book.inLibrary ? 'in-library' : (book.requested ? 'requested' : '')"
+                                                    x-text="book.inLibrary ? 'View in Library' : (book.requested ? 'Pending' : 'Request')"></button>
+                                        </div>
+                                    </div>
+                                    <div class="book-info">
+                                        <div class="book-title-small" x-text="book.title"></div>
+                                        <div class="book-author-small" x-text="book.author"></div>
+                                        <div class="book-meta-small">
+                                            <span class="rating" x-show="book.rating">
+                                                <i class="bi bi-star-fill"></i>
+                                                <span x-text="book.rating?.toFixed(1)"></span>
+                                            </span>
+                                            <span x-text="book.year"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Genre Sections from Hardcover -->
+                    <template x-for="section in hardcoverSections" :key="'section-'+section.title">
+                        <div class="section">
+                            <div class="section-header">
+                                <h2 class="section-title" x-text="section.title"></h2>
+                                <a class="view-all cursor-pointer">
+                                    View All
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </div>
+                            <div class="books-scroll">
+                                <template x-for="book in section.books" :key="'sec-'+book.id">
+                                    <div @click="openHardcoverModal(book)" class="book-card">
+                                        <div class="book-cover-wrapper">
+                                            <div class="status-badge"
+                                                 :class="book.inLibrary ? 'badge-library' : (book.requested ? 'badge-requested' : 'badge-available')"
+                                                 x-text="book.inLibrary ? 'In Library' : (book.requested ? 'Requested' : 'Available')"></div>
+                                            <img :src="book.image"
+                                                 :alt="book.title"
+                                                 class="w-full h-full object-cover"
+                                                 loading="lazy"
+                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23C45D35%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                            <div class="book-overlay">
+                                                <button class="overlay-button"
+                                                        :class="book.inLibrary ? 'in-library' : (book.requested ? 'requested' : '')"
+                                                        x-text="book.inLibrary ? 'View in Library' : (book.requested ? 'Pending' : 'Request')"></button>
+                                            </div>
+                                        </div>
+                                        <div class="book-info">
+                                            <div class="book-title-small" x-text="book.title"></div>
+                                            <div class="book-author-small" x-text="book.author"></div>
+                                            <div class="book-meta-small">
+                                                <span class="rating" x-show="book.rating">
+                                                    <i class="bi bi-star-fill"></i>
+                                                    <span x-text="book.rating?.toFixed(1)"></span>
+                                                </span>
+                                                <span x-text="book.year"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Empty State for Explore -->
+                <div x-show="!hardcoverLoading && hardcoverBooks.length === 0 && hardcoverToken" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
+                    <i class="bi bi-compass text-6xl text-secondary-light mb-4"></i>
+                    <h3 class="text-lg font-semibold text-dark mb-2">Discover New Books</h3>
+                    <p class="text-sm text-gray-500 text-center">Search for books to see results from Hardcover</p>
+                </div>
+            </div>
+
+            <!-- Requests Tab -->
+            <div x-show="currentTab === 'requests'" x-cloak>
+                <!-- Requested Books List -->
+                <div x-show="requestedBooks.length > 0" class="section mt-4">
+                    <div class="section-header">
+                        <h2 class="section-title">Your Requests</h2>
+                        <span class="text-sm text-gray-500" x-text="`${requestedBooks.length} pending`"></span>
+                    </div>
+                    <div class="books-scroll">
+                        <template x-for="book in requestedBooks" :key="'req-'+book.id">
+                            <div @click="openHardcoverModal(book)" class="book-card">
+                                <div class="book-cover-wrapper">
+                                    <div class="status-badge badge-requested">Requested</div>
+                                    <img :src="book.image"
+                                         :alt="book.title"
+                                         class="w-full h-full object-cover"
+                                         loading="lazy"
+                                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%238B2635%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                    <div class="book-overlay">
+                                        <button class="overlay-button requested">Pending</button>
+                                    </div>
+                                </div>
+                                <div class="book-info">
+                                    <div class="book-title-small" x-text="book.title"></div>
+                                    <div class="book-author-small" x-text="book.author"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div x-show="requestedBooks.length === 0" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
+                    <i class="bi bi-inbox text-6xl text-secondary-light mb-4"></i>
+                    <h3 class="text-lg font-semibold text-dark mb-2">No Requests Yet</h3>
+                    <p class="text-sm text-gray-500 text-center mb-4">Explore and request books you'd like to add to your library</p>
+                    <button @click="currentTab = 'explore'" class="px-6 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-all">
+                        Explore Books
+                    </button>
+                </div>
             </div>
         </main>
     </div>
@@ -635,48 +1251,190 @@
                     <div class="p-6">
                         <h3 class="text-lg font-semibold mb-6 text-header">Settings</h3>
                         <div class="space-y-6">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-900 mb-2">
-                                    Calibre Library Path
-                                </label>
-                                <div class="flex gap-2">
-                                    <input type="text"
-                                           x-model="calibreLibraryPath"
-                                           placeholder="~/Calibre Library"
-                                           class="flex-1 bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <button @click="openBrowser()"
-                                            class="px-4 py-3 text-sm font-medium text-primary bg-cream border border-mint rounded-xl hover:bg-cream active:bg-cream inline-flex items-center gap-2">
-                                        <i class="bi bi-folder2-open"></i>
-                                        Browse
-                                    </button>
+                            <!-- Calibre Library Section -->
+                            <div class="pb-6 border-b border-warm">
+                                <h4 class="text-sm font-semibold text-secondary mb-4">Calibre Library</h4>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        Library Path
+                                    </label>
+                                    <div class="flex gap-2">
+                                        <input type="text"
+                                               x-model="calibreLibraryPath"
+                                               placeholder="~/Calibre Library"
+                                               class="flex-1 bg-parchment text-dark border-warm placeholder-gray-400 rounded-xl px-4 py-3 border-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                        <button @click="openBrowser()"
+                                                class="px-4 py-3 text-sm font-medium text-secondary bg-parchment border-2 border-secondary rounded-xl hover:bg-cream transition-all inline-flex items-center gap-2">
+                                            <i class="bi bi-folder2-open"></i>
+                                            Browse
+                                        </button>
+                                    </div>
+                                    <p class="mt-2 text-xs text-gray-500">
+                                        Path to your Calibre library directory (contains metadata.db)
+                                    </p>
                                 </div>
-                                <p class="mt-2 text-xs text-gray-500">
-                                    Path to your Calibre library directory (contains metadata.db)
-                                </p>
                             </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-900 mb-2">
-                                    calibredb Command Path
-                                </label>
-                                <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                                    <code class="text-xs text-gray-600">/Applications/calibre.app/Contents/MacOS/calibredb</code>
+
+                            <!-- Hardcover API Section -->
+                            <div class="pb-6 border-b border-warm">
+                                <h4 class="text-sm font-semibold text-secondary mb-4">Hardcover API</h4>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        API Token
+                                    </label>
+                                    <input type="password"
+                                           x-model="hardcoverToken"
+                                           placeholder="Enter your Hardcover API token"
+                                           class="w-full bg-parchment text-dark border-warm placeholder-gray-400 rounded-xl px-4 py-3 border-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                    <p class="mt-2 text-xs text-gray-500">
+                                        Get your API token from <a href="https://hardcover.app/account/api" target="_blank" class="text-primary hover:underline">hardcover.app/account/api</a>
+                                    </p>
                                 </div>
-                                <p class="mt-2 text-xs text-gray-500">
-                                    Hardcoded for macOS. Edit serve.py to change.
-                                </p>
+                            </div>
+
+                            <!-- Advanced Section -->
+                            <div>
+                                <h4 class="text-sm font-semibold text-secondary mb-4">Advanced</h4>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        calibredb Command Path
+                                    </label>
+                                    <div class="p-3 bg-parchment rounded-xl border-2 border-warm">
+                                        <code class="text-xs text-gray-600">/Applications/calibre.app/Contents/MacOS/calibredb</code>
+                                    </div>
+                                    <p class="mt-2 text-xs text-gray-500">
+                                        Hardcoded for macOS. Edit serve.py to change.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                         <div class="mt-8 flex gap-3">
                             <button @click="showSettings = false"
-                                    class="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 active:bg-gray-300">
+                                    class="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-parchment rounded-xl hover:bg-cream border-2 border-warm transition-all">
                                 Cancel
                             </button>
                             <button @click="saveSettings(); showSettings = false"
-                                    class="flex-1 px-6 py-3 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary-dark active:bg-primary-dark shadow-lg">
+                                    class="flex-1 px-6 py-3 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary-dark shadow-lg transition-all">
                                 Save
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hardcover Book Modal -->
+    <div x-show="selectedHardcoverBook" x-cloak>
+        <div class="modal-backdrop" @click="selectedHardcoverBook = null"></div>
+        <div class="modal-sheet">
+            <div class="modal-content" @click.stop>
+                <div class="flex-1 overflow-y-auto">
+                    <template x-if="selectedHardcoverBook">
+                        <div class="p-6">
+                            <!-- Header -->
+                            <div class="flex items-center justify-between mb-6">
+                                <div class="flex items-center gap-2">
+                                    <span class="status-badge"
+                                          :class="selectedHardcoverBook.inLibrary ? 'badge-library' : (selectedHardcoverBook.requested ? 'badge-requested' : 'badge-available')"
+                                          x-text="selectedHardcoverBook.inLibrary ? 'In Library' : (selectedHardcoverBook.requested ? 'Requested' : 'Available')"></span>
+                                </div>
+                                <button @click="selectedHardcoverBook = null"
+                                        class="w-10 h-10 flex items-center justify-center rounded-xl bg-parchment text-gray-700 hover:bg-cream transition-colors">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+
+                            <!-- Cover and Details -->
+                            <div class="flex flex-col md:flex-row gap-6 md:gap-8">
+                                <!-- Cover -->
+                                <div class="flex-shrink-0 mx-auto md:mx-0 w-48 md:w-56">
+                                    <div class="aspect-[2/3] bg-gradient-to-br from-secondary to-accent rounded-2xl overflow-hidden shadow-2xl">
+                                        <img :src="selectedHardcoverBook.image"
+                                             class="w-full h-full object-cover"
+                                             @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                    </div>
+                                    <!-- Rating -->
+                                    <div x-show="selectedHardcoverBook.rating" class="mt-4 flex items-center justify-center gap-1">
+                                        <template x-for="i in 5" :key="i">
+                                            <i class="bi"
+                                               :class="i <= Math.round(selectedHardcoverBook.rating) ? 'bi-star-fill text-gold' : 'bi-star text-gray-300'"></i>
+                                        </template>
+                                        <span class="ml-2 text-sm text-gray-600" x-text="selectedHardcoverBook.rating?.toFixed(1)"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Details -->
+                                <div class="flex-1 space-y-5 md:space-y-6">
+                                    <!-- Title -->
+                                    <div>
+                                        <h3 class="text-2xl md:text-3xl font-bold text-dark" x-text="selectedHardcoverBook.title"></h3>
+                                        <p class="text-lg text-secondary font-medium mt-1" x-text="selectedHardcoverBook.author"></p>
+                                    </div>
+
+                                    <!-- Meta Info -->
+                                    <div class="flex flex-wrap gap-4">
+                                        <div x-show="selectedHardcoverBook.year">
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Year</h4>
+                                            <p class="text-base font-semibold text-dark" x-text="selectedHardcoverBook.year"></p>
+                                        </div>
+                                        <div x-show="selectedHardcoverBook.pages">
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Pages</h4>
+                                            <p class="text-base font-semibold text-dark" x-text="selectedHardcoverBook.pages"></p>
+                                        </div>
+                                        <div x-show="selectedHardcoverBook.publisher">
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Publisher</h4>
+                                            <p class="text-base font-semibold text-dark" x-text="selectedHardcoverBook.publisher"></p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Genres -->
+                                    <div x-show="selectedHardcoverBook.genres && selectedHardcoverBook.genres.length > 0">
+                                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Genres</h4>
+                                        <div class="flex flex-wrap gap-2">
+                                            <template x-for="genre in selectedHardcoverBook.genres" :key="genre">
+                                                <span class="px-3 py-1.5 bg-secondary text-white rounded-lg text-xs font-medium" x-text="genre"></span>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <!-- Description -->
+                                    <div x-show="selectedHardcoverBook.description">
+                                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Description</h4>
+                                        <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none" x-html="selectedHardcoverBook.description"></div>
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="pt-4">
+                                        <template x-if="selectedHardcoverBook.inLibrary">
+                                            <button @click="viewInLibrary(selectedHardcoverBook)"
+                                                    class="w-full py-3 bg-secondary text-white font-semibold rounded-xl hover:bg-secondary-dark transition-all">
+                                                <i class="bi bi-book mr-2"></i> View in Library
+                                            </button>
+                                        </template>
+                                        <template x-if="!selectedHardcoverBook.inLibrary && !selectedHardcoverBook.requested">
+                                            <button @click="requestBook(selectedHardcoverBook)"
+                                                    class="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark transition-all">
+                                                <i class="bi bi-plus-circle mr-2"></i> Request This Book
+                                            </button>
+                                        </template>
+                                        <template x-if="selectedHardcoverBook.requested">
+                                            <div class="flex gap-3">
+                                                <button disabled
+                                                        class="flex-1 py-3 bg-accent text-white font-semibold rounded-xl opacity-80 cursor-not-allowed">
+                                                    <i class="bi bi-hourglass-split mr-2"></i> Request Pending
+                                                </button>
+                                                <button @click="cancelRequest(selectedHardcoverBook)"
+                                                        class="px-4 py-3 bg-parchment text-gray-700 font-semibold rounded-xl hover:bg-cream border-2 border-warm transition-all">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
