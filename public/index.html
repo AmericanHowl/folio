@@ -638,6 +638,21 @@
 
                 <!-- Grid View -->
                 <div x-show="!loading && displayedBooks.length > 0 && viewMode === 'grid'" x-cloak>
+                    <!-- Back Button -->
+                    <div class="flex items-center gap-3 mb-6 px-4">
+                        <button @click="viewMode = 'rows'; searchQuery = ''; loadBooks()"
+                                class="flex items-center gap-2 px-4 py-2 text-secondary hover:bg-accent hover:bg-opacity-10 rounded-lg transition-colors">
+                            <i class="bi bi-arrow-left text-xl"></i>
+                            <span class="font-medium">Back to Browse</span>
+                        </button>
+                        <div class="flex-1">
+                            <h2 class="text-2xl font-semibold text-dark">
+                                <span x-show="!searchQuery">All Books</span>
+                                <span x-show="searchQuery" x-text="'Results for \"' + searchQuery + '\"'"></span>
+                            </h2>
+                        </div>
+                    </div>
+
                     <div class="book-grid">
                         <template x-for="book in displayedBooks" :key="book.id">
                             <div @click="openBookModal(book)" class="book-card">
@@ -860,6 +875,30 @@
                                     </div>
                                 </div>
                             </template>
+
+                            <!-- More from {Author} -->
+                            <div x-show="hardcoverAuthorBooks.length > 0" class="section">
+                                <div class="section-header">
+                                    <h2 class="section-title" x-text="'More from ' + hardcoverAuthor"></h2>
+                                </div>
+                                <div class="books-scroll">
+                                    <template x-for="book in hardcoverAuthorBooks" :key="'author-'+book.id">
+                                        <div class="book-card cursor-pointer">
+                                            <div class="book-cover-wrapper">
+                                                <img :src="book.image"
+                                                     :alt="book.title"
+                                                     class="w-full h-full object-cover"
+                                                     loading="lazy"
+                                                     @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23593c8f%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22white%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
+                                            </div>
+                                            <div class="book-info">
+                                                <div class="book-title-small" x-text="book.title"></div>
+                                                <div class="book-author-small" x-text="book.author || 'Unknown'"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
                     </template>
                 </div>
