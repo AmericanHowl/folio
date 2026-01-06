@@ -17,6 +17,7 @@ function folioApp() {
         showSettings: false,
         showBrowser: false,
         showInitialSetup: false,
+        showHardcoverSetup: false,
         isEditingMetadata: false,
         editingBook: null,
 
@@ -46,9 +47,17 @@ function folioApp() {
         browserEntries: [],
 
         // Hardcover integration
+        includeHardcover: true, // Now always on by default
+        hardcoverApiKeyInput: '',
+        validatingApiKey: false,
+        apiKeyError: '',
         hardcoverSearchQuery: '',
         hardcoverBooks: [],
+        hardcoverTrending: [],
+        hardcoverRecentReleases: [],
         hardcoverSections: [],
+        hardcoverAuthorBooks: [],
+        hardcoverAuthor: '',
         hardcoverLoading: false,
         selectedHardcoverBook: null,
 
@@ -67,7 +76,14 @@ function folioApp() {
             // Load server config
             await this.loadConfig();
 
-            // Check if we need initial setup
+            // Check if Hardcover API key is configured
+            if (!this.hardcoverToken) {
+                console.log('🔑 No Hardcover API key, showing setup screen');
+                this.showHardcoverSetup = true;
+                return;
+            }
+
+            // Check if we need Calibre library setup
             if (!this.calibreLibraryPath) {
                 console.log('📋 No library configured, showing setup screen');
                 this.showInitialSetup = true;
@@ -79,6 +95,9 @@ function folioApp() {
 
             // Load requested books
             await this.loadRequestedBooks();
+
+            // Load Hardcover data
+            await this.loadHardcoverData();
 
             // Start auto-update check
             this.startAutoUpdate();
@@ -289,6 +308,276 @@ function folioApp() {
                 console.log('📖 Loaded config:', data);
             } catch (error) {
                 console.error('Failed to load config:', error);
+            }
+        },
+
+        /**
+         * Toggle Hardcover mode
+         */
+        async toggleHardcoverMode() {
+            this.includeHardcover = !this.includeHardcover;
+
+            if (this.includeHardcover) {
+                console.log('🌍 Hardcover mode enabled');
+                if (!this.hardcoverToken) {
+                    alert('Please configure your Hardcover API token in Settings to use this feature.');
+                    this.includeHardcover = false;
+                    this.showSettings = true;
+                    return;
+                }
+                await this.loadHardcoverData();
+            } else {
+                console.log('📚 Local-only mode');
+            }
+        },
+
+        /**
+         * Load all Hardcover data
+         */
+        async loadHardcoverData() {
+            if (!this.hardcoverToken) return;
+
+            this.hardcoverLoading = true;
+
+            try {
+                // Load all Hardcover sections in parallel
+                await Promise.all([
+                    this.loadHardcoverTrending(),
+                    this.loadHardcoverRecent(),
+                    this.loadHardcoverLists(),
+                    this.loadHardcoverAuthorBooks()
+                ]);
+
+                console.log('✅ Hardcover data loaded');
+            } catch (error) {
+                console.error('❌ Failed to load Hardcover data:', error);
+            } finally {
+                this.hardcoverLoading = false;
+            }
+        },
+
+        /**
+         * Load curated lists from @hardcover user
+         */
+        async loadHardcoverLists() {
+            try {
+                // First, get all lists from @hardcover user
+                const response = await fetch('/api/hardcover/lists');
+                const data = await response.json();
+
+                if (data.error || !data.lists || data.lists.length === 0) {
+                    console.error('Failed to load Hardcover lists:', data.error);
+                    this.hardcoverSections = [];
+                    return;
+                }
+
+                // Randomly select 2 lists
+                const shuffled = data.lists.sort(() => 0.5 - Math.random());
+                const selectedLists = shuffled.slice(0, 2);
+
+                // Load books from the selected lists
+                const listPromises = selectedLists.map(list => this.loadHardcoverList(list.id));
+                const results = await Promise.all(listPromises);
+
+                // Store the results
+                this.hardcoverSections = results.filter(result => result.books.length > 0);
+                console.log(`📚 Loaded ${this.hardcoverSections.length} curated lists from @hardcover`);
+            } catch (error) {
+                console.error('Failed to load Hardcover lists:', error);
+                this.hardcoverSections = [];
+            }
+        },
+
+        /**
+         * Load trending books from Hardcover
+         */
+        async loadHardcoverTrending() {
+            try {
+                const response = await fetch('/api/hardcover/trending?limit=20');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Hardcover trending error:', data.error);
+                    this.hardcoverTrending = [];
+                } else {
+                    this.hardcoverTrending = data.books || [];
+                    console.log(`📈 Loaded ${this.hardcoverTrending.length} trending books`);
+                }
+            } catch (error) {
+                console.error('Failed to load Hardcover trending:', error);
+                this.hardcoverTrending = [];
+            }
+        },
+
+        /**
+         * Load recent releases from Hardcover
+         */
+        async loadHardcoverRecent() {
+            try {
+                const response = await fetch('/api/hardcover/recent?limit=20');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Hardcover recent releases error:', data.error);
+                    this.hardcoverRecentReleases = [];
+                } else {
+                    this.hardcoverRecentReleases = data.books || [];
+                    console.log(`🆕 Loaded ${this.hardcoverRecentReleases.length} recent releases`);
+                }
+            } catch (error) {
+                console.error('Failed to load Hardcover recent releases:', error);
+                this.hardcoverRecentReleases = [];
+            }
+        },
+
+        /**
+         * Load books from a Hardcover list by ID
+         */
+        async loadHardcoverList(listId) {
+            try {
+                const response = await fetch(`/api/hardcover/list?id=${listId}&limit=20`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error(`Hardcover list ${listId} error:`, data.error);
+                    return { books: [], name: '', description: '' };
+                } else {
+                    console.log(`📚 Loaded ${data.books?.length || 0} books from list: ${data.list_name}`);
+                    return {
+                        books: data.books || [],
+                        name: data.list_name || '',
+                        description: data.list_description || ''
+                    };
+                }
+            } catch (error) {
+                console.error(`Failed to load Hardcover list ${listId}:`, error);
+                return { books: [], name: '', description: '' };
+            }
+        },
+
+        /**
+         * Load books by a random author from local library
+         */
+        async loadHardcoverAuthorBooks() {
+            try {
+                // Pick a random author from local library
+                const authors = this.getTopAuthors();
+                if (!authors || authors.length === 0) {
+                    this.hardcoverAuthorBooks = [];
+                    this.hardcoverAuthor = '';
+                    return;
+                }
+
+                // Select a random author
+                const randomAuthor = authors[Math.floor(Math.random() * authors.length)];
+                this.hardcoverAuthor = randomAuthor;
+
+                // Fetch books by this author from Hardcover
+                const response = await fetch(`/api/hardcover/author?author=${encodeURIComponent(randomAuthor)}&limit=20`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error(`Hardcover author ${randomAuthor} error:`, data.error);
+                    this.hardcoverAuthorBooks = [];
+                } else {
+                    this.hardcoverAuthorBooks = data.books || [];
+                    console.log(`👤 Loaded ${this.hardcoverAuthorBooks.length} books by ${randomAuthor}`);
+                }
+            } catch (error) {
+                console.error('Failed to load Hardcover author books:', error);
+                this.hardcoverAuthorBooks = [];
+                this.hardcoverAuthor = '';
+            }
+        },
+
+        /**
+         * Search Hardcover for books
+         */
+        async searchHardcover(query) {
+            if (!query) return [];
+            if (!this.hardcoverToken) {
+                alert('Please configure your Hardcover API token in Settings.');
+                return [];
+            }
+
+            try {
+                const response = await fetch(`/api/hardcover/search?q=${encodeURIComponent(query)}&limit=20`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Hardcover search error:', data.error);
+                    return [];
+                }
+
+                return data.books || [];
+            } catch (error) {
+                console.error('Failed to search Hardcover:', error);
+                return [];
+            }
+        },
+
+        /**
+         * Validate and save Hardcover API key
+         */
+        async validateAndSaveHardcoverKey() {
+            if (!this.hardcoverApiKeyInput.trim()) {
+                this.apiKeyError = 'Please enter an API key';
+                return;
+            }
+
+            this.validatingApiKey = true;
+            this.apiKeyError = '';
+
+            try {
+                // Test the API key by making a simple request
+                const response = await fetch('/api/hardcover/trending?limit=1', {
+                    headers: {
+                        'X-Test-Token': this.hardcoverApiKeyInput.trim()
+                    }
+                });
+
+                // For now, save the token and test by actually saving it
+                this.hardcoverToken = this.hardcoverApiKeyInput.trim();
+
+                const saveResponse = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        hardcover_token: this.hardcoverToken,
+                        calibre_library: this.calibreLibraryPath || ''
+                    }),
+                });
+
+                const result = await saveResponse.json();
+
+                if (result.success) {
+                    // Test if we can actually fetch data
+                    const testResponse = await fetch('/api/hardcover/trending?limit=1');
+                    const testData = await testResponse.json();
+
+                    if (testData.error) {
+                        this.apiKeyError = 'Invalid API key: ' + testData.error;
+                        this.validatingApiKey = false;
+                        return;
+                    }
+
+                    // Success! Close setup and initialize
+                    console.log('✅ Hardcover API key validated and saved');
+                    this.showHardcoverSetup = false;
+                    this.hardcoverToken = true;
+
+                    // Initialize the app
+                    await this.init();
+                } else {
+                    this.apiKeyError = 'Failed to save API key: ' + result.error;
+                }
+            } catch (error) {
+                console.error('Failed to validate API key:', error);
+                this.apiKeyError = 'Failed to validate API key: ' + error.message;
+            } finally {
+                this.validatingApiKey = false;
             }
         },
 
