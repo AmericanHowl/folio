@@ -1344,17 +1344,61 @@
                             <!-- Hardcover API Section -->
                             <div class="pb-6 border-b border-warm">
                                 <h4 class="text-sm font-semibold text-secondary mb-4">Hardcover API</h4>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        API Token
-                                    </label>
-                                    <input type="password"
-                                           x-model="hardcoverToken"
-                                           placeholder="Enter your Hardcover API token"
-                                           class="w-full bg-parchment text-dark border-warm placeholder-gray-400 rounded-xl px-4 py-3 border-2 focus:ring-2 focus:ring-primary focus:border-primary">
-                                    <p class="mt-2 text-xs text-gray-500">
-                                        Get your API token from <a href="https://hardcover.app/account/api" target="_blank" class="text-primary hover:underline">hardcover.app/account/api</a>
-                                    </p>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            API Token
+                                        </label>
+                                        <div class="flex gap-2">
+                                            <input type="password"
+                                                   x-model="settingsHardcoverToken"
+                                                   placeholder="Enter your Hardcover API token"
+                                                   :disabled="testingApiKey"
+                                                   class="flex-1 bg-parchment text-dark border-warm placeholder-gray-400 rounded-xl px-4 py-3 border-2 focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50">
+                                            <button @click="testApiKey()"
+                                                    :disabled="testingApiKey || !settingsHardcoverToken"
+                                                    class="px-4 py-3 text-sm font-medium text-white bg-secondary rounded-xl hover:bg-secondary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                                <template x-if="!testingApiKey">
+                                                    <span><i class="bi bi-check-circle"></i> Test</span>
+                                                </template>
+                                                <template x-if="testingApiKey">
+                                                    <span><div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent inline-block"></div></span>
+                                                </template>
+                                            </button>
+                                        </div>
+                                        <p class="mt-2 text-xs text-gray-500">
+                                            Get your API token from <a href="https://hardcover.app/account/api" target="_blank" class="text-primary hover:underline">hardcover.app/account/api</a>
+                                        </p>
+                                    </div>
+
+                                    <!-- API Test Result -->
+                                    <div x-show="apiTestResult" x-cloak>
+                                        <div :class="apiTestSuccess ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'"
+                                             class="rounded-xl p-4 border-2">
+                                            <div class="flex items-start gap-3">
+                                                <i :class="apiTestSuccess ? 'bi-check-circle-fill text-green-600' : 'bi-exclamation-circle-fill text-red-600'"
+                                                   class="bi text-xl flex-shrink-0"></i>
+                                                <div>
+                                                    <p :class="apiTestSuccess ? 'text-green-800' : 'text-red-800'"
+                                                       class="text-sm font-medium" x-text="apiTestResult"></p>
+                                                    <p x-show="apiTestSuccess && apiTestBooks"
+                                                       class="text-xs text-green-600 mt-1"
+                                                       x-text="'Found ' + apiTestBooks + ' trending books'"></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Current Status -->
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <span class="text-gray-500">Status:</span>
+                                        <span x-show="hardcoverToken" class="text-green-600 font-medium flex items-center gap-1">
+                                            <i class="bi bi-check-circle-fill"></i> Connected
+                                        </span>
+                                        <span x-show="!hardcoverToken" class="text-gray-400 font-medium flex items-center gap-1">
+                                            <i class="bi bi-dash-circle"></i> Not configured
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1608,34 +1652,67 @@
                                            class="w-full bg-white text-gray-900 border-2 border-gray-200 placeholder-gray-400 rounded-lg px-4 py-3 focus:ring-2 focus:ring-secondary focus:border-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                                     <p class="mt-2 text-xs text-gray-500">
                                         Get your API key from
-                                        <a href="https://hardcover.app/settings/api" target="_blank" class="text-secondary hover:text-primary font-medium underline">
-                                            hardcover.app/settings/api
+                                        <a href="https://hardcover.app/account/api" target="_blank" class="text-secondary hover:text-primary font-medium underline">
+                                            hardcover.app/account/api
                                         </a>
                                     </p>
                                 </div>
 
                                 <!-- Error Message -->
-                                <div x-show="apiKeyError" class="bg-red-50 border border-red-200 rounded-lg p-3">
-                                    <p class="text-sm text-red-600 flex items-center gap-2">
-                                        <i class="bi bi-exclamation-circle"></i>
-                                        <span x-text="apiKeyError"></span>
-                                    </p>
+                                <div x-show="apiKeyError" x-cloak class="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                                    <div class="flex items-start gap-3">
+                                        <i class="bi bi-exclamation-circle-fill text-red-500 text-xl flex-shrink-0"></i>
+                                        <div>
+                                            <p class="text-sm text-red-700 font-medium">API Key Error</p>
+                                            <p class="text-sm text-red-600 mt-1" x-text="apiKeyError"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Success Message (shows briefly before redirect) -->
+                                <div x-show="apiKeySuccess" x-cloak class="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                                    <div class="flex items-start gap-3">
+                                        <i class="bi bi-check-circle-fill text-green-500 text-xl flex-shrink-0"></i>
+                                        <div>
+                                            <p class="text-sm text-green-700 font-medium">API Key Valid!</p>
+                                            <p class="text-sm text-green-600 mt-1">Successfully connected to Hardcover. Loading your library...</p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Submit Button -->
                                 <button @click="validateAndSaveHardcoverKey()"
-                                        :disabled="validatingApiKey"
+                                        :disabled="validatingApiKey || !hardcoverApiKeyInput"
                                         class="w-full px-6 py-3 text-white font-medium bg-gradient-to-r from-secondary to-primary rounded-lg hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2">
                                     <template x-if="!validatingApiKey">
-                                        <span>Continue</span>
+                                        <span><i class="bi bi-key mr-2"></i>Validate & Continue</span>
                                     </template>
                                     <template x-if="validatingApiKey">
                                         <div class="flex items-center gap-2">
                                             <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                            <span>Validating...</span>
+                                            <span>Testing API Key...</span>
                                         </div>
                                     </template>
                                 </button>
+
+                                <!-- How to get API key -->
+                                <div class="mt-6 pt-6 border-t border-gray-100">
+                                    <p class="text-xs text-gray-500 text-center mb-3">Need an API key?</p>
+                                    <ol class="text-xs text-gray-600 space-y-2">
+                                        <li class="flex items-start gap-2">
+                                            <span class="bg-secondary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">1</span>
+                                            <span>Create a free account at <a href="https://hardcover.app" target="_blank" class="text-secondary hover:underline">hardcover.app</a></span>
+                                        </li>
+                                        <li class="flex items-start gap-2">
+                                            <span class="bg-secondary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">2</span>
+                                            <span>Go to Settings → API in your Hardcover account</span>
+                                        </li>
+                                        <li class="flex items-start gap-2">
+                                            <span class="bg-secondary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">3</span>
+                                            <span>Generate and copy your API key</span>
+                                        </li>
+                                    </ol>
+                                </div>
                             </div>
                         </div>
 

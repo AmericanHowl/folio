@@ -51,7 +51,15 @@ function folioApp() {
         hardcoverApiKeyInput: '',
         validatingApiKey: false,
         apiKeyError: '',
+        apiKeySuccess: false,
         hardcoverSearchQuery: '',
+
+        // Settings panel API test
+        settingsHardcoverToken: '',
+        testingApiKey: false,
+        apiTestResult: '',
+        apiTestSuccess: false,
+        apiTestBooks: 0,
         hardcoverBooks: [],
         hardcoverTrending: [],
         hardcoverRecentReleases: [],
@@ -559,17 +567,22 @@ function folioApp() {
 
                     if (testData.error) {
                         this.apiKeyError = 'Invalid API key: ' + testData.error;
+                        this.apiKeySuccess = false;
                         this.validatingApiKey = false;
                         return;
                     }
 
-                    // Success! Close setup and initialize
+                    // Success! Show success state, then close and initialize
                     console.log('✅ Hardcover API key validated and saved');
-                    this.showHardcoverSetup = false;
+                    this.apiKeySuccess = true;
+                    this.apiKeyError = '';
                     this.hardcoverToken = true;
 
-                    // Initialize the app
-                    await this.init();
+                    // Wait a moment to show success state, then proceed
+                    setTimeout(async () => {
+                        this.showHardcoverSetup = false;
+                        await this.init();
+                    }, 1500);
                 } else {
                     this.apiKeyError = 'Failed to save API key: ' + result.error;
                 }
@@ -578,6 +591,67 @@ function folioApp() {
                 this.apiKeyError = 'Failed to validate API key: ' + error.message;
             } finally {
                 this.validatingApiKey = false;
+            }
+        },
+
+        /**
+         * Test API key from Settings panel (doesn't save)
+         */
+        async testApiKey() {
+            if (!this.settingsHardcoverToken.trim()) {
+                this.apiTestResult = 'Please enter an API key';
+                this.apiTestSuccess = false;
+                return;
+            }
+
+            this.testingApiKey = true;
+            this.apiTestResult = '';
+            this.apiTestSuccess = false;
+            this.apiTestBooks = 0;
+
+            try {
+                // Save the token first, then test
+                const saveResponse = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        hardcover_token: this.settingsHardcoverToken.trim(),
+                        calibre_library: this.calibreLibraryPath || ''
+                    }),
+                });
+
+                const saveResult = await saveResponse.json();
+                if (!saveResult.success) {
+                    this.apiTestResult = 'Failed to save API key: ' + (saveResult.error || 'Unknown error');
+                    this.apiTestSuccess = false;
+                    return;
+                }
+
+                // Now test by fetching trending books
+                const testResponse = await fetch('/api/hardcover/trending?limit=5');
+                const testData = await testResponse.json();
+
+                if (testData.error) {
+                    this.apiTestResult = 'API key invalid: ' + testData.error;
+                    this.apiTestSuccess = false;
+                } else if (testData.books && testData.books.length > 0) {
+                    this.apiTestResult = 'API key is valid!';
+                    this.apiTestSuccess = true;
+                    this.apiTestBooks = testData.books.length;
+                    this.hardcoverToken = true;
+                    console.log('✅ API key tested successfully');
+                } else {
+                    this.apiTestResult = 'API returned no data - check your key';
+                    this.apiTestSuccess = false;
+                }
+            } catch (error) {
+                console.error('Failed to test API key:', error);
+                this.apiTestResult = 'Connection error: ' + error.message;
+                this.apiTestSuccess = false;
+            } finally {
+                this.testingApiKey = false;
             }
         },
 
