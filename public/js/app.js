@@ -17,6 +17,7 @@ function folioApp() {
         showSettings: false,
         showBrowser: false,
         showInitialSetup: false,
+        showHardcoverSetup: false,
         isEditingMetadata: false,
         editingBook: null,
 
@@ -46,7 +47,10 @@ function folioApp() {
         browserEntries: [],
 
         // Hardcover integration
-        includeHardcover: false,
+        includeHardcover: true, // Now always on by default
+        hardcoverApiKeyInput: '',
+        validatingApiKey: false,
+        apiKeyError: '',
         hardcoverSearchQuery: '',
         hardcoverBooks: [],
         hardcoverTrending: [],
@@ -72,7 +76,14 @@ function folioApp() {
             // Load server config
             await this.loadConfig();
 
-            // Check if we need initial setup
+            // Check if Hardcover API key is configured
+            if (!this.hardcoverToken) {
+                console.log('🔑 No Hardcover API key, showing setup screen');
+                this.showHardcoverSetup = true;
+                return;
+            }
+
+            // Check if we need Calibre library setup
             if (!this.calibreLibraryPath) {
                 console.log('📋 No library configured, showing setup screen');
                 this.showInitialSetup = true;
@@ -84,6 +95,9 @@ function folioApp() {
 
             // Load requested books
             await this.loadRequestedBooks();
+
+            // Load Hardcover data
+            await this.loadHardcoverData();
 
             // Start auto-update check
             this.startAutoUpdate();
@@ -499,6 +513,71 @@ function folioApp() {
             } catch (error) {
                 console.error('Failed to search Hardcover:', error);
                 return [];
+            }
+        },
+
+        /**
+         * Validate and save Hardcover API key
+         */
+        async validateAndSaveHardcoverKey() {
+            if (!this.hardcoverApiKeyInput.trim()) {
+                this.apiKeyError = 'Please enter an API key';
+                return;
+            }
+
+            this.validatingApiKey = true;
+            this.apiKeyError = '';
+
+            try {
+                // Test the API key by making a simple request
+                const response = await fetch('/api/hardcover/trending?limit=1', {
+                    headers: {
+                        'X-Test-Token': this.hardcoverApiKeyInput.trim()
+                    }
+                });
+
+                // For now, save the token and test by actually saving it
+                this.hardcoverToken = this.hardcoverApiKeyInput.trim();
+
+                const saveResponse = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        hardcover_token: this.hardcoverToken,
+                        calibre_library: this.calibreLibraryPath || ''
+                    }),
+                });
+
+                const result = await saveResponse.json();
+
+                if (result.success) {
+                    // Test if we can actually fetch data
+                    const testResponse = await fetch('/api/hardcover/trending?limit=1');
+                    const testData = await testResponse.json();
+
+                    if (testData.error) {
+                        this.apiKeyError = 'Invalid API key: ' + testData.error;
+                        this.validatingApiKey = false;
+                        return;
+                    }
+
+                    // Success! Close setup and initialize
+                    console.log('✅ Hardcover API key validated and saved');
+                    this.showHardcoverSetup = false;
+                    this.hardcoverToken = true;
+
+                    // Initialize the app
+                    await this.init();
+                } else {
+                    this.apiKeyError = 'Failed to save API key: ' + result.error;
+                }
+            } catch (error) {
+                console.error('Failed to validate API key:', error);
+                this.apiKeyError = 'Failed to validate API key: ' + error.message;
+            } finally {
+                this.validatingApiKey = false;
             }
         },
 
