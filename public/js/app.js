@@ -52,6 +52,8 @@ function folioApp() {
         hardcoverTrending: [],
         hardcoverRecentReleases: [],
         hardcoverSections: [],
+        hardcoverAuthorBooks: [],
+        hardcoverAuthor: '',
         hardcoverLoading: false,
         selectedHardcoverBook: null,
 
@@ -328,7 +330,8 @@ function folioApp() {
                 await Promise.all([
                     this.loadHardcoverTrending(),
                     this.loadHardcoverRecent(),
-                    this.loadHardcoverLists()
+                    this.loadHardcoverLists(),
+                    this.loadHardcoverAuthorBooks()
                 ]);
 
                 console.log('✅ Hardcover data loaded');
@@ -340,29 +343,35 @@ function folioApp() {
         },
 
         /**
-         * Load curated themes from Hardcover
+         * Load curated lists from @hardcover user
          */
         async loadHardcoverLists() {
-            // Available themes
-            const themes = [
-                'fantasy',
-                'scifi',
-                'mystery',
-                'romance',
-                'classics',
-                'contemporary'
-            ];
+            try {
+                // First, get all lists from @hardcover user
+                const response = await fetch('/api/hardcover/lists');
+                const data = await response.json();
 
-            // Randomly select 2 themes
-            const shuffled = themes.sort(() => 0.5 - Math.random());
-            const selectedThemes = shuffled.slice(0, 2);
+                if (data.error || !data.lists || data.lists.length === 0) {
+                    console.error('Failed to load Hardcover lists:', data.error);
+                    this.hardcoverSections = [];
+                    return;
+                }
 
-            // Load the selected themes
-            const themePromises = selectedThemes.map(theme => this.loadHardcoverList(theme));
-            const results = await Promise.all(themePromises);
+                // Randomly select 2 lists
+                const shuffled = data.lists.sort(() => 0.5 - Math.random());
+                const selectedLists = shuffled.slice(0, 2);
 
-            // Store the results
-            this.hardcoverSections = results.filter(result => result.books.length > 0);
+                // Load books from the selected lists
+                const listPromises = selectedLists.map(list => this.loadHardcoverList(list.id));
+                const results = await Promise.all(listPromises);
+
+                // Store the results
+                this.hardcoverSections = results.filter(result => result.books.length > 0);
+                console.log(`📚 Loaded ${this.hardcoverSections.length} curated lists from @hardcover`);
+            } catch (error) {
+                console.error('Failed to load Hardcover lists:', error);
+                this.hardcoverSections = [];
+            }
         },
 
         /**
@@ -408,18 +417,18 @@ function folioApp() {
         },
 
         /**
-         * Load books from a Hardcover theme/genre
+         * Load books from a Hardcover list by ID
          */
-        async loadHardcoverList(theme) {
+        async loadHardcoverList(listId) {
             try {
-                const response = await fetch(`/api/hardcover/list?theme=${theme}&limit=20`);
+                const response = await fetch(`/api/hardcover/list?id=${listId}&limit=20`);
                 const data = await response.json();
 
                 if (data.error) {
-                    console.error(`Hardcover theme ${theme} error:`, data.error);
+                    console.error(`Hardcover list ${listId} error:`, data.error);
                     return { books: [], name: '', description: '' };
                 } else {
-                    console.log(`📚 Loaded ${data.books?.length || 0} books from theme: ${data.list_name}`);
+                    console.log(`📚 Loaded ${data.books?.length || 0} books from list: ${data.list_name}`);
                     return {
                         books: data.books || [],
                         name: data.list_name || '',
@@ -427,8 +436,43 @@ function folioApp() {
                     };
                 }
             } catch (error) {
-                console.error(`Failed to load Hardcover theme ${theme}:`, error);
+                console.error(`Failed to load Hardcover list ${listId}:`, error);
                 return { books: [], name: '', description: '' };
+            }
+        },
+
+        /**
+         * Load books by a random author from local library
+         */
+        async loadHardcoverAuthorBooks() {
+            try {
+                // Pick a random author from local library
+                const authors = this.getTopAuthors();
+                if (!authors || authors.length === 0) {
+                    this.hardcoverAuthorBooks = [];
+                    this.hardcoverAuthor = '';
+                    return;
+                }
+
+                // Select a random author
+                const randomAuthor = authors[Math.floor(Math.random() * authors.length)];
+                this.hardcoverAuthor = randomAuthor;
+
+                // Fetch books by this author from Hardcover
+                const response = await fetch(`/api/hardcover/author?author=${encodeURIComponent(randomAuthor)}&limit=20`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error(`Hardcover author ${randomAuthor} error:`, data.error);
+                    this.hardcoverAuthorBooks = [];
+                } else {
+                    this.hardcoverAuthorBooks = data.books || [];
+                    console.log(`👤 Loaded ${this.hardcoverAuthorBooks.length} books by ${randomAuthor}`);
+                }
+            } catch (error) {
+                console.error('Failed to load Hardcover author books:', error);
+                this.hardcoverAuthorBooks = [];
+                this.hardcoverAuthor = '';
             }
         },
 
