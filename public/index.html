@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>folio - Your Personal Library</title>
-    <meta name="description" content="A modern interface for browsing and managing your Calibre library">
-
+    <title>Folio - Your Personal Library</title>
+    <meta name="description" content="A modern interface for browsing and managing your Calibre library with Hardcover.app discovery">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -13,1766 +18,1029 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+                        sans: ['Satoshi', 'system-ui', 'sans-serif'],
+                        display: ['Clash Display', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        ink: {
+                            50: '#f8f9fa',
+                            100: '#f1f3f5',
+                            200: '#e9ecef',
+                            300: '#dee2e6',
+                            400: '#ced4da',
+                            500: '#adb5bd',
+                            600: '#868e96',
+                            700: '#495057',
+                            800: '#343a40',
+                            900: '#212529',
+                        },
+                        sage: {
+                            50: '#f4f6f3',
+                            100: '#e8ede6',
+                            200: '#d4ddd0',
+                            300: '#b5c4ae',
+                            400: '#94a88a',
+                            500: '#768c6a',
+                            600: '#5d7253',
+                            700: '#4a5b43',
+                            800: '#3d4a38',
+                            900: '#343f30',
+                        },
+                        coral: {
+                            50: '#fff5f3',
+                            100: '#ffe8e3',
+                            200: '#ffd5cc',
+                            300: '#ffb8a8',
+                            400: '#ff9075',
+                            500: '#f86c4f',
+                            600: '#e54d2e',
+                            700: '#c13d21',
+                            800: '#9f351f',
+                            900: '#84311f',
+                        },
+                        ocean: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
                     }
                 }
             }
         }
     </script>
-
+    
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
-
+    
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cal+Sans:wght@400;600&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
     <style>
         [x-cloak] { display: none !important; }
-
-        /* Custom Color Palette - Warm Library Theme */
+        
         :root {
-            /* Primary: Rose/Pink */
-            --color-primary: #db5461;
-            --color-primary-dark: #c03d4a;
-            --color-primary-light: #ff7e8a;
-
-            /* Secondary: Purple */
-            --color-secondary: #593c8f;
-            --color-secondary-dark: #3f2a65;
-            --color-secondary-light: #7a5fb0;
-
-            /* Accent: Cyan */
-            --color-accent: #8ef9f3;
-            --color-accent-dark: #6dd9d3;
-            --color-accent-light: #b0fcf8;
-
-            /* Tertiary: Peach */
-            --color-peach: #ffd9ce;
-            --color-peach-dark: #ffbfad;
-
-            /* Neutrals */
-            --color-dark: #171738;
-            --color-cream: #ffd9ce;
-            --color-warm-white: #ffffff;
-            --color-parchment: #ffd9ce;
-
-            /* Header & UI */
-            --color-header: #593c8f;
-            --color-border: #8ef9f3;
-            --color-border-dark: #6dd9d3;
-
-            /* Status Colors */
-            --color-in-library: #593c8f;
-            --color-requested: #db5461;
-            --color-available: #8ef9f3;
+            --font-sans: 'DM Sans', system-ui, sans-serif;
+            --font-display: 'Fraunces', Georgia, serif;
         }
-
-        /* Custom color classes */
-        .bg-primary { background-color: var(--color-primary); }
-        .bg-primary-dark { background-color: var(--color-primary-dark); }
-        .bg-primary-light { background-color: var(--color-primary-light); }
-        .bg-secondary { background-color: var(--color-secondary); }
-        .bg-secondary-dark { background-color: var(--color-secondary-dark); }
-        .bg-secondary-light { background-color: var(--color-secondary-light); }
-        .bg-accent { background-color: var(--color-accent); }
-        .bg-accent-light { background-color: var(--color-accent-light); }
-        .bg-dark { background-color: var(--color-dark); }
-        .bg-cream { background-color: var(--color-cream); }
-        .bg-warm-white { background-color: var(--color-warm-white); }
-        .bg-parchment { background-color: var(--color-parchment); }
-        .bg-peach { background-color: var(--color-peach); }
-
-        .text-primary { color: var(--color-primary); }
-        .text-primary-dark { color: var(--color-primary-dark); }
-        .text-secondary { color: var(--color-secondary); }
-        .text-secondary-light { color: var(--color-secondary-light); }
-        .text-accent { color: var(--color-accent); }
-        .text-dark { color: var(--color-dark); }
-        .text-header { color: var(--color-header); }
-        .text-gold { color: var(--color-gold); }
-
-        .border-primary { border-color: var(--color-primary); }
-        .border-secondary { border-color: var(--color-secondary); }
-        .border-accent { border-color: var(--color-accent); }
-        .border-warm { border-color: var(--color-border); }
-        .border-warm-dark { border-color: var(--color-border-dark); }
-
-        .hover\:bg-primary-dark:hover { background-color: var(--color-primary-dark); }
-        .hover\:bg-secondary:hover { background-color: var(--color-secondary); }
-        .hover\:bg-secondary-dark:hover { background-color: var(--color-secondary-dark); }
-        .hover\:text-primary:hover { color: var(--color-primary); }
-        .active\:bg-primary-dark:active { background-color: var(--color-primary-dark); }
-
-        .focus\:ring-primary:focus {
-            --tw-ring-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(196, 93, 53, 0.3);
-        }
-
-        /* Gradient backgrounds */
-        .bg-gradient-hero {
-            background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-accent) 100%);
-        }
-        .bg-gradient-warm {
-            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-        }
-
-        /* Safe Area Support */
-        --safe-area-inset-top: env(safe-area-inset-top);
-        --safe-area-inset-right: env(safe-area-inset-right);
-        --safe-area-inset-bottom: env(safe-area-inset-bottom);
-        --safe-area-inset-left: env(safe-area-inset-left);
-
-        html {
-            overscroll-behavior-y: contain;
-            height: 100%;
-        }
-
-        body {
-            background: #ffffff;
-            color: var(--color-dark);
-            -webkit-overflow-scrolling: touch;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
-
-        .font-calsans {
-            font-family: 'Cal Sans', sans-serif;
-        }
-
-        /* App-like transitions */
+        
         * {
             -webkit-tap-highlight-color: transparent;
         }
-
-        /* Native app container */
-        .app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            padding-top: var(--safe-area-inset-top);
+        
+        html {
+            font-family: var(--font-sans);
+            scroll-behavior: smooth;
         }
-
-        /* Top bar - minimal, native style */
-        .top-bar {
-            flex-shrink: 0;
-            background: rgba(253, 249, 243, 0.95);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 2px solid var(--color-accent);
-            padding: 12px 16px;
+        
+        body {
+            background: linear-gradient(180deg, #fafbfc 0%, #f5f7f9 100%);
+            min-height: 100vh;
+        }
+        
+        .font-display {
+            font-family: var(--font-display);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+        
+        /* Horizontal scroll sections */
+        .scroll-section {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
             gap: 16px;
-            height: 56px;
-            box-shadow: 0 2px 8px rgba(89, 60, 143, 0.08);
-        }
-
-        /* Main content area */
-        .main-content {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            padding: 8px 0 16px 0;
             -webkit-overflow-scrolling: touch;
-            padding-bottom: 24px;
+            scrollbar-width: none;
         }
-
-        /* Book grid - native card style */
-        .book-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            padding: 16px;
+        .scroll-section::-webkit-scrollbar {
+            display: none;
         }
-
-        @media (min-width: 640px) {
-            .book-grid {
-                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-                gap: 20px;
-                padding: 24px;
-            }
+        .scroll-section > * {
+            scroll-snap-align: start;
+            flex-shrink: 0;
         }
-
+        
+        /* Book card */
         .book-card {
-            position: relative;
-            overflow: visible;
-            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: pointer;
+            width: 140px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-
+        .book-card:hover {
+            transform: translateY(-4px);
+        }
         .book-card:active {
-            transform: scale(0.95);
+            transform: scale(0.98);
         }
-
-        .book-cover-wrapper {
-            position: relative;
+        
+        .book-cover {
             aspect-ratio: 2/3;
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(89, 60, 143, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
-            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.05);
+            background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
         }
-
-        .book-card:active .book-cover-wrapper {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Native modal animations */
-        .modal-backdrop {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.4);
-            z-index: 200;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .modal-sheet {
-            position: fixed;
-            inset: 0;
-            z-index: 201;
-            display: flex;
-            align-items: flex-end;
-            pointer-events: none;
-        }
-
-        @media (min-width: 640px) {
-            .modal-sheet {
-                align-items: center;
-                justify-content: center;
-                padding: 16px;
-            }
-        }
-
-        .modal-content {
+        .book-cover img {
             width: 100%;
-            max-height: 90vh;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Glass effect for modals */
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        
+        /* Setup wizard */
+        .setup-card {
             background: white;
-            border-radius: 16px 16px 0 0;
-            overflow: hidden;
-            pointer-events: auto;
-            animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
         }
-
-        @media (min-width: 640px) {
-            .modal-content {
-                max-width: 680px;
-                max-height: 85vh;
-                border-radius: 20px;
-            }
+        
+        /* Input styling */
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.2s ease;
+            background: #fafbfc;
         }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        .input-field:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
         }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
+        .input-field.error {
+            border-color: #ef4444;
+            background: #fef2f2;
         }
-
-        /* Hide scrollbar for horizontal scroll */
-        .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        .input-field.success {
+            border-color: #22c55e;
+            background: #f0fdf4;
         }
-
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
+        
+        /* Button styles */
+        .btn {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-
-        /* Horizontal scrolling book rows */
-        .books-scroll {
-            display: flex;
-            gap: 1rem;
-            overflow-x: auto;
-            padding: 0.5rem 1rem 1rem 1rem;
-            padding-left: 1rem;
-            scrollbar-width: thin;
-            scrollbar-color: var(--color-accent) transparent;
-            scroll-snap-type: x proximity;
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            color: white;
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
         }
-
-        .books-scroll::-webkit-scrollbar {
-            height: 6px;
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
         }
-
-        .books-scroll::-webkit-scrollbar-track {
-            background: var(--color-parchment);
-            border-radius: 10px;
+        .btn-primary:active {
+            transform: translateY(0);
         }
-
-        .books-scroll::-webkit-scrollbar-thumb {
-            background: var(--color-border-dark);
-            border-radius: 10px;
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
-
-        .books-scroll .book-card {
-            flex: 0 0 auto;
-            width: 140px;
-            scroll-snap-align: start;
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
         }
-
-        @media (min-width: 640px) {
-            .books-scroll .book-card {
-                width: 160px;
-            }
+        .btn-secondary:hover {
+            background: #e2e8f0;
         }
-
-        /* Section styling */
-        .section {
-            margin-bottom: 2rem;
-        }
-
+        
+        /* Section header */
         .section-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 0 1rem;
-            margin-bottom: 0.75rem;
+            justify-content: space-between;
+            margin-bottom: 16px;
         }
-
         .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--color-dark);
-        }
-
-        .view-all {
-            color: var(--color-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            transition: opacity 0.2s;
-        }
-
-        .view-all:hover {
-            opacity: 0.7;
-        }
-
-        /* Status badges */
-        .status-badge {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 8px;
-            font-size: 0.6rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            z-index: 10;
-        }
-
-        .badge-library {
-            background: rgba(83, 58, 123, 0.95);
-            color: white;
-        }
-
-        .badge-requested {
-            background: rgba(139, 38, 53, 0.95);
-            color: white;
-        }
-
-        .badge-available {
-            background: rgba(255, 255, 255, 0.95);
-            color: var(--color-primary);
-            border: 1.5px solid var(--color-primary);
-        }
-
-        /* Book overlay on hover */
-        .book-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            padding: 0.75rem;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .book-card:hover .book-overlay {
-            opacity: 1;
-        }
-
-        .overlay-button {
-            background: var(--color-primary);
-            color: white;
-            border: none;
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-        }
-
-        .overlay-button:hover {
-            background: var(--color-primary-dark);
-            transform: scale(1.02);
-        }
-
-        .overlay-button.in-library {
-            background: var(--color-secondary);
-        }
-
-        .overlay-button.in-library:hover {
-            background: var(--color-secondary-dark);
-        }
-
-        .overlay-button.requested {
-            background: var(--color-accent);
-        }
-
-        .overlay-button.requested:hover {
-            background: var(--color-accent-dark);
-        }
-
-        /* Hero section */
-        .hero-section {
-            background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-accent) 100%);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 12px rgba(83, 58, 123, 0.25);
-        }
-
-        .hero-content h1 {
+            font-family: var(--font-display);
             font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-            color: white;
-        }
-
-        .hero-content p {
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 0.875rem;
-        }
-
-        .hero-stats {
-            display: flex;
-            gap: 1.5rem;
-        }
-
-        .stat {
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--color-gold);
-        }
-
-        .stat-label {
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 0.7rem;
-            margin-top: 0.1rem;
-        }
-
-        /* Genre pills */
-        .genre-banner {
-            background: linear-gradient(135deg, var(--color-secondary-light) 0%, var(--color-secondary) 100%);
-            padding: 1rem 1.25rem;
-            border-radius: 12px;
-            margin: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            box-shadow: 0 4px 12px rgba(83, 58, 123, 0.15);
-        }
-
-        .genre-banner h3 {
-            font-size: 1rem;
             font-weight: 600;
-            color: white;
+            color: #1e293b;
         }
-
-        .genre-pills {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .genre-pill {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 0.35rem 0.75rem;
-            border-radius: 16px;
-            font-size: 0.75rem;
-            color: white;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .genre-pill:hover {
-            background: rgba(212, 165, 116, 0.4);
-            border-color: var(--color-gold);
-        }
-
-        .genre-pill.active {
-            background: var(--color-gold);
-            color: var(--color-dark);
-            border-color: var(--color-gold);
-        }
-
-        /* Book info under card */
-        .book-info {
-            padding: 0.5rem 0.25rem 0;
-        }
-
-        .book-title-small {
-            font-weight: 600;
-            font-size: 0.8rem;
-            color: var(--color-dark);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            line-height: 1.2;
-        }
-
-        .book-author-small {
-            color: #666;
-            font-size: 0.7rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            margin-top: 0.15rem;
-        }
-
-        .book-meta-small {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-top: 0.25rem;
-            font-size: 0.65rem;
-            color: #888;
-        }
-
+        
+        /* Rating stars */
         .rating {
             display: flex;
             align-items: center;
-            gap: 0.15rem;
-            color: var(--color-gold);
+            gap: 2px;
         }
-
-        /* Tabs styling */
-        .tab-active {
-            color: var(--color-primary) !important;
-            font-weight: 600 !important;
+        .star {
+            width: 14px;
+            height: 14px;
+            color: #fbbf24;
         }
-
+        .star-empty {
+            color: #e5e7eb;
+        }
+        
+        /* Status badge */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-library {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .badge-requested {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        /* Directory browser */
+        .dir-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .dir-item:hover {
+            background: #f1f5f9;
+        }
+        .dir-item.calibre {
+            background: #ecfdf5;
+            border: 2px solid #86efac;
+        }
+        
         /* Loading spinner */
-        .spinner-warm {
-            border-color: var(--color-border);
-            border-top-color: var(--color-primary);
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e7eb;
+            border-top-color: #0ea5e9;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Skeleton loading */
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        /* Modal overlay */
+        .modal-overlay {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+        }
+        
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .slide-up {
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(100%); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Safe area padding */
+        .safe-area-bottom {
+            padding-bottom: max(24px, env(safe-area-inset-bottom));
+        }
+        .safe-area-top {
+            padding-top: max(16px, env(safe-area-inset-top));
         }
     </style>
 </head>
 <body x-data="folioApp()" x-init="init()">
-    <!-- Native App Container -->
-    <div class="app-container">
-        <!-- Top Bar -->
-        <div class="top-bar">
+    
+    <!-- Setup Screen -->
+    <div x-show="showSetup" x-cloak class="min-h-screen flex items-center justify-content-center p-6">
+        <div class="setup-card max-w-md w-full mx-auto p-8 fade-in">
             <!-- Logo -->
-            <h1 class="text-2xl font-calsans text-primary flex-shrink-0">folio</h1>
-
-            <!-- Search Bar -->
-            <div class="flex-1 max-w-2xl relative">
-                <i class="bi bi-search absolute left-4 top-1/2 transform -translate-y-1/2 text-secondary text-lg"></i>
-                <input type="text"
-                       x-model="searchQuery"
-                       @input.debounce.500ms="searchBooks()"
-                       placeholder="Search your library or discover new books..."
-                       class="w-full pl-12 pr-4 py-2 bg-white text-dark placeholder-gray-400 rounded-lg border-2 border-accent focus:ring-2 focus:ring-secondary focus:border-secondary shadow-sm">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-ocean-400 to-ocean-600 rounded-2xl mb-4 shadow-lg">
+                    <i data-lucide="book-open" class="w-8 h-8 text-white"></i>
+                </div>
+                <h1 class="font-display text-3xl font-bold text-ink-900">Welcome to Folio</h1>
+                <p class="text-ink-500 mt-2">Let's get your library set up</p>
             </div>
-
-            <!-- Controls -->
-            <div class="flex items-center gap-3 flex-shrink-0">
-                <!-- Settings -->
-                <button @click="showSettings = true"
-                        class="p-2 text-secondary hover:bg-accent hover:bg-opacity-10 rounded-lg transition-colors">
-                    <i class="bi bi-gear text-lg"></i>
+            
+            <!-- Step Indicator -->
+            <div class="flex items-center justify-center gap-3 mb-8">
+                <div class="flex items-center gap-2">
+                    <div :class="setupStep >= 1 ? 'bg-ocean-500 text-white' : 'bg-ink-200 text-ink-500'" 
+                         class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors">
+                        <template x-if="setupStep > 1">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                        </template>
+                        <template x-if="setupStep <= 1">
+                            <span>1</span>
+                        </template>
+                    </div>
+                    <span :class="setupStep >= 1 ? 'text-ink-700' : 'text-ink-400'" class="text-sm font-medium">Hardcover API</span>
+                </div>
+                <div class="w-8 h-0.5 bg-ink-200"></div>
+                <div class="flex items-center gap-2">
+                    <div :class="setupStep >= 2 ? 'bg-ocean-500 text-white' : 'bg-ink-200 text-ink-500'" 
+                         class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors">
+                        <template x-if="setupStep > 2">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                        </template>
+                        <template x-if="setupStep <= 2">
+                            <span>2</span>
+                        </template>
+                    </div>
+                    <span :class="setupStep >= 2 ? 'text-ink-700' : 'text-ink-400'" class="text-sm font-medium">Calibre Library</span>
+                </div>
+            </div>
+            
+            <!-- Step 1: Hardcover API Key -->
+            <div x-show="setupStep === 1" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">Hardcover API Key</label>
+                    <p class="text-sm text-ink-500 mb-3">
+                        Get your API key from 
+                        <a href="https://hardcover.app/account/api" target="_blank" class="text-ocean-600 hover:underline">hardcover.app/account/api</a>
+                    </p>
+                    <input 
+                        type="text" 
+                        x-model="hardcoverApiKeyInput"
+                        :class="{'error': apiKeyError, 'success': apiKeySuccess}"
+                        class="input-field font-mono text-sm"
+                        placeholder="Paste your API key here"
+                        @keyup.enter="validateHardcoverKey()"
+                    >
+                    <p class="text-xs text-ink-400 mt-2">
+                        <i data-lucide="info" class="w-3 h-3 inline"></i>
+                        Copy the key exactly as shown on Hardcover
+                    </p>
+                </div>
+                
+                <!-- Error/Success Messages -->
+                <div x-show="apiKeyError" class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <i data-lucide="alert-circle" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-red-700" x-text="apiKeyError"></p>
+                </div>
+                <div x-show="apiKeySuccess" class="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-green-700">API key verified successfully!</p>
+                </div>
+                
+                <button 
+                    @click="validateHardcoverKey()"
+                    :disabled="validatingApiKey || !hardcoverApiKeyInput.trim()"
+                    class="btn btn-primary w-full"
+                >
+                    <template x-if="validatingApiKey">
+                        <span class="flex items-center gap-2">
+                            <span class="spinner"></span>
+                            Verifying...
+                        </span>
+                    </template>
+                    <template x-if="!validatingApiKey">
+                        <span>Verify & Continue</span>
+                    </template>
                 </button>
             </div>
-        </div>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Library Tab -->
-            <div x-show="currentTab === 'library'" x-cloak>
-                <!-- Loading -->
-                <div x-show="loading" class="flex justify-center items-center py-20">
-                    <div class="animate-spin rounded-full h-12 w-12 border-4 spinner-warm"></div>
-                </div>
-
-                <!-- Grid View -->
-                <div x-show="!loading && displayedBooks.length > 0 && viewMode === 'grid'" x-cloak>
-                    <!-- Back Button -->
-                    <div class="flex items-center gap-3 mb-6 px-4">
-                        <button @click="viewMode = 'rows'; searchQuery = ''; loadBooks()"
-                                class="flex items-center gap-2 px-4 py-2 text-secondary hover:bg-accent hover:bg-opacity-10 rounded-lg transition-colors">
-                            <i class="bi bi-arrow-left text-xl"></i>
-                            <span class="font-medium">Back to Browse</span>
-                        </button>
-                        <div class="flex-1">
-                            <h2 class="text-2xl font-semibold text-dark">
-                                <span x-show="!searchQuery">All Books</span>
-                                <span x-show="searchQuery" x-text="'Results for \"' + searchQuery + '\"'"></span>
-                            </h2>
-                        </div>
+            
+            <!-- Step 2: Calibre Library -->
+            <div x-show="setupStep === 2" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">Calibre Library Location</label>
+                    <p class="text-sm text-ink-500 mb-3">
+                        Select the folder containing your Calibre library (with metadata.db)
+                    </p>
+                    
+                    <!-- Current Path Display -->
+                    <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl mb-4">
+                        <i data-lucide="folder" class="w-5 h-5 text-ink-400"></i>
+                        <span class="text-sm font-mono text-ink-600 truncate" x-text="browserPath || 'Select a directory...'"></span>
                     </div>
-
-                    <div class="book-grid">
-                        <template x-for="book in displayedBooks" :key="book.id">
-                            <div @click="openBookModal(book)" class="book-card">
-                                <div class="book-cover-wrapper">
-                                    <div class="status-badge badge-library">In Library</div>
-                                    <img :src="`/api/cover/${book.id}`"
-                                         :alt="book.title"
-                                         class="w-full h-full object-cover"
-                                         loading="lazy"
-                                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                    <div class="book-overlay">
-                                        <button class="overlay-button in-library">View Details</button>
-                                    </div>
-                                </div>
+                    
+                    <!-- Directory Browser -->
+                    <div class="border-2 border-ink-200 rounded-xl max-h-64 overflow-y-auto">
+                        <!-- Parent Directory -->
+                        <div 
+                            x-show="browserParent"
+                            @click="browseTo(browserParent)"
+                            class="dir-item border-b border-ink-100"
+                        >
+                            <i data-lucide="arrow-up" class="w-5 h-5 text-ink-400"></i>
+                            <span class="text-ink-600">..</span>
+                        </div>
+                        
+                        <!-- Directory Entries -->
+                        <template x-for="entry in browserEntries" :key="entry.path">
+                            <div 
+                                @click="entry.is_calibre_library ? selectCalibreLibrary(entry.path) : browseTo(entry.path)"
+                                :class="{'calibre': entry.is_calibre_library}"
+                                class="dir-item"
+                            >
+                                <i :data-lucide="entry.is_calibre_library ? 'database' : 'folder'" 
+                                   :class="entry.is_calibre_library ? 'text-green-500' : 'text-ink-400'"
+                                   class="w-5 h-5"></i>
+                                <span :class="entry.is_calibre_library ? 'text-green-700 font-semibold' : 'text-ink-700'" x-text="entry.name"></span>
+                                <span x-show="entry.is_calibre_library" class="ml-auto text-xs text-green-600 font-medium">Calibre Library</span>
                             </div>
                         </template>
-                    </div>
-
-                    <!-- Load More Button -->
-                    <div class="px-4 mt-6 mb-4">
-                        <button @click="loadMoreBooks()"
-                                x-show="!loadingMore && displayedBooks.length >= booksPerPage"
-                                class="w-full py-3 bg-white text-secondary font-semibold rounded-xl border-2 border-secondary hover:bg-parchment active:bg-parchment transition-all">
-                            Load More Books
-                        </button>
-                        <div x-show="loadingMore" class="flex justify-center py-4">
-                            <div class="animate-spin rounded-full h-8 w-8 border-4 spinner-warm"></div>
-                        </div>
-                    </div>
-
-                    <!-- Genre Banner -->
-                    <div class="genre-banner">
-                        <h3>Browse by Genre</h3>
-                        <div class="genre-pills">
-                            <template x-for="genre in getTopGenres()" :key="genre">
-                                <div class="genre-pill"
-                                     :class="selectedGenre === genre ? 'active' : ''"
-                                     @click="filterByGenre(genre)"
-                                     x-text="genre"></div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- By Author (first few authors with most books) -->
-                    <template x-for="author in getTopAuthors()" :key="'author-'+author">
-                        <div class="section">
-                            <div class="section-header">
-                                <h2 class="section-title" x-text="author"></h2>
-                                <a @click="searchQuery = author; searchBooks(); viewMode = 'grid'" class="view-all cursor-pointer">
-                                    View All
-                                    <i class="bi bi-chevron-right"></i>
-                                </a>
-                            </div>
-                            <div class="books-scroll">
-                                <template x-for="book in getBooksByAuthor(author)" :key="'auth-'+book.id">
-                                    <div @click="openBookModal(book)" class="book-card">
-                                        <div class="book-cover-wrapper">
-                                            <div class="status-badge badge-library">In Library</div>
-                                            <img :src="`/api/cover/${book.id}`"
-                                                 :alt="book.title"
-                                                 class="w-full h-full object-cover"
-                                                 loading="lazy"
-                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                            <div class="book-overlay">
-                                                <button class="overlay-button in-library">View Details</button>
-                                            </div>
-                                        </div>
-                                        <div class="book-info">
-                                            <div class="book-title-small" x-text="book.title"></div>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-
-                <!-- Row View (Sections) -->
-                <div x-show="!loading && displayedBooks.length > 0 && viewMode === 'rows'" x-cloak>
-                    <!-- Recently Added -->
-                    <div class="section">
-                        <div class="section-header">
-                            <h2 class="section-title">Recently Added</h2>
-                            <a @click="viewMode = 'grid'; changeSortOrder('date-desc')" class="view-all cursor-pointer">
-                                View All
-                                <i class="bi bi-chevron-right"></i>
-                            </a>
-                        </div>
-                        <div class="books-scroll">
-                            <template x-for="book in getRecentBooks()" :key="'recent-'+book.id">
-                                <div @click="openBookModal(book)" class="book-card">
-                                    <div class="book-cover-wrapper">
-                                        <div class="status-badge badge-library">In Library</div>
-                                        <img :src="`/api/cover/${book.id}`"
-                                             :alt="book.title"
-                                             class="w-full h-full object-cover"
-                                             loading="lazy"
-                                             @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                        <div class="book-overlay">
-                                            <button class="overlay-button in-library">View Details</button>
-                                        </div>
-                                    </div>
-                                    <div class="book-info">
-                                        <div class="book-title-small" x-text="book.title"></div>
-                                        <div class="book-author-small" x-text="Array.isArray(book.authors) ? book.authors[0] : book.authors"></div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- By Author (first few authors with most books) -->
-                    <template x-for="author in getTopAuthors()" :key="'author-'+author">
-                        <div class="section">
-                            <div class="section-header">
-                                <h2 class="section-title" x-text="author"></h2>
-                                <a @click="searchQuery = author; searchBooks(); viewMode = 'grid'" class="view-all cursor-pointer">
-                                    View All
-                                    <i class="bi bi-chevron-right"></i>
-                                </a>
-                            </div>
-                            <div class="books-scroll">
-                                <template x-for="book in getBooksByAuthor(author)" :key="'auth-'+book.id">
-                                    <div @click="openBookModal(book)" class="book-card">
-                                        <div class="book-cover-wrapper">
-                                            <div class="status-badge badge-library">In Library</div>
-                                            <img :src="`/api/cover/${book.id}`"
-                                                 :alt="book.title"
-                                                 class="w-full h-full object-cover"
-                                                 loading="lazy"
-                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                            <div class="book-overlay">
-                                                <button class="overlay-button in-library">View Details</button>
-                                            </div>
-                                        </div>
-                                        <div class="book-info">
-                                            <div class="book-title-small" x-text="book.title"></div>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
-
-                    <!-- Hardcover Sections -->
-                    <!-- Trending -->
-                    <div x-show="hardcoverTrending.length > 0" class="section">
-                                <div class="section-header">
-                                    <h2 class="section-title">Trending This Month</h2>
-                                </div>
-                                <div class="books-scroll">
-                                    <template x-for="book in hardcoverTrending" :key="'trending-'+book.id">
-                                        <div class="book-card cursor-pointer">
-                                            <div class="book-cover-wrapper">
-                                                <div class="status-badge badge-requested">Trending</div>
-                                                <img :src="book.image"
-                                                     :alt="book.title"
-                                                     class="w-full h-full object-cover"
-                                                     loading="lazy"
-                                                     @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23593c8f%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22white%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                            </div>
-                                            <div class="book-info">
-                                                <div class="book-title-small" x-text="book.title"></div>
-                                                <div class="book-author-small" x-text="book.author || 'Unknown'"></div>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-
-                            <!-- Recent Releases -->
-                            <div x-show="hardcoverRecentReleases.length > 0" class="section">
-                                <div class="section-header">
-                                    <h2 class="section-title">Recent Releases</h2>
-                                </div>
-                                <div class="books-scroll">
-                                    <template x-for="book in hardcoverRecentReleases" :key="'recent-'+book.id">
-                                        <div class="book-card cursor-pointer">
-                                            <div class="book-cover-wrapper">
-                                                <div class="status-badge badge-requested">New</div>
-                                                <img :src="book.image"
-                                                     :alt="book.title"
-                                                     class="w-full h-full object-cover"
-                                                     loading="lazy"
-                                                     @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23593c8f%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22white%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                            </div>
-                                            <div class="book-info">
-                                                <div class="book-title-small" x-text="book.title"></div>
-                                                <div class="book-author-small" x-text="book.author || 'Unknown'"></div>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-
-                            <!-- Curated Lists -->
-                            <template x-for="(section, index) in hardcoverSections" :key="'section-'+index">
-                                <div x-show="section.books.length > 0" class="section">
-                                    <div class="section-header">
-                                        <h2 class="section-title" x-text="section.name"></h2>
-                                    </div>
-                                    <div class="books-scroll">
-                                        <template x-for="book in section.books" :key="'list-'+index+'-'+book.id">
-                                            <div class="book-card cursor-pointer">
-                                                <div class="book-cover-wrapper">
-                                                    <img :src="book.image"
-                                                         :alt="book.title"
-                                                         class="w-full h-full object-cover"
-                                                         loading="lazy"
-                                                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23593c8f%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22white%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                                </div>
-                                                <div class="book-info">
-                                                    <div class="book-title-small" x-text="book.title"></div>
-                                                    <div class="book-author-small" x-text="book.author || 'Unknown'"></div>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-
-                            <!-- More from {Author} -->
-                            <div x-show="hardcoverAuthorBooks.length > 0" class="section">
-                                <div class="section-header">
-                                    <h2 class="section-title" x-text="'More from ' + hardcoverAuthor"></h2>
-                                </div>
-                                <div class="books-scroll">
-                                    <template x-for="book in hardcoverAuthorBooks" :key="'author-'+book.id">
-                                        <div class="book-card cursor-pointer">
-                                            <div class="book-cover-wrapper">
-                                                <img :src="book.image"
-                                                     :alt="book.title"
-                                                     class="w-full h-full object-cover"
-                                                     loading="lazy"
-                                                     @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23593c8f%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22white%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                            </div>
-                                            <div class="book-info">
-                                                <div class="book-title-small" x-text="book.title"></div>
-                                                <div class="book-author-small" x-text="book.author || 'Unknown'"></div>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-                </div>
-
-                <!-- No Books -->
-                <div x-show="!loading && books.length === 0" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
-                    <i class="bi bi-book text-6xl text-secondary-light mb-4"></i>
-                    <h3 class="text-lg font-semibold text-dark mb-2">No books found</h3>
-                    <p class="text-sm text-gray-500 text-center">Check your Calibre library connection</p>
-                </div>
-            </div>
-
-            <!-- Explore Tab -->
-            <div x-show="currentTab === 'explore'" x-cloak>
-                <!-- Search Bar for Hardcover -->
-                <div class="px-4 py-4">
-                    <div class="relative">
-                        <i class="bi bi-search absolute left-4 top-1/2 transform -translate-y-1/2 text-secondary text-lg"></i>
-                        <input type="text"
-                               x-model="hardcoverSearchQuery"
-                               @keyup.enter="searchHardcover()"
-                               placeholder="Search Hardcover for books..."
-                               class="w-full pl-12 pr-24 py-3 bg-white text-dark placeholder-gray-400 rounded-xl border-2 border-warm focus:ring-2 focus:ring-primary focus:border-primary shadow-sm">
-                        <button @click="searchHardcover()"
-                                class="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-all">
-                            Search
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Hardcover API Status -->
-                <div x-show="!hardcoverToken" class="mx-4 mb-4 bg-parchment border-2 border-warm rounded-xl p-4">
-                    <div class="flex items-start gap-3">
-                        <i class="bi bi-key text-primary text-xl flex-shrink-0 mt-0.5"></i>
-                        <div>
-                            <p class="text-sm text-dark font-medium mb-1">Hardcover API not configured</p>
-                            <p class="text-xs text-gray-500 mb-2">Add your Hardcover API token in Settings to search and discover books.</p>
-                            <a @click="showSettings = true" class="text-xs text-primary font-medium cursor-pointer hover:underline">Configure API Token</a>
+                        
+                        <!-- Empty State -->
+                        <div x-show="browserEntries.length === 0" class="p-8 text-center text-ink-400">
+                            <i data-lucide="folder-x" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                            <p class="text-sm">No subdirectories found</p>
                         </div>
                     </div>
                 </div>
-
-                <!-- Loading -->
-                <div x-show="hardcoverLoading" class="flex justify-center items-center py-20">
-                    <div class="animate-spin rounded-full h-12 w-12 border-4 spinner-warm"></div>
-                </div>
-
-                <!-- Hardcover Results -->
-                <div x-show="!hardcoverLoading && hardcoverBooks.length > 0" x-cloak>
-                    <!-- Trending Section -->
-                    <div class="section">
-                        <div class="section-header">
-                            <h2 class="section-title" x-text="hardcoverSearchQuery ? 'Search Results' : 'Trending Now'"></h2>
-                        </div>
-                        <div class="books-scroll">
-                            <template x-for="book in hardcoverBooks" :key="'hc-'+book.id">
-                                <div @click="openHardcoverModal(book)" class="book-card">
-                                    <div class="book-cover-wrapper">
-                                        <div class="status-badge"
-                                             :class="book.inLibrary ? 'badge-library' : (book.requested ? 'badge-requested' : 'badge-available')"
-                                             x-text="book.inLibrary ? 'In Library' : (book.requested ? 'Requested' : 'Available')"></div>
-                                        <img :src="book.image"
-                                             :alt="book.title"
-                                             class="w-full h-full object-cover"
-                                             loading="lazy"
-                                             @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23C45D35%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                        <div class="book-overlay">
-                                            <button class="overlay-button"
-                                                    :class="book.inLibrary ? 'in-library' : (book.requested ? 'requested' : '')"
-                                                    x-text="book.inLibrary ? 'View in Library' : (book.requested ? 'Pending' : 'Request')"></button>
-                                        </div>
-                                    </div>
-                                    <div class="book-info">
-                                        <div class="book-title-small" x-text="book.title"></div>
-                                        <div class="book-author-small" x-text="book.author"></div>
-                                        <div class="book-meta-small">
-                                            <span class="rating" x-show="book.rating">
-                                                <i class="bi bi-star-fill"></i>
-                                                <span x-text="book.rating?.toFixed(1)"></span>
-                                            </span>
-                                            <span x-text="book.year"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
+                
+                <!-- Selected Library -->
+                <div x-show="calibreLibraryPath" class="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-semibold text-green-700">Library selected</p>
+                        <p class="text-xs text-green-600 font-mono mt-1" x-text="calibreLibraryPath"></p>
                     </div>
-
-                    <!-- Genre Sections from Hardcover -->
-                    <template x-for="section in hardcoverSections" :key="'section-'+section.title">
-                        <div class="section">
-                            <div class="section-header">
-                                <h2 class="section-title" x-text="section.title"></h2>
-                                <a class="view-all cursor-pointer">
-                                    View All
-                                    <i class="bi bi-chevron-right"></i>
-                                </a>
-                            </div>
-                            <div class="books-scroll">
-                                <template x-for="book in section.books" :key="'sec-'+book.id">
-                                    <div @click="openHardcoverModal(book)" class="book-card">
-                                        <div class="book-cover-wrapper">
-                                            <div class="status-badge"
-                                                 :class="book.inLibrary ? 'badge-library' : (book.requested ? 'badge-requested' : 'badge-available')"
-                                                 x-text="book.inLibrary ? 'In Library' : (book.requested ? 'Requested' : 'Available')"></div>
-                                            <img :src="book.image"
-                                                 :alt="book.title"
-                                                 class="w-full h-full object-cover"
-                                                 loading="lazy"
-                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23C45D35%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                            <div class="book-overlay">
-                                                <button class="overlay-button"
-                                                        :class="book.inLibrary ? 'in-library' : (book.requested ? 'requested' : '')"
-                                                        x-text="book.inLibrary ? 'View in Library' : (book.requested ? 'Pending' : 'Request')"></button>
-                                            </div>
-                                        </div>
-                                        <div class="book-info">
-                                            <div class="book-title-small" x-text="book.title"></div>
-                                            <div class="book-author-small" x-text="book.author"></div>
-                                            <div class="book-meta-small">
-                                                <span class="rating" x-show="book.rating">
-                                                    <i class="bi bi-star-fill"></i>
-                                                    <span x-text="book.rating?.toFixed(1)"></span>
-                                                </span>
-                                                <span x-text="book.year"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
                 </div>
-
-                <!-- Empty State for Explore -->
-                <div x-show="!hardcoverLoading && hardcoverBooks.length === 0 && hardcoverToken" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
-                    <i class="bi bi-compass text-6xl text-secondary-light mb-4"></i>
-                    <h3 class="text-lg font-semibold text-dark mb-2">Discover New Books</h3>
-                    <p class="text-sm text-gray-500 text-center">Search for books to see results from Hardcover</p>
+                
+                <!-- Error Message -->
+                <div x-show="calibreError" class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <i data-lucide="alert-circle" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-red-700" x-text="calibreError"></p>
                 </div>
-            </div>
-
-            <!-- Requests Tab -->
-            <div x-show="currentTab === 'requests'" x-cloak>
-                <!-- Requested Books List -->
-                <div x-show="requestedBooks.length > 0" class="section mt-4">
-                    <div class="section-header">
-                        <h2 class="section-title">Your Requests</h2>
-                        <span class="text-sm text-gray-500" x-text="`${requestedBooks.length} pending`"></span>
-                    </div>
-                    <div class="books-scroll">
-                        <template x-for="book in requestedBooks" :key="'req-'+book.id">
-                            <div @click="openHardcoverModal(book)" class="book-card">
-                                <div class="book-cover-wrapper">
-                                    <div class="status-badge badge-requested">Requested</div>
-                                    <img :src="book.image"
-                                         :alt="book.title"
-                                         class="w-full h-full object-cover"
-                                         loading="lazy"
-                                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%238B2635%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                    <div class="book-overlay">
-                                        <button class="overlay-button requested">Pending</button>
-                                    </div>
-                                </div>
-                                <div class="book-info">
-                                    <div class="book-title-small" x-text="book.title"></div>
-                                    <div class="book-author-small" x-text="book.author"></div>
-                                </div>
-                            </div>
+                
+                <div class="flex gap-3">
+                    <button @click="setupStep = 1" class="btn btn-secondary flex-1">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        Back
+                    </button>
+                    <button 
+                        @click="completeSetup()"
+                        :disabled="!calibreLibraryPath || verifyingCalibre"
+                        class="btn btn-primary flex-1"
+                    >
+                        <template x-if="verifyingCalibre">
+                            <span class="flex items-center gap-2">
+                                <span class="spinner"></span>
+                                Verifying...
+                            </span>
                         </template>
-                    </div>
-                </div>
-
-                <!-- Empty State -->
-                <div x-show="requestedBooks.length === 0" x-cloak class="flex flex-col items-center justify-center py-20 px-4">
-                    <i class="bi bi-inbox text-6xl text-secondary-light mb-4"></i>
-                    <h3 class="text-lg font-semibold text-dark mb-2">No Requests Yet</h3>
-                    <p class="text-sm text-gray-500 text-center mb-4">Explore and request books you'd like to add to your library</p>
-                    <button @click="currentTab = 'explore'" class="px-6 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-all">
-                        Explore Books
+                        <template x-if="!verifyingCalibre">
+                            <span>Complete Setup</span>
+                        </template>
                     </button>
                 </div>
             </div>
-        </main>
+        </div>
     </div>
-
-    <!-- Book Modal -->
-    <div x-show="selectedBook" x-cloak>
-        <div class="modal-backdrop" @click="selectedBook = null"></div>
-        <div class="modal-sheet">
-            <div class="modal-content" @click.stop>
-                <div class="flex-1 overflow-y-auto">
-                    <template x-if="selectedBook">
-                        <div class="p-6">
-                                <!-- Header with close and edit/cancel buttons -->
-                                <div class="flex items-center justify-between mb-6">
-                                    <h3 class="text-lg font-semibold text-header" x-text="isEditingMetadata ? 'Edit Metadata' : 'Book Details'"></h3>
-                                    <div class="flex items-center gap-2">
-                                        <!-- Edit button (shown in view mode) -->
-                                        <button x-show="!isEditingMetadata"
-                                                @click="openEditMetadata(selectedBook)"
-                                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary-dark active:bg-primary-dark transition-colors">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <!-- Cancel button (shown in edit mode) -->
-                                        <button x-show="isEditingMetadata"
-                                                @click="cancelEditMetadata()"
-                                                class="px-4 h-10 flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300 transition-colors text-sm font-semibold">
-                                            Cancel
-                                        </button>
-                                        <!-- Save button (shown in edit mode) -->
-                                        <button x-show="isEditingMetadata"
-                                                @click="saveMetadata()"
-                                                class="px-4 h-10 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary-dark active:bg-primary-dark transition-colors text-sm font-semibold">
-                                            Save
-                                        </button>
-                                        <!-- Close button (always shown) -->
-                                        <button @click="selectedBook = null; isEditingMetadata = false; editingBook = null"
-                                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300 transition-colors">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
-                                    </div>
+    
+    <!-- Main App -->
+    <div x-show="!showSetup" x-cloak class="min-h-screen">
+        
+        <!-- Header -->
+        <header class="sticky top-0 z-40 glass border-b border-ink-200 safe-area-top">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo -->
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-ocean-400 to-ocean-600 rounded-xl flex items-center justify-center shadow-md">
+                            <i data-lucide="book-open" class="w-5 h-5 text-white"></i>
+                        </div>
+                        <span class="font-display text-xl font-bold text-ink-900">Folio</span>
+                    </div>
+                    
+                    <!-- Search -->
+                    <div class="hidden sm:flex flex-1 max-w-md mx-8">
+                        <div class="relative w-full">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-400"></i>
+                            <input 
+                                type="text" 
+                                x-model="searchQuery"
+                                @input.debounce.300ms="searchBooks()"
+                                placeholder="Search your library..."
+                                class="w-full pl-10 pr-4 py-2.5 bg-ink-100 border-0 rounded-xl text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all"
+                            >
+                        </div>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="flex items-center gap-2">
+                        <button @click="loadHardcoverData()" class="p-2.5 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-xl transition-colors" title="Refresh">
+                            <i data-lucide="refresh-cw" :class="{'animate-spin': hardcoverLoading}" class="w-5 h-5"></i>
+                        </button>
+                        <button @click="showSettings = true" class="p-2.5 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-xl transition-colors" title="Settings">
+                            <i data-lucide="settings" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Mobile Search -->
+        <div class="sm:hidden px-4 py-3 bg-white border-b border-ink-100">
+            <div class="relative">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-400"></i>
+                <input 
+                    type="text" 
+                    x-model="searchQuery"
+                    @input.debounce.300ms="searchBooks()"
+                    placeholder="Search your library..."
+                    class="w-full pl-10 pr-4 py-2.5 bg-ink-100 border-0 rounded-xl text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all"
+                >
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-10 safe-area-bottom">
+            
+            <!-- Loading State -->
+            <div x-show="loading" class="py-12">
+                <div class="flex flex-col items-center justify-center gap-4">
+                    <div class="spinner w-8 h-8"></div>
+                    <p class="text-ink-500">Loading your library...</p>
+                </div>
+            </div>
+            
+            <!-- Search Results -->
+            <section x-show="searchQuery && filteredBooks.length > 0 && !loading">
+                <div class="section-header">
+                    <h2 class="section-title">Search Results</h2>
+                    <span class="text-ink-500 text-sm" x-text="`${filteredBooks.length} books found`"></span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <template x-for="book in filteredBooks.slice(0, 24)" :key="book.id">
+                        <div @click="openBookModal(book)" class="book-card cursor-pointer">
+                            <div class="book-cover">
+                                <img :src="`/api/cover/${book.id}`" :alt="book.title" loading="lazy" 
+                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                            </div>
+                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-500 line-clamp-1" x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
+                        </div>
+                    </template>
+                </div>
+            </section>
+            
+            <!-- Your Library Section -->
+            <section x-show="!searchQuery && !loading && books.length > 0">
+                <div class="section-header">
+                    <h2 class="section-title">Your Library</h2>
+                    <button @click="currentTab = 'library'" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
+                        View All
+                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div class="scroll-section pl-1 -ml-1">
+                    <template x-for="book in getRecentBooks()" :key="book.id">
+                        <div @click="openBookModal(book)" class="book-card cursor-pointer">
+                            <div class="book-cover">
+                                <img :src="`/api/cover/${book.id}`" :alt="book.title" loading="lazy"
+                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                            </div>
+                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-500 line-clamp-1" x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
+                        </div>
+                    </template>
+                </div>
+            </section>
+            
+            <!-- Recent Releases Section -->
+            <section x-show="!searchQuery && !loading && hardcoverRecentReleases.length > 0">
+                <div class="section-header">
+                    <h2 class="section-title">Recent Releases</h2>
+                    <a href="https://hardcover.app/upcoming/recent" target="_blank" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
+                        View on Hardcover
+                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                    </a>
+                </div>
+                <div class="scroll-section pl-1 -ml-1">
+                    <template x-for="book in hardcoverRecentReleases" :key="book.id">
+                        <div @click="openHardcoverModal(book)" class="book-card cursor-pointer">
+                            <div class="book-cover relative">
+                                <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                <span x-show="book.inLibrary" class="absolute top-2 right-2 badge badge-library">
+                                    <i data-lucide="check" class="w-3 h-3"></i>
+                                    Owned
+                                </span>
+                            </div>
+                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
+                        </div>
+                    </template>
+                </div>
+            </section>
+            
+            <!-- Trending Section -->
+            <section x-show="!searchQuery && !loading && hardcoverTrending.length > 0">
+                <div class="section-header">
+                    <h2 class="section-title">Trending This Month</h2>
+                    <a href="https://hardcover.app/trending/month" target="_blank" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
+                        View on Hardcover
+                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                    </a>
+                </div>
+                <div class="scroll-section pl-1 -ml-1">
+                    <template x-for="book in hardcoverTrending" :key="book.id">
+                        <div @click="openHardcoverModal(book)" class="book-card cursor-pointer">
+                            <div class="book-cover relative">
+                                <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                <span x-show="book.inLibrary" class="absolute top-2 right-2 badge badge-library">
+                                    <i data-lucide="check" class="w-3 h-3"></i>
+                                    Owned
+                                </span>
+                            </div>
+                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
+                        </div>
+                    </template>
+                </div>
+            </section>
+            
+            <!-- Curated Lists from @hardcover -->
+            <template x-for="(section, index) in hardcoverSections" :key="index">
+                <section x-show="!searchQuery && !loading && section.books.length > 0">
+                    <div class="section-header">
+                        <h2 class="section-title" x-text="section.name"></h2>
+                        <a href="https://hardcover.app/@hardcover/lists" target="_blank" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
+                            View List
+                            <i data-lucide="external-link" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                    <p x-show="section.description" class="text-ink-500 text-sm mb-4 -mt-2" x-text="section.description"></p>
+                    <div class="scroll-section pl-1 -ml-1">
+                        <template x-for="book in section.books" :key="book.id">
+                            <div @click="openHardcoverModal(book)" class="book-card cursor-pointer">
+                                <div class="book-cover relative">
+                                    <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                         @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                    <span x-show="book.inLibrary" class="absolute top-2 right-2 badge badge-library">
+                                        <i data-lucide="check" class="w-3 h-3"></i>
+                                        Owned
+                                    </span>
                                 </div>
-
-                                <!-- VIEW MODE: Cover and Details - Stacked on mobile, side-by-side on desktop -->
-                                <div x-show="!isEditingMetadata" class="flex flex-col md:flex-row gap-6 md:gap-8">
-                                    <!-- Cover -->
-                                    <div class="flex-shrink-0 mx-auto md:mx-0 w-48 md:w-56">
-                                        <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden shadow-2xl">
-                                            <img :src="`/api/cover/${selectedBook.id}`"
-                                                 class="w-full h-full object-cover"
-                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23D1D5DB%22 font-family=%22sans-serif%22 font-size=%2220%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                        </div>
-                                        <!-- Formats badge -->
-                                        <div x-show="selectedBook.formats && selectedBook.formats.length > 0" class="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
-                                            <template x-for="format in selectedBook.formats" :key="format">
-                                                <span class="inline-block px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold" x-text="format"></span>
-                                            </template>
-                                        </div>
-                                    </div>
-
-                                    <!-- Details -->
-                                    <div class="flex-1 space-y-5 md:space-y-6">
-                                        <!-- Title -->
-                                        <div>
-                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Title</h4>
-                                            <h3 class="text-2xl md:text-3xl font-bold text-gray-900" x-text="selectedBook.title"></h3>
-                                        </div>
-
-                                        <!-- Author -->
-                                        <div x-show="selectedBook.authors">
-                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Author</h4>
-                                            <p class="text-lg md:text-xl font-medium text-gray-900" x-text="Array.isArray(selectedBook.authors) ? selectedBook.authors.join(', ') : selectedBook.authors"></p>
-                                        </div>
-
-                                        <!-- Year, Pages, Publisher in a row -->
-                                        <div class="grid grid-cols-3 gap-4 md:gap-6">
-                                            <div x-show="selectedBook.pubdate">
-                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 md:mb-2">Year</h4>
-                                                <p class="text-base md:text-lg font-semibold text-gray-900" x-text="new Date(selectedBook.pubdate).getFullYear()"></p>
-                                            </div>
-                                            <div>
-                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 md:mb-2">Pages</h4>
-                                                <p class="text-base md:text-lg font-semibold text-gray-900">—</p>
-                                            </div>
-                                            <div x-show="selectedBook.publisher">
-                                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 md:mb-2">Publisher</h4>
-                                                <p class="text-base md:text-lg font-semibold text-gray-900 truncate" x-text="selectedBook.publisher" :title="selectedBook.publisher"></p>
-                                            </div>
-                                        </div>
-
-                                        <!-- Genres -->
-                                        <div x-show="selectedBook.tags && selectedBook.tags.length > 0">
-                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 md:mb-3">Genres</h4>
-                                            <div class="flex flex-wrap gap-2">
-                                                <template x-for="tag in selectedBook.tags" :key="tag">
-                                                    <span class="px-3 md:px-4 py-1.5 md:py-2 bg-secondary text-white rounded-lg text-xs md:text-sm font-medium" x-text="tag"></span>
-                                                </template>
-                                            </div>
-                                        </div>
-
-                                        <!-- Description -->
-                                        <div x-show="selectedBook.comments">
-                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 md:mb-3">Description</h4>
-                                            <div class="text-sm md:text-base text-gray-700 leading-relaxed prose prose-sm max-w-none" x-html="selectedBook.comments"></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- EDIT MODE: Editable form -->
-                                <template x-if="isEditingMetadata && editingBook">
-                                    <div>
-                                        <!-- Cover Upload Section with Overlay -->
-                                        <div class="mb-6">
-                                            <label class="block text-sm font-semibold text-gray-900 mb-3">Book Cover</label>
-                                            <div class="w-48 mx-auto">
-                                                <div class="aspect-[2/3] bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden relative cursor-pointer shadow-lg group"
-                                                     @click="$refs.coverInput.click()"
-                                                     @drop.prevent="handleCoverDrop($event)"
-                                                     @dragover.prevent
-                                                     @dragleave.prevent>
-                                                    <!-- Cover Image -->
-                                                    <img x-show="editingBook.coverData || editingBook.id"
-                                                         :src="editingBook.coverData || `/api/cover/${editingBook.id}`"
-                                                         class="w-full h-full object-cover"
-                                                         @error="$el.style.display='none'">
-
-                                                    <!-- Overlay on hover/tap -->
-                                                    <div class="absolute inset-0 bg-black bg-opacity-60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-white p-4">
-                                                        <i class="bi bi-cloud-upload text-3xl mb-2"></i>
-                                                        <p class="text-xs text-center font-medium">Change cover<br>or drag & drop</p>
-                                                    </div>
-
-                                                    <!-- Fallback for no cover -->
-                                                    <div x-show="!editingBook.coverData && !editingBook.id" class="absolute inset-0 flex flex-col items-center justify-center text-white p-4">
-                                                        <i class="bi bi-cloud-upload text-3xl mb-2"></i>
-                                                        <p class="text-xs text-center">Tap or drop<br>image here</p>
-                                                    </div>
-
-                                                    <input type="file"
-                                                           x-ref="coverInput"
-                                                           accept="image/*"
-                                                           @change="handleCoverUpload($event)"
-                                                           class="hidden">
-                                                </div>
-                                                <p class="text-xs text-gray-500 text-center mt-2">Click or drag & drop to upload</p>
-                                            </div>
-                                        </div>
-
-                                        <!-- Form Fields -->
-                                        <div class="space-y-6">
-                                            <!-- Title -->
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Title</label>
-                                                <input type="text"
-                                                       x-model="editingBook.title"
-                                                       class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent"
-                                                       placeholder="Book Title">
-                                            </div>
-
-                                            <!-- Author -->
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Author</label>
-                                                <input type="text"
-                                                       x-model="editingBook.authors"
-                                                       list="authors-list"
-                                                       placeholder="Author name"
-                                                       class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                                <datalist id="authors-list">
-                                                    <template x-for="author in getAuthors()" :key="author">
-                                                        <option :value="author"></option>
-                                                    </template>
-                                                </datalist>
-                                            </div>
-
-                                            <!-- Year and Publisher -->
-                                            <div class="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label class="block text-sm font-semibold text-gray-900 mb-2">Year</label>
-                                                    <input type="number"
-                                                           x-model="editingBook.pubdate"
-                                                           placeholder="YYYY"
-                                                           min="1000"
-                                                           max="9999"
-                                                           class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                                </div>
-                                                <div>
-                                                    <label class="block text-sm font-semibold text-gray-900 mb-2">Publisher</label>
-                                                    <input type="text"
-                                                           x-model="editingBook.publisher"
-                                                           list="publishers-list"
-                                                           placeholder="Publisher"
-                                                           class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                                    <datalist id="publishers-list">
-                                                        <template x-for="publisher in getPublishers()" :key="publisher">
-                                                            <option :value="publisher"></option>
-                                                        </template>
-                                                    </datalist>
-                                                </div>
-                                            </div>
-
-                                            <!-- Genres -->
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Genres</label>
-                                                <input type="text"
-                                                       x-model="editingBook.tags"
-                                                       list="genres-list"
-                                                       placeholder="Comma-separated genres"
-                                                       class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent">
-                                                <datalist id="genres-list">
-                                                    <template x-for="genre in getGenres()" :key="genre">
-                                                        <option :value="genre"></option>
-                                                    </template>
-                                                </datalist>
-                                            </div>
-
-                                            <!-- Description -->
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-900 mb-2">Description</label>
-                                                <textarea x-model="editingBook.comments"
-                                                          rows="5"
-                                                          placeholder="Book description..."
-                                                          class="w-full bg-gray-50 text-gray-900 border-gray-300 placeholder-gray-400 rounded-xl px-4 py-3 border focus:ring-2 focus:ring-primary focus:border-transparent resize-none"></textarea>
-                                            </div>
-
-                                            <!-- Search Metadata Button -->
-                                            <button @click="searchMetadata()"
-                                                    class="w-full px-4 py-3 text-sm font-medium text-primary bg-cream border border-mint rounded-xl hover:bg-cream active:bg-cream inline-flex items-center justify-center gap-2">
-                                                <i class="bi bi-search"></i>
-                                                Search for Metadata
-                                            </button>
-                                        </div>
-                                    </div>
-                                </template>
+                                <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
+                                <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
                             </div>
                         </template>
                     </div>
+                </section>
+            </template>
+            
+            <!-- More from Author Section -->
+            <section x-show="!searchQuery && !loading && hardcoverAuthorBooks.length > 0">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        More from <span class="text-ocean-600" x-text="hardcoverAuthor"></span>
+                    </h2>
+                    <button @click="loadHardcoverAuthorBooks()" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
+                        <i data-lucide="shuffle" class="w-4 h-4"></i>
+                        Random Author
+                    </button>
                 </div>
-            </div>
-        </div>
-
-    <!-- Settings Modal -->
-    <div x-show="showSettings" x-cloak>
-        <div class="modal-backdrop" @click="showSettings = false"></div>
-        <div class="modal-sheet">
-            <div class="modal-content" @click.stop>
-                <div class="flex-1 overflow-y-auto">
-                    <div class="p-6">
-                        <h3 class="text-lg font-semibold mb-6 text-header">Settings</h3>
-                        <div class="space-y-6">
-                            <!-- Calibre Library Section -->
-                            <div class="pb-6 border-b border-warm">
-                                <h4 class="text-sm font-semibold text-secondary mb-4">Calibre Library</h4>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Library Path
-                                    </label>
-                                    <div class="flex gap-2">
-                                        <input type="text"
-                                               x-model="calibreLibraryPath"
-                                               placeholder="~/Calibre Library"
-                                               class="flex-1 bg-parchment text-dark border-warm placeholder-gray-400 rounded-xl px-4 py-3 border-2 focus:ring-2 focus:ring-primary focus:border-primary">
-                                        <button @click="openBrowser()"
-                                                class="px-4 py-3 text-sm font-medium text-secondary bg-parchment border-2 border-secondary rounded-xl hover:bg-cream transition-all inline-flex items-center gap-2">
-                                            <i class="bi bi-folder2-open"></i>
-                                            Browse
-                                        </button>
-                                    </div>
-                                    <p class="mt-2 text-xs text-gray-500">
-                                        Path to your Calibre library directory (contains metadata.db)
-                                    </p>
-                                </div>
+                <div class="scroll-section pl-1 -ml-1">
+                    <template x-for="book in hardcoverAuthorBooks" :key="book.id">
+                        <div @click="openHardcoverModal(book)" class="book-card cursor-pointer">
+                            <div class="book-cover relative">
+                                <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                <span x-show="book.inLibrary" class="absolute top-2 right-2 badge badge-library">
+                                    <i data-lucide="check" class="w-3 h-3"></i>
+                                    Owned
+                                </span>
                             </div>
-
-                            <!-- Hardcover API Section -->
-                            <div class="pb-6 border-b border-warm">
-                                <h4 class="text-sm font-semibold text-secondary mb-4">Hardcover API</h4>
-                                <div class="space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            API Token
-                                        </label>
-                                        <div class="flex gap-2">
-                                            <input type="password"
-                                                   x-model="settingsHardcoverToken"
-                                                   placeholder="Enter your Hardcover API token"
-                                                   :disabled="testingApiKey"
-                                                   class="flex-1 bg-parchment text-dark border-warm placeholder-gray-400 rounded-xl px-4 py-3 border-2 focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50">
-                                            <button @click="testApiKey()"
-                                                    :disabled="testingApiKey || !settingsHardcoverToken"
-                                                    class="px-4 py-3 text-sm font-medium text-white bg-secondary rounded-xl hover:bg-secondary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-                                                <template x-if="!testingApiKey">
-                                                    <span><i class="bi bi-check-circle"></i> Test</span>
-                                                </template>
-                                                <template x-if="testingApiKey">
-                                                    <span><div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent inline-block"></div></span>
-                                                </template>
-                                            </button>
-                                        </div>
-                                        <p class="mt-2 text-xs text-gray-500">
-                                            Get your API token from <a href="https://hardcover.app/account/api" target="_blank" class="text-primary hover:underline">hardcover.app/account/api</a>
-                                        </p>
-                                    </div>
-
-                                    <!-- API Test Result -->
-                                    <div x-show="apiTestResult" x-cloak>
-                                        <div :class="apiTestSuccess ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'"
-                                             class="rounded-xl p-4 border-2">
-                                            <div class="flex items-start gap-3">
-                                                <i :class="apiTestSuccess ? 'bi-check-circle-fill text-green-600' : 'bi-exclamation-circle-fill text-red-600'"
-                                                   class="bi text-xl flex-shrink-0"></i>
-                                                <div>
-                                                    <p :class="apiTestSuccess ? 'text-green-800' : 'text-red-800'"
-                                                       class="text-sm font-medium" x-text="apiTestResult"></p>
-                                                    <p x-show="apiTestSuccess && apiTestBooks"
-                                                       class="text-xs text-green-600 mt-1"
-                                                       x-text="'Found ' + apiTestBooks + ' trending books'"></p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Current Status -->
-                                    <div class="flex items-center gap-2 text-sm">
-                                        <span class="text-gray-500">Status:</span>
-                                        <span x-show="hardcoverToken" class="text-green-600 font-medium flex items-center gap-1">
-                                            <i class="bi bi-check-circle-fill"></i> Connected
-                                        </span>
-                                        <span x-show="!hardcoverToken" class="text-gray-400 font-medium flex items-center gap-1">
-                                            <i class="bi bi-dash-circle"></i> Not configured
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Advanced Section -->
-                            <div>
-                                <h4 class="text-sm font-semibold text-secondary mb-4">Advanced</h4>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        calibredb Command Path
-                                    </label>
-                                    <div class="p-3 bg-parchment rounded-xl border-2 border-warm">
-                                        <code class="text-xs text-gray-600">/Applications/calibre.app/Contents/MacOS/calibredb</code>
-                                    </div>
-                                    <p class="mt-2 text-xs text-gray-500">
-                                        Hardcoded for macOS. Edit serve.py to change.
-                                    </p>
-                                </div>
-                            </div>
+                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-500" x-text="book.year"></p>
                         </div>
-                        <div class="mt-8 flex gap-3">
-                            <button @click="showSettings = false"
-                                    class="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-parchment rounded-xl hover:bg-cream border-2 border-warm transition-all">
-                                Cancel
-                            </button>
-                            <button @click="saveSettings(); showSettings = false"
-                                    class="flex-1 px-6 py-3 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary-dark shadow-lg transition-all">
-                                Save
-                            </button>
-                        </div>
-                    </div>
+                    </template>
                 </div>
+            </section>
+            
+            <!-- Empty State -->
+            <div x-show="!loading && books.length === 0 && !searchQuery" class="py-16 text-center">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-ink-100 rounded-full mb-6">
+                    <i data-lucide="book-x" class="w-10 h-10 text-ink-400"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-ink-700 mb-2">No books found</h3>
+                <p class="text-ink-500 max-w-md mx-auto">Your Calibre library appears to be empty. Add some books to get started!</p>
             </div>
-        </div>
+            
+            <!-- No Search Results -->
+            <div x-show="searchQuery && filteredBooks.length === 0 && !loading" class="py-16 text-center">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-ink-100 rounded-full mb-6">
+                    <i data-lucide="search-x" class="w-10 h-10 text-ink-400"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-ink-700 mb-2">No results found</h3>
+                <p class="text-ink-500">Try a different search term</p>
+            </div>
+            
+        </main>
     </div>
-
-    <!-- Hardcover Book Modal -->
-    <div x-show="selectedHardcoverBook" x-cloak>
-        <div class="modal-backdrop" @click="selectedHardcoverBook = null"></div>
-        <div class="modal-sheet">
-            <div class="modal-content" @click.stop>
-                <div class="flex-1 overflow-y-auto">
-                    <template x-if="selectedHardcoverBook">
-                        <div class="p-6">
-                            <!-- Header -->
-                            <div class="flex items-center justify-between mb-6">
-                                <div class="flex items-center gap-2">
-                                    <span class="status-badge"
-                                          :class="selectedHardcoverBook.inLibrary ? 'badge-library' : (selectedHardcoverBook.requested ? 'badge-requested' : 'badge-available')"
-                                          x-text="selectedHardcoverBook.inLibrary ? 'In Library' : (selectedHardcoverBook.requested ? 'Requested' : 'Available')"></span>
-                                </div>
-                                <button @click="selectedHardcoverBook = null"
-                                        class="w-10 h-10 flex items-center justify-center rounded-xl bg-parchment text-gray-700 hover:bg-cream transition-colors">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </div>
-
-                            <!-- Cover and Details -->
-                            <div class="flex flex-col md:flex-row gap-6 md:gap-8">
-                                <!-- Cover -->
-                                <div class="flex-shrink-0 mx-auto md:mx-0 w-48 md:w-56">
-                                    <div class="aspect-[2/3] bg-gradient-to-br from-secondary to-accent rounded-2xl overflow-hidden shadow-2xl">
-                                        <img :src="selectedHardcoverBook.image"
-                                             class="w-full h-full object-cover"
-                                             @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%23533A7B%22 width=%22200%22 height=%22300%22/%3E%3Ctext fill=%22%23FAF3E8%22 font-family=%22sans-serif%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Cover%3C/text%3E%3C/svg%3E'">
-                                    </div>
-                                    <!-- Rating -->
-                                    <div x-show="selectedHardcoverBook.rating" class="mt-4 flex items-center justify-center gap-1">
-                                        <template x-for="i in 5" :key="i">
-                                            <i class="bi"
-                                               :class="i <= Math.round(selectedHardcoverBook.rating) ? 'bi-star-fill text-gold' : 'bi-star text-gray-300'"></i>
-                                        </template>
-                                        <span class="ml-2 text-sm text-gray-600" x-text="selectedHardcoverBook.rating?.toFixed(1)"></span>
-                                    </div>
-                                </div>
-
-                                <!-- Details -->
-                                <div class="flex-1 space-y-5 md:space-y-6">
-                                    <!-- Title -->
-                                    <div>
-                                        <h3 class="text-2xl md:text-3xl font-bold text-dark" x-text="selectedHardcoverBook.title"></h3>
-                                        <p class="text-lg text-secondary font-medium mt-1" x-text="selectedHardcoverBook.author"></p>
-                                    </div>
-
-                                    <!-- Meta Info -->
-                                    <div class="flex flex-wrap gap-4">
-                                        <div x-show="selectedHardcoverBook.year">
-                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Year</h4>
-                                            <p class="text-base font-semibold text-dark" x-text="selectedHardcoverBook.year"></p>
-                                        </div>
-                                        <div x-show="selectedHardcoverBook.pages">
-                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Pages</h4>
-                                            <p class="text-base font-semibold text-dark" x-text="selectedHardcoverBook.pages"></p>
-                                        </div>
-                                        <div x-show="selectedHardcoverBook.publisher">
-                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Publisher</h4>
-                                            <p class="text-base font-semibold text-dark" x-text="selectedHardcoverBook.publisher"></p>
-                                        </div>
-                                    </div>
-
-                                    <!-- Genres -->
-                                    <div x-show="selectedHardcoverBook.genres && selectedHardcoverBook.genres.length > 0">
-                                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Genres</h4>
-                                        <div class="flex flex-wrap gap-2">
-                                            <template x-for="genre in selectedHardcoverBook.genres" :key="genre">
-                                                <span class="px-3 py-1.5 bg-secondary text-white rounded-lg text-xs font-medium" x-text="genre"></span>
-                                            </template>
-                                        </div>
-                                    </div>
-
-                                    <!-- Description -->
-                                    <div x-show="selectedHardcoverBook.description">
-                                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Description</h4>
-                                        <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none" x-html="selectedHardcoverBook.description"></div>
-                                    </div>
-
-                                    <!-- Action Buttons -->
-                                    <div class="pt-4">
-                                        <template x-if="selectedHardcoverBook.inLibrary">
-                                            <button @click="viewInLibrary(selectedHardcoverBook)"
-                                                    class="w-full py-3 bg-secondary text-white font-semibold rounded-xl hover:bg-secondary-dark transition-all">
-                                                <i class="bi bi-book mr-2"></i> View in Library
-                                            </button>
-                                        </template>
-                                        <template x-if="!selectedHardcoverBook.inLibrary && !selectedHardcoverBook.requested">
-                                            <button @click="requestBook(selectedHardcoverBook)"
-                                                    class="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark transition-all">
-                                                <i class="bi bi-plus-circle mr-2"></i> Request This Book
-                                            </button>
-                                        </template>
-                                        <template x-if="selectedHardcoverBook.requested">
-                                            <div class="flex gap-3">
-                                                <button disabled
-                                                        class="flex-1 py-3 bg-accent text-white font-semibold rounded-xl opacity-80 cursor-not-allowed">
-                                                    <i class="bi bi-hourglass-split mr-2"></i> Request Pending
-                                                </button>
-                                                <button @click="cancelRequest(selectedHardcoverBook)"
-                                                        class="px-4 py-3 bg-parchment text-gray-700 font-semibold rounded-xl hover:bg-cream border-2 border-warm transition-all">
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+    
+    <!-- Book Detail Modal (Local Library) -->
+    <div x-show="selectedBook" x-cloak @click.self="selectedBook = null" 
+         class="fixed inset-0 z-50 modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div x-show="selectedBook" x-transition:enter="slide-up" 
+             class="bg-white w-full sm:max-w-lg sm:rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <!-- Cover Image -->
+            <div class="relative h-64 sm:h-72 bg-gradient-to-b from-ink-200 to-ink-100">
+                <img :src="`/api/cover/${selectedBook?.id}`" :alt="selectedBook?.title" 
+                     class="w-full h-full object-contain">
+                <button @click="selectedBook = null" 
+                        class="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-lg">
+                    <i data-lucide="x" class="w-5 h-5 text-ink-600"></i>
+                </button>
+            </div>
+            
+            <!-- Book Info -->
+            <div class="p-6 space-y-4">
+                <div>
+                    <h2 class="font-display text-2xl font-bold text-ink-900" x-text="selectedBook?.title"></h2>
+                    <p class="text-ink-600 mt-1" x-text="Array.isArray(selectedBook?.authors) ? selectedBook?.authors.join(', ') : selectedBook?.authors"></p>
+                </div>
+                
+                <!-- Meta Info -->
+                <div class="flex flex-wrap gap-2">
+                    <span x-show="selectedBook?.publisher" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="selectedBook?.publisher"></span>
+                    <span x-show="selectedBook?.pubdate" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="selectedBook?.pubdate ? new Date(selectedBook.pubdate).getFullYear() : ''"></span>
+                    <template x-for="format in (selectedBook?.formats || [])" :key="format">
+                        <span class="px-3 py-1 bg-ocean-100 text-ocean-700 rounded-full text-xs font-semibold" x-text="format"></span>
+                    </template>
+                </div>
+                
+                <!-- Series -->
+                <p x-show="selectedBook?.series" class="text-sm text-ink-500">
+                    Part of <span class="font-semibold" x-text="selectedBook?.series"></span>
+                    <span x-show="selectedBook?.series_index" x-text="` (#${selectedBook?.series_index})`"></span>
+                </p>
+                
+                <!-- Description -->
+                <div x-show="selectedBook?.comments" class="prose prose-sm text-ink-600 max-h-40 overflow-y-auto" x-html="selectedBook?.comments"></div>
+                
+                <!-- Tags -->
+                <div x-show="selectedBook?.tags?.length" class="flex flex-wrap gap-2">
+                    <template x-for="tag in (selectedBook?.tags || [])" :key="tag">
+                        <span class="px-2 py-1 bg-sage-100 text-sage-700 rounded text-xs" x-text="tag"></span>
+                    </template>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex gap-3 pt-4">
+                    <template x-for="format in (selectedBook?.formats || [])" :key="format">
+                        <a :href="`/api/download/${selectedBook?.id}/${format}`" 
+                           class="btn btn-primary flex-1">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span x-text="format"></span>
+                        </a>
                     </template>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Directory Browser Modal -->
-    <div x-show="showBrowser" x-cloak>
-        <div class="modal-backdrop" @click="showBrowser = false"></div>
-        <div class="modal-sheet">
-            <div class="modal-content" @click.stop>
-                <div class="flex-1 overflow-y-auto">
-                    <div class="p-6">
-                        <h3 class="text-lg font-semibold mb-6 text-header">Select Calibre Library</h3>
-
-                            <!-- Current path -->
-                            <div class="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
-                                <div class="text-xs text-gray-500 mb-1">Current Path:</div>
-                                <div class="text-sm font-mono text-gray-900" x-text="browserPath"></div>
-                            </div>
-
-                            <!-- Directory listing -->
-                            <div class="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
-                                <!-- Parent directory -->
-                                <div x-show="browserParent"
-                                     @click="browseTo(browserParent)"
-                                     class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 flex items-center gap-2">
-                                    <i class="bi bi-arrow-up text-gray-400"></i>
-                                    <span class="text-sm text-gray-600">..</span>
-                                </div>
-
-                                <!-- Directories -->
-                                <template x-for="entry in browserEntries" :key="entry.path">
-                                    <div @click="browseTo(entry.path)"
-                                         class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 flex items-center justify-between gap-2">
-                                        <div class="flex items-center gap-2 flex-1 min-w-0">
-                                            <i class="bi bi-folder-fill text-gray-400 flex-shrink-0"></i>
-                                            <span class="text-sm text-gray-900 truncate" x-text="entry.name"></span>
-                                        </div>
-                                        <button x-show="entry.is_calibre_library"
-                                                @click.stop="selectLibrary(entry.path)"
-                                                class="flex-shrink-0 px-3 py-1 text-xs text-white bg-accent rounded hover:bg-accent">
-                                            Select
-                                        </button>
-                                        <span x-show="entry.is_calibre_library"
-                                              class="flex-shrink-0 text-xs text-accent font-medium">
-                                            Calibre Library
-                                        </span>
-                                    </div>
-                                </template>
-
-                                <!-- Empty state -->
-                                <div x-show="browserEntries.length === 0" class="px-4 py-8 text-center text-gray-500">
-                                    <i class="bi bi-folder-x text-4xl mb-2"></i>
-                                    <p class="text-sm">No folders found</p>
-                                </div>
-                            </div>
-
-                            <div class="mt-6 flex justify-end gap-3">
-                                <button @click="showBrowser = false"
-                                        class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100">
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
+    
+    <!-- Hardcover Book Modal -->
+    <div x-show="selectedHardcoverBook" x-cloak @click.self="selectedHardcoverBook = null" 
+         class="fixed inset-0 z-50 modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div x-show="selectedHardcoverBook" x-transition:enter="slide-up" 
+             class="bg-white w-full sm:max-w-lg sm:rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <!-- Cover Image -->
+            <div class="relative h-64 sm:h-72 bg-gradient-to-b from-ink-200 to-ink-100">
+                <img :src="selectedHardcoverBook?.image" :alt="selectedHardcoverBook?.title" 
+                     class="w-full h-full object-contain">
+                <button @click="selectedHardcoverBook = null" 
+                        class="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-lg">
+                    <i data-lucide="x" class="w-5 h-5 text-ink-600"></i>
+                </button>
+                <!-- Status Badge -->
+                <div class="absolute top-4 left-4">
+                    <span x-show="selectedHardcoverBook?.inLibrary" class="badge badge-library">
+                        <i data-lucide="check" class="w-3 h-3"></i>
+                        In Library
+                    </span>
+                    <span x-show="selectedHardcoverBook?.requested && !selectedHardcoverBook?.inLibrary" class="badge badge-requested">
+                        <i data-lucide="clock" class="w-3 h-3"></i>
+                        Requested
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Book Info -->
+            <div class="p-6 space-y-4">
+                <div>
+                    <h2 class="font-display text-2xl font-bold text-ink-900" x-text="selectedHardcoverBook?.title"></h2>
+                    <p class="text-ink-600 mt-1" x-text="selectedHardcoverBook?.author"></p>
+                </div>
+                
+                <!-- Rating -->
+                <div x-show="selectedHardcoverBook?.rating" class="flex items-center gap-2">
+                    <div class="rating">
+                        <template x-for="i in 5" :key="i">
+                            <i data-lucide="star" 
+                               :class="i <= Math.round(selectedHardcoverBook?.rating) ? 'text-amber-400 fill-amber-400' : 'text-ink-200'"
+                               class="w-4 h-4"></i>
+                        </template>
                     </div>
+                    <span class="text-sm text-ink-500" x-text="`${selectedHardcoverBook?.rating?.toFixed(1)} (${selectedHardcoverBook?.ratings_count} ratings)`"></span>
+                </div>
+                
+                <!-- Meta Info -->
+                <div class="flex flex-wrap gap-2">
+                    <span x-show="selectedHardcoverBook?.publisher" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="selectedHardcoverBook?.publisher"></span>
+                    <span x-show="selectedHardcoverBook?.year" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="selectedHardcoverBook?.year"></span>
+                    <span x-show="selectedHardcoverBook?.pages" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="`${selectedHardcoverBook?.pages} pages`"></span>
+                </div>
+                
+                <!-- Description -->
+                <div x-show="selectedHardcoverBook?.description" class="prose prose-sm text-ink-600 max-h-40 overflow-y-auto" x-html="selectedHardcoverBook?.description"></div>
+                
+                <!-- Genres -->
+                <div x-show="selectedHardcoverBook?.genres?.length" class="flex flex-wrap gap-2">
+                    <template x-for="genre in (selectedHardcoverBook?.genres || [])" :key="genre">
+                        <span class="px-2 py-1 bg-sage-100 text-sage-700 rounded text-xs" x-text="genre"></span>
+                    </template>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex gap-3 pt-4">
+                    <template x-if="selectedHardcoverBook?.inLibrary">
+                        <button @click="viewInLibrary(selectedHardcoverBook)" class="btn btn-secondary flex-1">
+                            <i data-lucide="book-open" class="w-4 h-4"></i>
+                            View in Library
+                        </button>
+                    </template>
+                    <template x-if="!selectedHardcoverBook?.inLibrary && !selectedHardcoverBook?.requested">
+                        <button @click="requestBook(selectedHardcoverBook)" class="btn btn-primary flex-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            Request This Book
+                        </button>
+                    </template>
+                    <template x-if="selectedHardcoverBook?.requested && !selectedHardcoverBook?.inLibrary">
+                        <button @click="cancelRequest(selectedHardcoverBook)" class="btn btn-secondary flex-1">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                            Cancel Request
+                        </button>
+                    </template>
+                    <a :href="`https://hardcover.app/books/${selectedHardcoverBook?.slug}`" 
+                       target="_blank"
+                       class="btn btn-secondary">
+                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                    </a>
                 </div>
             </div>
         </div>
-
-        <!-- Hardcover API Key Setup Screen -->
-        <div x-show="showHardcoverSetup" x-cloak>
-            <div class="fixed inset-0 bg-gradient-to-br from-purple-50 via-white to-cyan-50 z-50">
-                <div class="flex min-h-full items-center justify-center p-4">
-                    <div class="w-full max-w-md">
-                        <!-- Logo and Header -->
-                        <div class="text-center mb-12">
-                            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-secondary to-primary shadow-lg mb-6">
-                                <i class="bi bi-book text-white text-3xl"></i>
-                            </div>
-                            <h1 class="text-5xl font-calsans bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent mb-4">
-                                folio
-                            </h1>
-                            <p class="text-lg text-gray-600 font-medium">Welcome to your reading companion</p>
-                            <p class="text-sm text-gray-500 mt-2">Discover and manage books powered by Hardcover</p>
-                        </div>
-
-                        <!-- Setup Card -->
-                        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 backdrop-blur-sm bg-opacity-95">
-                            <div class="mb-6">
-                                <h2 class="text-xl font-semibold text-dark mb-2">Get Started</h2>
-                                <p class="text-sm text-gray-600">Enter your Hardcover API key to begin exploring</p>
-                            </div>
-
-                            <div class="space-y-4">
-                                <!-- API Key Input -->
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Hardcover API Key
-                                    </label>
-                                    <input type="password"
-                                           x-model="hardcoverApiKeyInput"
-                                           @keyup.enter="validateAndSaveHardcoverKey()"
-                                           :disabled="validatingApiKey"
-                                           placeholder="Enter your API key..."
-                                           class="w-full bg-white text-gray-900 border-2 border-gray-200 placeholder-gray-400 rounded-lg px-4 py-3 focus:ring-2 focus:ring-secondary focus:border-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <p class="mt-2 text-xs text-gray-500">
-                                        Get your API key from
-                                        <a href="https://hardcover.app/account/api" target="_blank" class="text-secondary hover:text-primary font-medium underline">
-                                            hardcover.app/account/api
-                                        </a>
-                                    </p>
-                                </div>
-
-                                <!-- Error Message -->
-                                <div x-show="apiKeyError" x-cloak class="bg-red-50 border-2 border-red-200 rounded-lg p-4">
-                                    <div class="flex items-start gap-3">
-                                        <i class="bi bi-exclamation-circle-fill text-red-500 text-xl flex-shrink-0"></i>
-                                        <div>
-                                            <p class="text-sm text-red-700 font-medium">API Key Error</p>
-                                            <p class="text-sm text-red-600 mt-1" x-text="apiKeyError"></p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Success Message (shows briefly before redirect) -->
-                                <div x-show="apiKeySuccess" x-cloak class="bg-green-50 border-2 border-green-200 rounded-lg p-4">
-                                    <div class="flex items-start gap-3">
-                                        <i class="bi bi-check-circle-fill text-green-500 text-xl flex-shrink-0"></i>
-                                        <div>
-                                            <p class="text-sm text-green-700 font-medium">API Key Valid!</p>
-                                            <p class="text-sm text-green-600 mt-1">Successfully connected to Hardcover. Loading your library...</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Submit Button -->
-                                <button @click="validateAndSaveHardcoverKey()"
-                                        :disabled="validatingApiKey || !hardcoverApiKeyInput"
-                                        class="w-full px-6 py-3 text-white font-medium bg-gradient-to-r from-secondary to-primary rounded-lg hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2">
-                                    <template x-if="!validatingApiKey">
-                                        <span><i class="bi bi-key mr-2"></i>Validate & Continue</span>
-                                    </template>
-                                    <template x-if="validatingApiKey">
-                                        <div class="flex items-center gap-2">
-                                            <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                            <span>Testing API Key...</span>
-                                        </div>
-                                    </template>
-                                </button>
-
-                                <!-- How to get API key -->
-                                <div class="mt-6 pt-6 border-t border-gray-100">
-                                    <p class="text-xs text-gray-500 text-center mb-3">Need an API key?</p>
-                                    <ol class="text-xs text-gray-600 space-y-2">
-                                        <li class="flex items-start gap-2">
-                                            <span class="bg-secondary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">1</span>
-                                            <span>Create a free account at <a href="https://hardcover.app" target="_blank" class="text-secondary hover:underline">hardcover.app</a></span>
-                                        </li>
-                                        <li class="flex items-start gap-2">
-                                            <span class="bg-secondary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">2</span>
-                                            <span>Go to Settings → API in your Hardcover account</span>
-                                        </li>
-                                        <li class="flex items-start gap-2">
-                                            <span class="bg-secondary text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">3</span>
-                                            <span>Generate and copy your API key</span>
-                                        </li>
-                                    </ol>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Footer -->
-                        <div class="text-center mt-8">
-                            <p class="text-xs text-gray-500">
-                                Powered by <a href="https://hardcover.app" target="_blank" class="text-secondary hover:text-primary font-medium">Hardcover</a>
-                            </p>
-                        </div>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div x-show="showSettings" x-cloak @click.self="showSettings = false" 
+         class="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-4">
+        <div x-show="showSettings" x-transition class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-6 border-b border-ink-100 flex items-center justify-between">
+                <h2 class="font-display text-xl font-bold text-ink-900">Settings</h2>
+                <button @click="showSettings = false" class="p-2 hover:bg-ink-100 rounded-lg transition-colors">
+                    <i data-lucide="x" class="w-5 h-5 text-ink-500"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+                <!-- Calibre Library -->
+                <div>
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">Calibre Library</label>
+                    <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl">
+                        <i data-lucide="database" class="w-5 h-5 text-ink-400"></i>
+                        <span class="text-sm text-ink-600 truncate flex-1" x-text="calibreLibraryPath || 'Not configured'"></span>
+                        <button @click="showSetup = true; setupStep = 2; showSettings = false; openBrowser()" 
+                                class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold">
+                            Change
+                        </button>
                     </div>
+                </div>
+                
+                <!-- Hardcover API -->
+                <div>
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">Hardcover API</label>
+                    <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl">
+                        <i data-lucide="key" class="w-5 h-5 text-ink-400"></i>
+                        <span class="text-sm text-ink-600 flex-1" x-text="hardcoverToken ? 'Connected' : 'Not configured'"></span>
+                        <span x-show="hardcoverToken" class="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <button @click="showSetup = true; setupStep = 1; showSettings = false" 
+                                class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold">
+                            Change
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Requests -->
+                <div>
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">
+                        Book Requests 
+                        <span class="text-ink-400 font-normal" x-text="`(${requestedBooks.length})`"></span>
+                    </label>
+                    <div x-show="requestedBooks.length === 0" class="p-4 bg-ink-50 rounded-xl text-center text-ink-500 text-sm">
+                        No pending requests
+                    </div>
+                    <div x-show="requestedBooks.length > 0" class="space-y-2 max-h-48 overflow-y-auto">
+                        <template x-for="book in requestedBooks" :key="book.id">
+                            <div class="flex items-center gap-3 p-3 bg-ink-50 rounded-xl">
+                                <img :src="book.image" class="w-10 h-14 rounded object-cover">
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-semibold text-ink-800 truncate" x-text="book.title"></p>
+                                    <p class="text-xs text-ink-500 truncate" x-text="book.author"></p>
+                                </div>
+                                <button @click="cancelRequest(book)" class="p-1.5 hover:bg-ink-200 rounded-lg transition-colors">
+                                    <i data-lucide="x" class="w-4 h-4 text-ink-400"></i>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- About -->
+                <div class="pt-4 border-t border-ink-100">
+                    <p class="text-xs text-ink-400 text-center">
+                        Folio • Your Personal Library Manager<br>
+                        Powered by <a href="https://hardcover.app" target="_blank" class="text-ocean-600 hover:underline">Hardcover.app</a>
+                    </p>
                 </div>
             </div>
         </div>
-
-        <!-- Initial Setup Screen -->
-        <div x-show="showInitialSetup" x-cloak>
-            <div class="fixed inset-0 bg-black bg-opacity-95 z-50"></div>
-            <div class="fixed inset-0 z-50 overflow-y-auto">
-                <div class="flex min-h-full items-center justify-center p-4">
-                    <div class="relative bg-white border border-gray-200 rounded-lg shadow-xl w-full max-w-2xl">
-                        <div class="p-8">
-                            <div class="text-center mb-8">
-                                <h1 class="text-5xl font-calsans text-primary mb-4">folio</h1>
-                                <p class="text-gray-600">Welcome! Let's set up your Calibre library.</p>
-                            </div>
-
-                            <div class="space-y-6">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Calibre Library Path
-                                    </label>
-                                    <div class="flex gap-2">
-                                        <input type="text"
-                                               x-model="calibreLibraryPath"
-                                               placeholder="~/Calibre Library"
-                                               class="flex-1 bg-white text-gray-900 border-gray-200 placeholder-gray-400 rounded-md px-3 py-2 border focus:ring-2 focus:ring-accent focus:border-accent">
-                                        <button @click="openBrowser()"
-                                                class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100 inline-flex items-center gap-2">
-                                            <i class="bi bi-folder2-open"></i>
-                                            Browse
-                                        </button>
-                                    </div>
-                                    <p class="mt-2 text-xs text-gray-500">
-                                        Select the directory containing your Calibre library (should have a metadata.db file)
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="mt-8 flex justify-end">
-                                <button @click="completeSetup()"
-                                        class="px-6 py-3 text-sm text-white bg-accent rounded-md hover:bg-accent">
-                                    Complete Setup
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    <script src="js/app.js"></script>
+    </div>
+    
+    <!-- Initialize Lucide Icons -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+        
+        // Re-initialize icons when Alpine updates DOM
+        document.addEventListener('alpine:initialized', () => {
+            // Watch for DOM changes
+            const observer = new MutationObserver(() => {
+                lucide.createIcons();
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        });
+    </script>
+    
+    <!-- App Script -->
+    <script src="/js/app.js"></script>
 </body>
 </html>

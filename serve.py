@@ -198,39 +198,49 @@ def run_calibredb(args):
         return {'success': False, 'error': error_msg}
 
 
+def transform_hardcover_books(results):
+    """Transform Hardcover API book results to our format"""
+    books = []
+    for book in results:
+        if not book:
+            continue
+            
+        # Extract author from cached_contributors
+        author = ''
+        contributors = book.get('cached_contributors', [])
+        if contributors and isinstance(contributors, list):
+            author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
+            if author_entry:
+                author = author_entry.get('author', {}).get('name', '')
+            elif contributors:
+                author = contributors[0].get('author', {}).get('name', '')
+
+        books.append({
+            'id': book.get('id'),
+            'title': book.get('title', ''),
+            'author': author,
+            'year': book.get('release_year'),
+            'pages': book.get('pages'),
+            'description': book.get('description', ''),
+            'image': book.get('cached_image', ''),
+            'rating': book.get('rating'),
+            'ratings_count': book.get('ratings_count', 0),
+            'slug': book.get('slug', '')
+        })
+    
+    return books
+
+
 def search_hardcover(query, token, limit=20):
     """Search Hardcover API for books"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
-    # GraphQL query for searching books
+    # GraphQL query for searching books (API returns results as JSON blob)
     graphql_query = """
-    query SearchBooks($query: String!, $limit: Int) {
-        search(query: $query, limit: $limit, query_type: "Book") {
-            results {
-                ... on Book {
-                    id
-                    title
-                    slug
-                    release_year
-                    pages
-                    description
-                    cached_image
-                    cached_contributors
-                    rating
-                    ratings_count
-                    default_physical_edition {
-                        publisher {
-                            name
-                        }
-                    }
-                    taggings(limit: 5) {
-                        tag {
-                            tag
-                        }
-                    }
-                }
-            }
+    query SearchBooks($query: String!) {
+        search(query: $query, query_type: "Book") {
+            results
         }
     }
     """
@@ -238,8 +248,7 @@ def search_hardcover(query, token, limit=20):
     payload = json.dumps({
         'query': graphql_query,
         'variables': {
-            'query': query,
-            'limit': limit
+            'query': query
         }
     })
 
@@ -261,50 +270,37 @@ def search_hardcover(query, token, limit=20):
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
-            results = data.get('data', {}).get('search', {}).get('results', [])
-
-            # Transform results to a simpler format
+            # New API returns results as JSON with hits array
+            results_json = data.get('data', {}).get('search', {}).get('results', {})
+            hits = results_json.get('hits', [])
+            
             books = []
-            for book in results:
-                if book:  # Filter out null results
-                    # Extract author from cached_contributors
-                    author = ''
-                    contributors = book.get('cached_contributors', [])
-                    if contributors and isinstance(contributors, list):
-                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
-                        if author_entry:
-                            author = author_entry.get('author', {}).get('name', '')
-                        elif contributors:
-                            # Fallback to first contributor
-                            author = contributors[0].get('author', {}).get('name', '')
-
-                    # Extract genres/tags
-                    genres = []
-                    taggings = book.get('taggings', [])
-                    if taggings:
-                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
-
-                    # Get publisher
-                    publisher = ''
-                    default_edition = book.get('default_physical_edition')
-                    if default_edition and default_edition.get('publisher'):
-                        publisher = default_edition['publisher'].get('name', '')
-
-                    books.append({
-                        'id': book.get('id'),
-                        'title': book.get('title', ''),
-                        'author': author,
-                        'year': book.get('release_year'),
-                        'pages': book.get('pages'),
-                        'description': book.get('description', ''),
-                        'image': book.get('cached_image', ''),
-                        'rating': book.get('rating'),
-                        'ratings_count': book.get('ratings_count', 0),
-                        'publisher': publisher,
-                        'genres': genres,
-                        'slug': book.get('slug', '')
-                    })
-
+            for hit in hits[:limit]:
+                doc = hit.get('document', {})
+                # Extract author from author_names or contributions
+                author = ''
+                author_names = doc.get('author_names', [])
+                if author_names:
+                    author = author_names[0]
+                
+                # Get image URL
+                image = ''
+                if doc.get('image') and isinstance(doc['image'], dict):
+                    image = doc['image'].get('url', '')
+                
+                books.append({
+                    'id': doc.get('id'),
+                    'title': doc.get('title', ''),
+                    'author': author,
+                    'year': doc.get('release_year'),
+                    'pages': doc.get('pages'),
+                    'description': doc.get('description', ''),
+                    'image': image,
+                    'rating': doc.get('rating'),
+                    'ratings_count': doc.get('ratings_count', 0),
+                    'slug': doc.get('slug', '')
+                })
+            
             return {'books': books}
 
     except urllib.error.HTTPError as e:
@@ -320,38 +316,24 @@ def search_hardcover(query, token, limit=20):
 
 
 def get_trending_hardcover(token, limit=20):
-    """Get trending books from Hardcover using search with popularity sort"""
+    """Get trending books from Hardcover - uses popular books query"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
-    # GraphQL query for trending books using search sorted by activities_count
+    # GraphQL query for trending/popular books
     graphql_query = """
-    query TrendingBooks($limit: Int) {
-        search(query: "", limit: $limit, query_type: "Book", sort: "activities_count:desc") {
-            results {
-                ... on Book {
-                    id
-                    title
-                    slug
-                    release_year
-                    pages
-                    description
-                    cached_image
-                    cached_contributors
-                    rating
-                    ratings_count
-                    default_physical_edition {
-                        publisher {
-                            name
-                        }
-                    }
-                    taggings(limit: 5) {
-                        tag {
-                            tag
-                        }
-                    }
-                }
-            }
+    query TrendingBooks($limit: Int!) {
+        books(limit: $limit, order_by: {users_count: desc}) {
+            id
+            title
+            slug
+            release_year
+            pages
+            description
+            cached_image
+            cached_contributors
+            rating
+            ratings_count
         }
     }
     """
@@ -381,46 +363,11 @@ def get_trending_hardcover(token, limit=20):
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
-            results = data.get('data', {}).get('search', {}).get('results', [])
+            # Get books directly from query result
+            results = data.get('data', {}).get('books', [])
 
-            # Transform results (same format as search)
-            books = []
-            for book in results:
-                if book:
-                    author = ''
-                    contributors = book.get('cached_contributors', [])
-                    if contributors and isinstance(contributors, list):
-                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
-                        if author_entry:
-                            author = author_entry.get('author', {}).get('name', '')
-                        elif contributors:
-                            author = contributors[0].get('author', {}).get('name', '')
-
-                    genres = []
-                    taggings = book.get('taggings', [])
-                    if taggings:
-                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
-
-                    publisher = ''
-                    default_edition = book.get('default_physical_edition')
-                    if default_edition and default_edition.get('publisher'):
-                        publisher = default_edition['publisher'].get('name', '')
-
-                    books.append({
-                        'id': book.get('id'),
-                        'title': book.get('title', ''),
-                        'author': author,
-                        'year': book.get('release_year'),
-                        'pages': book.get('pages'),
-                        'description': book.get('description', ''),
-                        'image': book.get('cached_image', ''),
-                        'rating': book.get('rating'),
-                        'ratings_count': book.get('ratings_count', 0),
-                        'publisher': publisher,
-                        'genres': genres,
-                        'slug': book.get('slug', '')
-                    })
-
+            # Transform results
+            books = transform_hardcover_books(results)
             return {'books': books}
 
     except Exception as e:
@@ -449,7 +396,7 @@ def get_recent_releases_hardcover(token, limit=20):
     query RecentReleases($startDate: date!, $limit: Int) {
         books(
             where: { release_date: { _gte: $startDate } }
-            order_by: { likes_count: desc }
+            order_by: { users_count: desc }
             limit: $limit
         ) {
             id
@@ -463,17 +410,6 @@ def get_recent_releases_hardcover(token, limit=20):
             cached_contributors
             rating
             ratings_count
-            likes_count
-            default_physical_edition {
-                publisher {
-                    name
-                }
-            }
-            taggings(limit: 5) {
-                tag {
-                    tag
-                }
-            }
         }
     }
     """
@@ -505,45 +441,7 @@ def get_recent_releases_hardcover(token, limit=20):
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
             results = data.get('data', {}).get('books', [])
-
-            # Transform results (same format as trending)
-            books = []
-            for book in results:
-                if book:
-                    author = ''
-                    contributors = book.get('cached_contributors', [])
-                    if contributors and isinstance(contributors, list):
-                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
-                        if author_entry:
-                            author = author_entry.get('author', {}).get('name', '')
-                        elif contributors:
-                            author = contributors[0].get('author', {}).get('name', '')
-
-                    genres = []
-                    taggings = book.get('taggings', [])
-                    if taggings:
-                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
-
-                    publisher = ''
-                    default_edition = book.get('default_physical_edition')
-                    if default_edition and default_edition.get('publisher'):
-                        publisher = default_edition['publisher'].get('name', '')
-
-                    books.append({
-                        'id': book.get('id'),
-                        'title': book.get('title', ''),
-                        'author': author,
-                        'year': book.get('release_year'),
-                        'pages': book.get('pages'),
-                        'description': book.get('description', ''),
-                        'image': book.get('cached_image', ''),
-                        'rating': book.get('rating'),
-                        'ratings_count': book.get('ratings_count', 0),
-                        'publisher': publisher,
-                        'genres': genres,
-                        'slug': book.get('slug', '')
-                    })
-
+            books = transform_hardcover_books(results)
             return {'books': books}
 
     except Exception as e:
@@ -560,7 +458,7 @@ def get_hardcover_user_lists(token):
     graphql_query = """
     query HardcoverUserLists {
         users(where: {username: {_eq: "hardcover"}}) {
-            lists(where: {visibility: {_eq: "everyone"}}, order_by: {followers_count: desc}) {
+            lists(limit: 20) {
                 id
                 name
                 description
@@ -629,16 +527,6 @@ def get_list_hardcover(token, list_id, limit=20):
                     cached_contributors
                     rating
                     ratings_count
-                    default_physical_edition {
-                        publisher {
-                            name
-                        }
-                    }
-                    taggings(limit: 5) {
-                        tag {
-                            tag
-                        }
-                    }
                 }
             }
         }
@@ -678,44 +566,9 @@ def get_list_hardcover(token, list_id, limit=20):
             list_data = lists[0]
             list_books = list_data.get('list_books', [])
 
-            # Transform results
-            books = []
-            for item in list_books:
-                book = item.get('book')
-                if book:
-                    author = ''
-                    contributors = book.get('cached_contributors', [])
-                    if contributors and isinstance(contributors, list):
-                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
-                        if author_entry:
-                            author = author_entry.get('author', {}).get('name', '')
-                        elif contributors:
-                            author = contributors[0].get('author', {}).get('name', '')
-
-                    genres = []
-                    taggings = book.get('taggings', [])
-                    if taggings:
-                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
-
-                    publisher = ''
-                    default_edition = book.get('default_physical_edition')
-                    if default_edition and default_edition.get('publisher'):
-                        publisher = default_edition['publisher'].get('name', '')
-
-                    books.append({
-                        'id': book.get('id'),
-                        'title': book.get('title', ''),
-                        'author': author,
-                        'year': book.get('release_year'),
-                        'pages': book.get('pages'),
-                        'description': book.get('description', ''),
-                        'image': book.get('cached_image', ''),
-                        'rating': book.get('rating'),
-                        'ratings_count': book.get('ratings_count', 0),
-                        'publisher': publisher,
-                        'genres': genres,
-                        'slug': book.get('slug', '')
-                    })
+            # Extract books from list_books structure
+            raw_books = [item.get('book') for item in list_books if item.get('book')]
+            books = transform_hardcover_books(raw_books)
 
             return {
                 'books': books,
@@ -733,34 +586,11 @@ def get_books_by_author_hardcover(token, author_name, limit=20):
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
-    # GraphQL query to search for books by author
+    # GraphQL query to search for books by author (API returns results as JSON blob)
     graphql_query = """
-    query BooksByAuthor($authorName: String!, $limit: Int) {
-        search(query: $authorName, limit: $limit, query_type: "Book", sort: "rating:desc") {
-            results {
-                ... on Book {
-                    id
-                    title
-                    slug
-                    release_year
-                    pages
-                    description
-                    cached_image
-                    cached_contributors
-                    rating
-                    ratings_count
-                    default_physical_edition {
-                        publisher {
-                            name
-                        }
-                    }
-                    taggings(limit: 5) {
-                        tag {
-                            tag
-                        }
-                    }
-                }
-            }
+    query BooksByAuthor($authorName: String!) {
+        search(query: $authorName, query_type: "Book") {
+            results
         }
     }
     """
@@ -768,8 +598,7 @@ def get_books_by_author_hardcover(token, author_name, limit=20):
     payload = json.dumps({
         'query': graphql_query,
         'variables': {
-            'authorName': author_name,
-            'limit': limit
+            'authorName': author_name
         }
     })
 
@@ -791,49 +620,43 @@ def get_books_by_author_hardcover(token, author_name, limit=20):
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
-            results = data.get('data', {}).get('search', {}).get('results', [])
-
-            # Filter to only books by this specific author and transform results
+            # New API returns results as JSON with hits array
+            results_json = data.get('data', {}).get('search', {}).get('results', {})
+            hits = results_json.get('hits', [])
+            
             books = []
-            for book in results:
-                if book:
-                    author = ''
-                    contributors = book.get('cached_contributors', [])
-                    if contributors and isinstance(contributors, list):
-                        author_entry = next((c for c in contributors if c.get('contribution') == 'Author'), None)
-                        if author_entry:
-                            author = author_entry.get('author', {}).get('name', '')
-                        elif contributors:
-                            author = contributors[0].get('author', {}).get('name', '')
-
-                    # Only include if the author matches (case-insensitive)
-                    if author.lower() != author_name.lower():
-                        continue
-
-                    genres = []
-                    taggings = book.get('taggings', [])
-                    if taggings:
-                        genres = [t.get('tag', {}).get('tag', '') for t in taggings if t.get('tag')]
-
-                    publisher = ''
-                    default_edition = book.get('default_physical_edition')
-                    if default_edition and default_edition.get('publisher'):
-                        publisher = default_edition['publisher'].get('name', '')
-
-                    books.append({
-                        'id': book.get('id'),
-                        'title': book.get('title', ''),
-                        'author': author,
-                        'year': book.get('release_year'),
-                        'pages': book.get('pages'),
-                        'description': book.get('description', ''),
-                        'image': book.get('cached_image', ''),
-                        'rating': book.get('rating'),
-                        'ratings_count': book.get('ratings_count', 0),
-                        'publisher': publisher,
-                        'genres': genres,
-                        'slug': book.get('slug', '')
-                    })
+            for hit in hits:
+                doc = hit.get('document', {})
+                # Extract author from author_names
+                author = ''
+                author_names = doc.get('author_names', [])
+                if author_names:
+                    author = author_names[0]
+                
+                # Only include if author matches (case-insensitive)
+                if author.lower() != author_name.lower():
+                    continue
+                
+                # Get image URL
+                image = ''
+                if doc.get('image') and isinstance(doc['image'], dict):
+                    image = doc['image'].get('url', '')
+                
+                books.append({
+                    'id': doc.get('id'),
+                    'title': doc.get('title', ''),
+                    'author': author,
+                    'year': doc.get('release_year'),
+                    'pages': doc.get('pages'),
+                    'description': doc.get('description', ''),
+                    'image': image,
+                    'rating': doc.get('rating'),
+                    'ratings_count': doc.get('ratings_count', 0),
+                    'slug': doc.get('slug', '')
+                })
+                
+                if len(books) >= limit:
+                    break
 
             return {
                 'books': books,
