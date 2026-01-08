@@ -433,28 +433,6 @@ def transform_itunes_books(results):
                 # Replace any dimension pattern (60x60, 100x100, 30x30, etc.) with 512x512
                 # This works because iTunes URLs have the pattern: .../artworkUrl60/60x60bb.jpg -> .../artworkUrl60/512x512bb.jpg
                 image = re.sub(r'\d+x\d+', '512x512', base_url)
-        
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'O',
-                    'location': 'serve.py:360',
-                    'message': 'Extracting image URL',
-                    'data': {
-                        'has_artworkUrl512': bool(book.get('artworkUrl512')),
-                        'has_artworkUrl100': bool(book.get('artworkUrl100')),
-                        'has_artworkUrl60': bool(book.get('artworkUrl60')),
-                        'original_url': (book.get('artworkUrl100') or book.get('artworkUrl60') or '')[:100],
-                        'final_image': image[:100] if image else 'none'
-                    },
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         # Clean description - remove bold tags but preserve paragraph layout and rich formatting
         description = book.get('description', '')
         if description:
@@ -483,63 +461,16 @@ def transform_itunes_books(results):
 
 def search_itunes(query, limit=20, offset=0):
     """Search iTunes API for books"""
-    # #region agent log
-    try:
-        with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'H',
-                'location': 'serve.py:423',
-                'message': 'search_itunes entry',
-                'data': {'query': query, 'limit': limit, 'offset': offset},
-                'timestamp': int(time.time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
-    
     # iTunes Search API endpoint
     # media=ebook for books, limit results
     # Note: iTunes API doesn't support offset directly, but we can request more and slice
     # For pagination, we'll request limit + offset and then slice
     requested_limit = limit + offset
     search_url = f"https://itunes.apple.com/search?term={urllib.parse.quote(query)}&media=ebook&limit={requested_limit}&country=us"
-    
-    # #region agent log
-    try:
-        with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'I',
-                'location': 'serve.py:330',
-                'message': 'Making iTunes API request',
-                'data': {'url': search_url},
-                'timestamp': int(time.time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
-    
     try:
         req = urllib.request.Request(search_url)
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'J',
-                        'location': 'serve.py:340',
-                        'message': 'iTunes API response received',
-                        'data': {'result_count': data.get('resultCount', 0) if isinstance(data, dict) else 0, 'has_error': 'errorMessage' in data if isinstance(data, dict) else False},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-            
             if 'errorMessage' in data:
                 return {'error': data['errorMessage']}
             
@@ -552,95 +483,22 @@ def search_itunes(query, limit=20, offset=0):
             # Limit results to requested limit
             if isinstance(transformed, list) and len(transformed) > limit:
                 transformed = transformed[:limit]
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'K',
-                        'location': 'serve.py:485',
-                        'message': 'Transformation complete',
-                        'data': {'books_count': len(transformed) if isinstance(transformed, list) else 0, 'offset': offset, 'limit': limit},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-            
             return {'books': transformed}
 
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8') if e.fp else ''
         print(f"❌ iTunes API error: {e.code} - {error_body}")
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'L',
-                    'location': 'serve.py:360',
-                    'message': 'iTunes HTTPError',
-                    'data': {'code': e.code, 'error': error_body[:200]},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return {'error': f'API error: {e.code}'}
     except urllib.error.URLError as e:
         print(f"❌ iTunes connection error: {e.reason}")
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'M',
-                    'location': 'serve.py:366',
-                    'message': 'iTunes URLError',
-                    'data': {'reason': str(e.reason)},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return {'error': f'Connection error: {e.reason}'}
     except Exception as e:
         print(f"❌ iTunes search error: {e}")
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'N',
-                    'location': 'serve.py:372',
-                    'message': 'iTunes Exception',
-                    'data': {'error': str(e), 'type': type(e).__name__},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return {'error': str(e)}
 
 
 def get_trending_hardcover(token, limit=20):
     """Get most popular books from 2025 on Hardcover"""
-    # #region agent log
-    try:
-        with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'BC',
-                'location': 'serve.py:554',
-                'message': 'get_trending_hardcover called',
-                'data': {'has_token': bool(token), 'limit': limit},
-                'timestamp': int(time.time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
-    
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
@@ -690,21 +548,6 @@ def get_trending_hardcover(token, limit=20):
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
             
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'BD',
-                        'location': 'serve.py:629',
-                        'message': 'Hardcover trending API response',
-                        'data': {'has_errors': 'errors' in data, 'has_data': 'data' in data, 'books_count': len(data.get('data', {}).get('books', [])) if 'data' in data else 0, 'error': data.get('errors', [{}])[0].get('message', '') if 'errors' in data else ''},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
@@ -713,60 +556,15 @@ def get_trending_hardcover(token, limit=20):
 
             # Transform results
             books = transform_hardcover_books(results)
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'BE',
-                        'location': 'serve.py:645',
-                        'message': 'Hardcover trending transform complete',
-                        'data': {'results_count': len(results), 'books_count': len(books)},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-            
             return {'books': books}
 
     except Exception as e:
         print(f"❌ Hardcover trending error: {e}")
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'BF',
-                    'location': 'serve.py:660',
-                    'message': 'Hardcover trending exception',
-                    'data': {'error': str(e), 'type': type(e).__name__},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return {'error': str(e)}
 
 
 def get_recent_releases_hardcover(token, limit=20):
     """Get recent book releases from Hardcover - matches /upcoming/recent page"""
-    # #region agent log
-    try:
-        with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'BG',
-                'location': 'serve.py:625',
-                'message': 'get_recent_releases_hardcover called',
-                'data': {'has_token': bool(token), 'limit': limit},
-                'timestamp': int(time.time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
-    
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
@@ -827,80 +625,20 @@ def get_recent_releases_hardcover(token, limit=20):
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
             
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'BH',
-                        'location': 'serve.py:721',
-                        'message': 'Hardcover recent API response',
-                        'data': {'has_errors': 'errors' in data, 'has_data': 'data' in data, 'books_count': len(data.get('data', {}).get('books', [])) if 'data' in data else 0, 'error': data.get('errors', [{}])[0].get('message', '') if 'errors' in data else ''},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
             results = data.get('data', {}).get('books', [])
             books = transform_hardcover_books(results)
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'BI',
-                        'location': 'serve.py:737',
-                        'message': 'Hardcover recent transform complete',
-                        'data': {'results_count': len(results), 'books_count': len(books)},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-            
             return {'books': books}
 
     except Exception as e:
         print(f"❌ Hardcover recent releases error: {e}")
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'BJ',
-                    'location': 'serve.py:752',
-                    'message': 'Hardcover recent exception',
-                    'data': {'error': str(e), 'type': type(e).__name__},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return {'error': str(e)}
 
 
 def get_hardcover_popular_lists(token):
     """Get popular lists from Hardcover - first 30, then pick 3 random"""
-    # #region agent log
-    try:
-        with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'BK',
-                'location': 'serve.py:826',
-                'message': 'get_hardcover_popular_lists called',
-                'data': {'has_token': bool(token)},
-                'timestamp': int(time.time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
-    
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
@@ -940,21 +678,6 @@ def get_hardcover_popular_lists(token):
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
             
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'BL',
-                        'location': 'serve.py:870',
-                        'message': 'Hardcover popular lists API response',
-                        'data': {'has_errors': 'errors' in data, 'has_data': 'data' in data, 'lists_count': len(data.get('data', {}).get('lists', [])) if 'data' in data else 0, 'error': data.get('errors', [{}])[0].get('message', '') if 'errors' in data else ''},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
@@ -965,60 +688,15 @@ def get_hardcover_popular_lists(token):
                 selected_lists = random.sample(lists, 3)
             else:
                 selected_lists = lists
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'BM',
-                        'location': 'serve.py:890',
-                        'message': 'Hardcover popular lists selected',
-                        'data': {'total_lists': len(lists), 'selected_count': len(selected_lists)},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-            
             return {'lists': selected_lists}
 
     except Exception as e:
         print(f"❌ Hardcover popular lists error: {e}")
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'BN',
-                    'location': 'serve.py:905',
-                    'message': 'Hardcover popular lists exception',
-                    'data': {'error': str(e), 'type': type(e).__name__},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return {'error': str(e)}
 
 
 def get_list_hardcover(token, list_id, limit=20):
     """Get books from a specific Hardcover list by ID"""
-    # #region agent log
-    try:
-        with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'AX',
-                'location': 'serve.py:822',
-                'message': 'get_list_hardcover called',
-                'data': {'has_token': bool(token), 'list_id': list_id, 'limit': limit},
-                'timestamp': int(time.time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
-    
     if not token:
         return {'error': 'No Hardcover API token configured'}
 
@@ -1070,21 +748,6 @@ def get_list_hardcover(token, list_id, limit=20):
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
             
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'AY',
-                        'location': 'serve.py:870',
-                        'message': 'Hardcover list API response',
-                        'data': {'has_errors': 'errors' in data, 'has_data': 'data' in data, 'lists_count': len(data.get('data', {}).get('lists', [])) if 'data' in data else 0, 'error': data.get('errors', [{}])[0].get('message', '') if 'errors' in data else '', 'list_id': list_id},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-
             if 'errors' in data:
                 return {'error': data['errors'][0].get('message', 'GraphQL error')}
 
@@ -1097,39 +760,7 @@ def get_list_hardcover(token, list_id, limit=20):
 
             # Extract books from list_books structure
             raw_books = [item.get('book') for item in list_books if item.get('book')]
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'AZ',
-                        'location': 'serve.py:887',
-                        'message': 'Hardcover list books extracted',
-                        'data': {'raw_books_count': len(raw_books), 'list_books_count': len(list_books)},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-            
             books = transform_hardcover_books(raw_books)
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'BA',
-                        'location': 'serve.py:895',
-                        'message': 'Hardcover list transform complete',
-                        'data': {'transformed_books_count': len(books)},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-
             return {
                 'books': books,
                 'list_name': list_data.get('name', ''),
@@ -1138,20 +769,6 @@ def get_list_hardcover(token, list_id, limit=20):
 
     except Exception as e:
         print(f"❌ Hardcover list error: {e}")
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'BB',
-                    'location': 'serve.py:913',
-                    'message': 'Hardcover list exception',
-                    'data': {'error': str(e), 'type': type(e).__name__, 'list_id': list_id},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return {'error': str(e)}
 
 
@@ -1312,22 +929,6 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         parsed_url = urlparse(self.path)
         path = parsed_url.path
         query_params = parse_qs(parsed_url.query)
-        
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'A',
-                    'location': 'serve.py:841',
-                    'message': 'do_GET entry',
-                    'data': {'path': path, 'full_path': self.path, 'query': str(query_params)},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-
         # API: Get config
         if path == '/api/config':
             self.send_response(200)
@@ -1346,35 +947,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         # API: Search iTunes (for metadata matching)
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'B',
-                    'location': 'serve.py:863',
-                    'message': 'Checking iTunes route',
-                    'data': {'path': path, 'matches': path == '/api/itunes/search', 'path_repr': repr(path)},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         if path == '/api/itunes/search':
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'C',
-                        'location': 'serve.py:876',
-                        'message': 'iTunes route matched',
-                        'data': {'query': query_params.get('q', [''])[0]},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
             query = query_params.get('q', [''])[0]
             limit = int(query_params.get('limit', [20])[0])
             offset = int(query_params.get('offset', [0])[0])
@@ -1386,59 +959,12 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 response = json.dumps({'error': 'Query parameter q is required'})
                 self.wfile.write(response.encode('utf-8'))
                 return
-
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'E',
-                        'location': 'serve.py:876',
-                        'message': 'Calling search_itunes',
-                        'data': {'query': query, 'limit': limit},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-            
             result = search_itunes(query, limit, offset)
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'F',
-                        'location': 'serve.py:888',
-                        'message': 'search_itunes returned',
-                        'data': {'result_keys': list(result.keys()) if isinstance(result, dict) else str(type(result)), 'has_error': 'error' in result if isinstance(result, dict) else False},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             response = json.dumps(result)
             self.wfile.write(response.encode('utf-8'))
-            
-            # #region agent log
-            try:
-                with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'G',
-                        'location': 'serve.py:900',
-                        'message': 'Response sent successfully',
-                        'data': {'response_length': len(response)},
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
             return
 
         # API: Get trending from Hardcover
@@ -1765,22 +1291,6 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"❌ Download error: {e}")
                 self.send_error(500, f"Download failed: {str(e)}")
                 return
-
-        # #region agent log
-        try:
-            with open('/Users/mykie/Sites/folio/folio/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'D',
-                    'location': 'serve.py:1253',
-                    'message': 'Falling through to static file serving',
-                    'data': {'path': path, 'no_api_match': True},
-                    'timestamp': int(time.time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         # Serve static files from public/ (directory set in __init__)
         super().do_GET()
 

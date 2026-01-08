@@ -3,24 +3,34 @@ version: '3.8'
 services:
   folio:
     build: .
+    image: folio:latest
     container_name: folio
     ports:
       - "9099:9099"
     volumes:
+      # Mount the public directory (read-only for security)
       - ./public:/app/public:ro
+      # Mount config.json for persistent configuration
       - ./config.json:/app/config.json:rw
+      # Mount your Calibre library - REQUIRED: Update this path!
       - ${CALIBRE_LIBRARY:-/data/calibre-library}:/data/calibre-library:ro
     environment:
-      # Calibre Library location (path to directory containing metadata.db)
-      - CALIBRE_LIBRARY=${CALIBRE_LIBRARY:-/data/calibre-library}
-      # calibredb executable path (optional - auto-detected if not set)
-      - CALIBREDB_PATH=${CALIBREDB_PATH:-}
+      # Calibre Library location inside container (must match volume mount)
+      - CALIBRE_LIBRARY=/data/calibre-library
+      # calibredb executable path (set explicitly for container)
+      - CALIBREDB_PATH=/usr/bin/calibredb
       # Hardcover API token (get from https://hardcover.app/account/api)
       - HARDCOVER_TOKEN=${HARDCOVER_TOKEN:-}
       # Prowlarr address (e.g., http://prowlarr:9696 or http://localhost:9696)
       - PROWLARR_URL=${PROWLARR_URL:-}
       # Prowlarr API key (get from Prowlarr Settings → General → API Key)
       - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9099/api/config"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     networks:
       - folio-network
