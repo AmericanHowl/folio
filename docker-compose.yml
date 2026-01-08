@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  folio:
+    build: .
+    container_name: folio
+    ports:
+      - "9099:9099"
+    volumes:
+      - ./public:/app/public:ro
+      - ./config.json:/app/config.json:rw
+      - ${CALIBRE_LIBRARY:-/data/calibre-library}:/data/calibre-library:ro
+    environment:
+      # Calibre Library location (path to directory containing metadata.db)
+      - CALIBRE_LIBRARY=${CALIBRE_LIBRARY:-/data/calibre-library}
+      # calibredb executable path (optional - auto-detected if not set)
+      - CALIBREDB_PATH=${CALIBREDB_PATH:-}
+      # Hardcover API token (get from https://hardcover.app/account/api)
+      - HARDCOVER_TOKEN=${HARDCOVER_TOKEN:-}
+      # Prowlarr address (e.g., http://prowlarr:9696 or http://localhost:9696)
+      - PROWLARR_URL=${PROWLARR_URL:-}
+      # Prowlarr API key (get from Prowlarr Settings → General → API Key)
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
+    restart: unless-stopped
+    networks:
+      - folio-network
+
+networks:
+  folio-network:
+    driver: bridge

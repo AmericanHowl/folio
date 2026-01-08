@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Folio - Your Personal Library</title>
+    <title>folio - Your Personal Library</title>
     <meta name="description" content="A modern interface for browsing and managing your Calibre library with Hardcover.app discovery">
     
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#1a1a2e">
-    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-    
+    <meta name="theme-color" content="#f6f7fa">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -18,95 +17,123 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Satoshi', 'system-ui', 'sans-serif'],
-                        display: ['Clash Display', 'system-ui', 'sans-serif'],
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        display: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        logo: ['Cal Sans', 'system-ui', 'sans-serif'],
                     },
                     colors: {
                         ink: {
-                            50: '#f8f9fa',
-                            100: '#f1f3f5',
-                            200: '#e9ecef',
-                            300: '#dee2e6',
-                            400: '#ced4da',
-                            500: '#adb5bd',
-                            600: '#868e96',
-                            700: '#495057',
-                            800: '#343a40',
-                            900: '#212529',
+                            50: '#f6f7fa',   // Background
+                            100: '#ffffff',   // White (modal background)
+                            200: '#e8e9ed',
+                            300: '#d1d3db',
+                            400: '#b4b7c2',
+                            500: '#5e607a',   // Secondary text
+                            600: '#4a4c62',
+                            700: '#3a3c4f',
+                            800: '#2a2b3c',
+                            900: '#1f1f2e',   // Main text
                         },
+                        primary: {
+                            50: '#f5f4ff',
+                            100: '#e8e4ff',
+                            200: '#d1caff',
+                            300: '#b4a5ff',
+                            400: '#9d7fff',
+                            500: '#6b5cff',   // Main accent highlight
+                            600: '#5a4be0',  // Main accent
+                            700: '#4a3dc7',
+                            800: '#3a2fa0',
+                            900: '#2a2179',
+                        },
+                        accent: {
+                            50: '#e6fffe',
+                            100: '#b3fffe',
+                            200: '#80fffd',
+                            300: '#4dfffc',
+                            400: '#3ccfcf',  // Secondary accent highlight
+                            500: '#2fb8b8',  // Secondary accent
+                            600: '#26a0a0',
+                            700: '#1d8888',
+                            800: '#147070',
+                            900: '#0b5858',
+                        },
+                        // Legacy names for compatibility
                         sage: {
-                            50: '#f4f6f3',
-                            100: '#e8ede6',
-                            200: '#d4ddd0',
-                            300: '#b5c4ae',
-                            400: '#94a88a',
-                            500: '#768c6a',
-                            600: '#5d7253',
-                            700: '#4a5b43',
-                            800: '#3d4a38',
-                            900: '#343f30',
+                            50: '#e6fffe',
+                            100: '#b3fffe',
+                            200: '#80fffd',
+                            300: '#4dfffc',
+                            400: '#3ccfcf',
+                            500: '#2fb8b8',
+                            600: '#26a0a0',
+                            700: '#1d8888',
+                            800: '#147070',
+                            900: '#0b5858',
                         },
                         coral: {
-                            50: '#fff5f3',
-                            100: '#ffe8e3',
-                            200: '#ffd5cc',
-                            300: '#ffb8a8',
-                            400: '#ff9075',
-                            500: '#f86c4f',
-                            600: '#e54d2e',
-                            700: '#c13d21',
-                            800: '#9f351f',
-                            900: '#84311f',
+                            50: '#f5f4ff',
+                            100: '#e8e4ff',
+                            200: '#d1caff',
+                            300: '#b4a5ff',
+                            400: '#9d7fff',
+                            500: '#6b5cff',
+                            600: '#5a4be0',
+                            700: '#4a3dc7',
+                            800: '#3a2fa0',
+                            900: '#2a2179',
                         },
                         ocean: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            200: '#bae6fd',
-                            300: '#7dd3fc',
-                            400: '#38bdf8',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            800: '#075985',
-                            900: '#0c4a6e',
+                            50: '#f5f4ff',
+                            100: '#e8e4ff',
+                            200: '#d1caff',
+                            300: '#b4a5ff',
+                            400: '#9d7fff',
+                            500: '#6b5cff',
+                            600: '#5a4be0',
+                            700: '#4a3dc7',
+                            800: '#3a2fa0',
+                            900: '#2a2179',
                         }
                     }
                 }
             }
         }
     </script>
-    
+
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
-    
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
-    
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cal+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap Icons (CSS-only, no JS needed) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
     <style>
         [x-cloak] { display: none !important; }
-        
+
         :root {
-            --font-sans: 'DM Sans', system-ui, sans-serif;
-            --font-display: 'Fraunces', Georgia, serif;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-logo: 'Cal Sans', system-ui, sans-serif;
         }
         
         * {
             -webkit-tap-highlight-color: transparent;
         }
-        
+
         html {
             font-family: var(--font-sans);
             scroll-behavior: smooth;
         }
-        
+
         body {
-            background: linear-gradient(180deg, #fafbfc 0%, #f5f7f9 100%);
+            background: #f6f7fa; /* Light gray background */
             min-height: 100vh;
+            color: #1f1f2e; /* Main text */
         }
         
         .font-display {
@@ -115,27 +142,64 @@
         
         /* Custom scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
         }
         ::-webkit-scrollbar-track {
             background: transparent;
         }
         ::-webkit-scrollbar-thumb {
             background: #d1d5db;
-            border-radius: 4px;
+            border-radius: 3px;
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #9ca3af;
         }
         
-        /* Horizontal scroll sections */
-        .scroll-section {
+        /* Swipeable grid pages for library */
+        .library-pages {
             display: flex;
-            gap: 16px;
             overflow-x: auto;
             scroll-snap-type: x mandatory;
-            padding: 8px 0 16px 0;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            gap: 0;
+        }
+        .library-pages::-webkit-scrollbar {
+            display: none;
+        }
+        .library-page {
+            flex-shrink: 0;
+            width: 100%;
+            scroll-snap-align: start;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 0 16px;
+        }
+        @media (min-width: 640px) {
+            .library-page {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        @media (min-width: 768px) {
+            .library-page {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+        @media (min-width: 1024px) {
+            .library-page {
+                grid-template-columns: repeat(6, 1fr);
+            }
+        }
+        
+        /* Horizontal scroll sections for Hardcover */
+        .scroll-section {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            padding: 4px 0 8px 0;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
         }
@@ -149,21 +213,20 @@
         
         /* Book card */
         .book-card {
-            width: 140px;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .book-card:hover {
-            transform: translateY(-4px);
+            transform: translateY(-2px);
         }
         .book-card:active {
             transform: scale(0.98);
         }
-        
+
         .book-cover {
             aspect-ratio: 2/3;
-            border-radius: 8px;
+            border-radius: 6px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05);
             background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
         }
         .book-cover img {
@@ -172,16 +235,21 @@
             object-fit: cover;
         }
         
+        /* Hardcover book card - smaller to emphasize library */
+        .hc-book-card {
+            width: 100px;
+        }
+        
         /* Glass effect for modals */
         .glass {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(246, 247, 250, 0.95); /* Background with glass */
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
         }
         
         /* Setup wizard */
         .setup-card {
-            background: white;
+            background: #ffffff; /* Modal background */
             border-radius: 24px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
         }
@@ -198,9 +266,9 @@
         }
         .input-field:focus {
             outline: none;
-            border-color: #0ea5e9;
+            border-color: #5a4be0;
             background: white;
-            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+            box-shadow: 0 0 0 4px rgba(90, 75, 224, 0.1);
         }
         .input-field.error {
             border-color: #ef4444;
@@ -214,6 +282,8 @@
         /* Button styles */
         .btn {
             padding: 12px 24px;
+            min-width: 48px; /* Ensure width is at least as tall as height (12px padding * 2 + line-height) */
+            min-height: 48px;
             border-radius: 12px;
             font-weight: 600;
             font-size: 15px;
@@ -223,29 +293,51 @@
             justify-content: center;
             gap: 8px;
         }
+        
+        /* Icon buttons - ensure width >= height */
+        button[class*="p-2"]:not(.btn),
+        button[class*="p-3"]:not(.btn) {
+            min-width: 40px;
+            min-height: 40px;
+        }
         .btn-primary {
-            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-            color: white;
-            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+            background: linear-gradient(135deg, #6b5cff 0%, #5a4be0 100%);
+            color: #ffffff;
+            box-shadow: 0 4px 16px rgba(90, 75, 224, 0.3), 0 2px 4px rgba(90, 75, 224, 0.2);
         }
         .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(90, 75, 224, 0.4), 0 4px 8px rgba(90, 75, 224, 0.3);
         }
         .btn-primary:active {
             transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(90, 75, 224, 0.3);
         }
         .btn-primary:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
         .btn-secondary {
-            background: #f1f5f9;
-            color: #475569;
+            background: #ffffff;
+            color: #1f1f2e;
+            border: 1.5px solid #e8e9ed;
+            box-shadow: 0 2px 8px rgba(31, 31, 46, 0.08);
         }
         .btn-secondary:hover {
-            background: #e2e8f0;
+            background: #f6f7fa;
+            border-color: #5e607a;
+            box-shadow: 0 4px 12px rgba(31, 31, 46, 0.12);
+            transform: translateY(-1px);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #3ccfcf 0%, #2fb8b8 100%);
+            color: #ffffff;
+            box-shadow: 0 4px 16px rgba(47, 184, 184, 0.3), 0 2px 4px rgba(47, 184, 184, 0.2);
+        }
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(47, 184, 184, 0.4), 0 4px 8px rgba(47, 184, 184, 0.3);
         }
         
         /* Section header */
@@ -253,13 +345,19 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 16px;
+            margin-bottom: 8px;
         }
         .section-title {
             font-family: var(--font-display);
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 600;
-            color: #1e293b;
+            color: #1f1f2e;
+        }
+        .section-title-large {
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1f1f2e;
         }
         
         /* Rating stars */
@@ -332,7 +430,7 @@
             background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
-            border-radius: 8px;
+            border-radius: 6px;
         }
         @keyframes shimmer {
             0% { background-position: 200% 0; }
@@ -364,63 +462,129 @@
 
         /* Safe area padding */
         .safe-area-bottom {
-            padding-bottom: max(24px, env(safe-area-inset-bottom));
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
         }
         .safe-area-top {
-            padding-top: max(16px, env(safe-area-inset-top));
+            padding-top: max(8px, env(safe-area-inset-top));
+        }
+        
+        /* Page indicators */
+        .page-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #d1d5db;
+            transition: all 0.2s ease;
+        }
+        .page-indicator.active {
+            width: 18px;
+            border-radius: 3px;
+            background: #0ea5e9;
+        }
+        
+        /* Compact header */
+        .compact-header {
+            height: 48px;
+        }
+        
+        /* Divider with text */
+        .divider-text {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .divider-text::before,
+        .divider-text::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, #e2e8f0 0%, transparent 100%);
+        }
+        .divider-text::after {
+            background: linear-gradient(90deg, transparent 0%, #e2e8f0 100%);
+        }
+        
+        /* Sort select */
+        .sort-select {
+            padding: 6px 28px 6px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center;
+            appearance: none;
+            cursor: pointer;
+        }
+        .sort-select:focus {
+            outline: none;
+            border-color: #0ea5e9;
         }
     </style>
 </head>
 <body x-data="folioApp()" x-init="init()">
     
     <!-- Setup Screen -->
-    <div x-show="showSetup" x-cloak class="min-h-screen flex items-center justify-content-center p-6">
+    <div x-show="showSetup" x-cloak class="min-h-screen flex items-center justify-center p-4">
         <div class="setup-card max-w-md w-full mx-auto p-8 fade-in">
             <!-- Logo -->
             <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-ocean-400 to-ocean-600 rounded-2xl mb-4 shadow-lg">
-                    <i data-lucide="book-open" class="w-8 h-8 text-white"></i>
-                </div>
-                <h1 class="font-display text-3xl font-bold text-ink-900">Welcome to Folio</h1>
+                <h1 class="font-logo text-3xl font-bold mb-2" style="color: #D4406F;">folio</h1>
                 <p class="text-ink-500 mt-2">Let's get your library set up</p>
-            </div>
-            
+        </div>
+
             <!-- Step Indicator -->
-            <div class="flex items-center justify-center gap-3 mb-8">
+            <div class="flex items-center justify-center gap-2 mb-8 flex-wrap">
                 <div class="flex items-center gap-2">
-                    <div :class="setupStep >= 1 ? 'bg-ocean-500 text-white' : 'bg-ink-200 text-ink-500'" 
+                    <div :class="setupStep >= 1 ? 'bg-primary-600 text-white' : 'bg-ink-200 text-ink-500'" 
                          class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors">
                         <template x-if="setupStep > 1">
-                            <i data-lucide="check" class="w-4 h-4"></i>
+                            <i class="bi bi-check-lg"></i>
                         </template>
                         <template x-if="setupStep <= 1">
                             <span>1</span>
                         </template>
-                    </div>
-                    <span :class="setupStep >= 1 ? 'text-ink-700' : 'text-ink-400'" class="text-sm font-medium">Hardcover API</span>
                 </div>
-                <div class="w-8 h-0.5 bg-ink-200"></div>
+                    <span :class="setupStep >= 1 ? 'text-ink-700' : 'text-ink-400'" class="text-sm font-medium hidden sm:inline">Hardcover</span>
+                        </div>
+                <div class="w-6 h-0.5 bg-ink-200"></div>
                 <div class="flex items-center gap-2">
-                    <div :class="setupStep >= 2 ? 'bg-ocean-500 text-white' : 'bg-ink-200 text-ink-500'" 
+                    <div :class="setupStep >= 2 ? 'bg-primary-600 text-white' : 'bg-ink-200 text-ink-500'" 
                          class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors">
                         <template x-if="setupStep > 2">
-                            <i data-lucide="check" class="w-4 h-4"></i>
+                            <i class="bi bi-check-lg"></i>
                         </template>
                         <template x-if="setupStep <= 2">
                             <span>2</span>
                         </template>
                     </div>
-                    <span :class="setupStep >= 2 ? 'text-ink-700' : 'text-ink-400'" class="text-sm font-medium">Calibre Library</span>
-                </div>
-            </div>
-            
+                    <span :class="setupStep >= 2 ? 'text-ink-700' : 'text-ink-400'" class="text-sm font-medium hidden sm:inline">Calibre</span>
+                                    </div>
+                <div class="w-6 h-0.5 bg-ink-200"></div>
+                <div class="flex items-center gap-2">
+                    <div :class="setupStep >= 3 ? 'bg-primary-600 text-white' : 'bg-ink-200 text-ink-500'" 
+                         class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors">
+                        <template x-if="setupStep > 3">
+                            <i class="bi bi-check-lg"></i>
+                        </template>
+                        <template x-if="setupStep <= 3">
+                            <span>3</span>
+                        </template>
+                                </div>
+                    <span :class="setupStep >= 3 ? 'text-ink-700' : 'text-ink-400'" class="text-sm font-medium hidden sm:inline">Prowlarr</span>
+                            </div>
+                    </div>
+
             <!-- Step 1: Hardcover API Key -->
             <div x-show="setupStep === 1" class="space-y-6">
                 <div>
                     <label class="block text-sm font-semibold text-ink-700 mb-2">Hardcover API Key</label>
                     <p class="text-sm text-ink-500 mb-3">
                         Get your API key from 
-                        <a href="https://hardcover.app/account/api" target="_blank" class="text-ocean-600 hover:underline">hardcover.app/account/api</a>
+                        <a href="https://hardcover.app/account/api" target="_blank" class="text-primary-600 hover:text-primary-700 hover:underline">hardcover.app/account/api</a>
                     </p>
                     <input 
                         type="text" 
@@ -431,21 +595,21 @@
                         @keyup.enter="validateHardcoverKey()"
                     >
                     <p class="text-xs text-ink-400 mt-2">
-                        <i data-lucide="info" class="w-3 h-3 inline"></i>
+                        <i class="bi bi-info-circle"></i>
                         Copy the key exactly as shown on Hardcover
                     </p>
-                </div>
+                        </div>
                 
                 <!-- Error/Success Messages -->
                 <div x-show="apiKeyError" class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <i data-lucide="alert-circle" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"></i>
+                    <i class="bi bi-exclamation-circle text-red-500 flex-shrink-0 mt-0.5"></i>
                     <p class="text-sm text-red-700" x-text="apiKeyError"></p>
-                </div>
+                                </div>
                 <div x-show="apiKeySuccess" class="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
-                    <i data-lucide="check-circle" class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5"></i>
+                    <i class="bi bi-check-circle text-green-500 flex-shrink-0 mt-0.5"></i>
                     <p class="text-sm text-green-700">API key verified successfully!</p>
-                </div>
-                
+                    </div>
+
                 <button 
                     @click="validateHardcoverKey()"
                     :disabled="validatingApiKey || !hardcoverApiKeyInput.trim()"
@@ -456,13 +620,13 @@
                             <span class="spinner"></span>
                             Verifying...
                         </span>
-                    </template>
+                            </template>
                     <template x-if="!validatingApiKey">
                         <span>Verify & Continue</span>
                     </template>
                 </button>
-            </div>
-            
+                        </div>
+
             <!-- Step 2: Calibre Library -->
             <div x-show="setupStep === 2" class="space-y-6">
                 <div>
@@ -473,10 +637,10 @@
                     
                     <!-- Current Path Display -->
                     <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl mb-4">
-                        <i data-lucide="folder" class="w-5 h-5 text-ink-400"></i>
+                        <i class="bi bi-folder text-ink-400"></i>
                         <span class="text-sm font-mono text-ink-600 truncate" x-text="browserPath || 'Select a directory...'"></span>
                     </div>
-                    
+
                     <!-- Directory Browser -->
                     <div class="border-2 border-ink-200 rounded-xl max-h-64 overflow-y-auto">
                         <!-- Parent Directory -->
@@ -485,10 +649,10 @@
                             @click="browseTo(browserParent)"
                             class="dir-item border-b border-ink-100"
                         >
-                            <i data-lucide="arrow-up" class="w-5 h-5 text-ink-400"></i>
+                            <i class="bi bi-arrow-up text-ink-400"></i>
                             <span class="text-ink-600">..</span>
-                        </div>
-                        
+                            </div>
+
                         <!-- Directory Entries -->
                         <template x-for="entry in browserEntries" :key="entry.path">
                             <div 
@@ -496,40 +660,38 @@
                                 :class="{'calibre': entry.is_calibre_library}"
                                 class="dir-item"
                             >
-                                <i :data-lucide="entry.is_calibre_library ? 'database' : 'folder'" 
-                                   :class="entry.is_calibre_library ? 'text-green-500' : 'text-ink-400'"
-                                   class="w-5 h-5"></i>
+                                <i :class="entry.is_calibre_library ? 'bi-database text-green-500' : 'bi-folder text-ink-400'" class="bi"></i>
                                 <span :class="entry.is_calibre_library ? 'text-green-700 font-semibold' : 'text-ink-700'" x-text="entry.name"></span>
                                 <span x-show="entry.is_calibre_library" class="ml-auto text-xs text-green-600 font-medium">Calibre Library</span>
-                            </div>
-                        </template>
+                                    </div>
+                                </template>
                         
                         <!-- Empty State -->
                         <div x-show="browserEntries.length === 0" class="p-8 text-center text-ink-400">
-                            <i data-lucide="folder-x" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-                            <p class="text-sm">No subdirectories found</p>
+                            <i class="bi bi-folder-x text-2xl opacity-50"></i>
+                            <p class="text-sm mt-2">No subdirectories found</p>
+                            </div>
                         </div>
-                    </div>
                 </div>
-                
+
                 <!-- Selected Library -->
                 <div x-show="calibreLibraryPath" class="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
-                    <i data-lucide="check-circle" class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5"></i>
+                    <i class="bi bi-check-circle text-green-500 flex-shrink-0 mt-0.5"></i>
                     <div>
                         <p class="text-sm font-semibold text-green-700">Library selected</p>
                         <p class="text-xs text-green-600 font-mono mt-1" x-text="calibreLibraryPath"></p>
-                    </div>
-                </div>
+                        </div>
+                                        </div>
                 
                 <!-- Error Message -->
                 <div x-show="calibreError" class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <i data-lucide="alert-circle" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"></i>
+                    <i class="bi bi-exclamation-circle text-red-500 flex-shrink-0 mt-0.5"></i>
                     <p class="text-sm text-red-700" x-text="calibreError"></p>
-                </div>
+                                    </div>
                 
                 <div class="flex gap-3">
                     <button @click="setupStep = 1" class="btn btn-secondary flex-1">
-                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        <i class="bi bi-arrow-left"></i>
                         Back
                     </button>
                     <button 
@@ -542,504 +704,1188 @@
                                 <span class="spinner"></span>
                                 Verifying...
                             </span>
-                        </template>
+                            </template>
                         <template x-if="!verifyingCalibre">
                             <span>Complete Setup</span>
                         </template>
                     </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
+                        </div>
+                    </div>
+
+            <!-- Step 3: Prowlarr (Optional) -->
+            <div x-show="setupStep === 3" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">Prowlarr URL</label>
+                    <p class="text-sm text-ink-500 mb-3">
+                        Enter your Prowlarr instance URL (e.g., http://localhost:9696)
+                    </p>
+                    <input 
+                        type="text" 
+                        x-model="prowlarrUrlInput"
+                        class="input-field"
+                        placeholder="http://localhost:9696"
+                    >
+                            </div>
+                
+                <div>
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">Prowlarr API Key</label>
+                    <p class="text-sm text-ink-500 mb-3">
+                        Get your API key from Prowlarr Settings → General → API Key
+                    </p>
+                    <input 
+                        type="text" 
+                        x-model="prowlarrApiKeyInput"
+                        class="input-field font-mono text-sm"
+                        placeholder="Paste your API key here"
+                    >
+                                            </div>
+                
+                <!-- Error/Success Messages -->
+                <div x-show="prowlarrError" class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <i class="bi bi-exclamation-circle text-red-500 flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-red-700" x-text="prowlarrError"></p>
+                                        </div>
+                <div x-show="prowlarrSuccess" class="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+                    <i class="bi bi-check-circle text-green-500 flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-green-700">Prowlarr configured successfully!</p>
+                                        </div>
+                
+                <div class="flex gap-3">
+                    <button @click="setupStep = 2" class="btn btn-secondary flex-1">
+                        <i class="bi bi-arrow-left"></i>
+                        Back
+                    </button>
+                    <button 
+                        @click="validateProwlarr()"
+                        :disabled="validatingProwlarr || !prowlarrUrlInput.trim() || !prowlarrApiKeyInput.trim()"
+                        class="btn btn-primary flex-1"
+                    >
+                        <template x-if="validatingProwlarr">
+                            <span class="flex items-center gap-2">
+                                <span class="spinner"></span>
+                                Verifying...
+                            </span>
+                                </template>
+                        <template x-if="!validatingProwlarr">
+                            <span>Verify & Complete</span>
+                    </template>
+                    </button>
+                    <button 
+                        @click="skipProwlarr()"
+                        class="btn btn-secondary"
+                    >
+                        Skip
+                    </button>
+                                </div>
+                                            </div>
+                                            </div>
+                                        </div>
+
     <!-- Main App -->
     <div x-show="!showSetup" x-cloak class="min-h-screen">
         
-        <!-- Header -->
+        <!-- Compact Header -->
         <header class="sticky top-0 z-40 glass border-b border-ink-200 safe-area-top">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16">
+            <div class="max-w-7xl mx-auto px-3">
+                <div class="flex items-center justify-between compact-header">
                     <!-- Logo -->
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-gradient-to-br from-ocean-400 to-ocean-600 rounded-xl flex items-center justify-center shadow-md">
-                            <i data-lucide="book-open" class="w-5 h-5 text-white"></i>
-                        </div>
-                        <span class="font-display text-xl font-bold text-ink-900">Folio</span>
-                    </div>
-                    
-                    <!-- Search -->
-                    <div class="hidden sm:flex flex-1 max-w-md mx-8">
-                        <div class="relative w-full">
-                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-400"></i>
-                            <input 
-                                type="text" 
-                                x-model="searchQuery"
-                                @input.debounce.300ms="searchBooks()"
-                                placeholder="Search your library..."
-                                class="w-full pl-10 pr-4 py-2.5 bg-ink-100 border-0 rounded-xl text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all"
-                            >
-                        </div>
-                    </div>
-                    
+                    <a @click.prevent="showSetup = false; searchQuery = ''; selectedBook = null; selectedHardcoverBook = null; showSettings = false; showRequests = false; showProwlarrSearch = false; showReadingList = false; bookshelfView = false; window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                        <span class="font-logo text-lg font-bold" style="color: #D4406F;">folio</span>
+                    </a>
+
                     <!-- Actions -->
                     <div class="flex items-center gap-2">
-                        <button @click="loadHardcoverData()" class="p-2.5 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-xl transition-colors" title="Refresh">
-                            <i data-lucide="refresh-cw" :class="{'animate-spin': hardcoverLoading}" class="w-5 h-5"></i>
+                        <button 
+                            @click="openReadingList()" 
+                            class="px-3 py-2 text-sm font-medium text-ink-700 hover:text-ink-900 hover:bg-ink-100 rounded-lg transition-colors flex items-center gap-1.5"
+                        >
+                            <i class="bi bi-bookmark"></i>
+                            <span>Reading List</span>
                         </button>
-                        <button @click="showSettings = true" class="p-2.5 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-xl transition-colors" title="Settings">
-                            <i data-lucide="settings" class="w-5 h-5"></i>
+                        <button 
+                            @click="openRequests()" 
+                            class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center" 
+                            title="Requests"
+                        >
+                            <i class="bi bi-inbox-fill"></i>
                         </button>
-                    </div>
-                </div>
-            </div>
+                                </div>
+                                            </div>
+                                            </div>
         </header>
         
-        <!-- Mobile Search -->
-        <div class="sm:hidden px-4 py-3 bg-white border-b border-ink-100">
-            <div class="relative">
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-400"></i>
+        <!-- Search Bar - Moved up -->
+        <div class="px-3 py-2 bg-ink-50 border-b border-ink-200">
+            <div class="relative max-w-7xl mx-auto">
+                <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
                 <input 
                     type="text" 
                     x-model="searchQuery"
                     @input.debounce.300ms="searchBooks()"
-                    placeholder="Search your library..."
-                    class="w-full pl-10 pr-4 py-2.5 bg-ink-100 border-0 rounded-xl text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all"
+                    placeholder="Search for books"
+                    class="w-full pl-9 pr-4 py-2 bg-ink-100 border-0 rounded-lg text-sm text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all"
                 >
-            </div>
-        </div>
+                                        </div>
+                                    </div>
         
         <!-- Main Content -->
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-10 safe-area-bottom">
+        <main class="max-w-7xl mx-auto safe-area-bottom">
             
             <!-- Loading State -->
-            <div x-show="loading" class="py-12">
-                <div class="flex flex-col items-center justify-center gap-4">
-                    <div class="spinner w-8 h-8"></div>
-                    <p class="text-ink-500">Loading your library...</p>
-                </div>
-            </div>
-            
+            <div x-show="libraryLoading" class="py-8">
+                <div class="flex flex-col items-center justify-center gap-3">
+                    <div class="spinner w-6 h-6"></div>
+                    <p class="text-ink-500 text-sm">Loading your library...</p>
+                                </div>
+                            </div>
+
             <!-- Search Results -->
-            <section x-show="searchQuery && filteredBooks.length > 0 && !loading">
-                <div class="section-header">
-                    <h2 class="section-title">Search Results</h2>
-                    <span class="text-ink-500 text-sm" x-text="`${filteredBooks.length} books found`"></span>
-                </div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    <template x-for="book in filteredBooks.slice(0, 24)" :key="book.id">
-                        <div @click="openBookModal(book)" class="book-card cursor-pointer">
-                            <div class="book-cover">
-                                <img :src="`/api/cover/${book.id}`" :alt="book.title" loading="lazy" 
-                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                            </div>
-                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
-                            <p class="text-xs text-ink-500 line-clamp-1" x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
-                        </div>
-                    </template>
-                </div>
-            </section>
-            
-            <!-- Your Library Section -->
-            <section x-show="!searchQuery && !loading && books.length > 0">
-                <div class="section-header">
-                    <h2 class="section-title">Your Library</h2>
-                    <button @click="currentTab = 'library'" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
-                        View All
-                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                    </button>
-                </div>
-                <div class="scroll-section pl-1 -ml-1">
-                    <template x-for="book in getRecentBooks()" :key="book.id">
-                        <div @click="openBookModal(book)" class="book-card cursor-pointer">
-                            <div class="book-cover">
-                                <img :src="`/api/cover/${book.id}`" :alt="book.title" loading="lazy"
-                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                            </div>
-                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
-                            <p class="text-xs text-ink-500 line-clamp-1" x-text="Array.isArray(book.authors) ? book.authors.join(', ') : book.authors"></p>
-                        </div>
-                    </template>
-                </div>
-            </section>
-            
-            <!-- Recent Releases Section -->
-            <section x-show="!searchQuery && !loading && hardcoverRecentReleases.length > 0">
-                <div class="section-header">
-                    <h2 class="section-title">Recent Releases</h2>
-                    <a href="https://hardcover.app/upcoming/recent" target="_blank" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
-                        View on Hardcover
-                        <i data-lucide="external-link" class="w-4 h-4"></i>
-                    </a>
-                </div>
-                <div class="scroll-section pl-1 -ml-1">
-                    <template x-for="book in hardcoverRecentReleases" :key="book.id">
-                        <div @click="openHardcoverModal(book)" class="book-card cursor-pointer">
-                            <div class="book-cover relative">
-                                <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
-                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                                <span x-show="book.inLibrary" class="absolute top-2 right-2 badge badge-library">
-                                    <i data-lucide="check" class="w-3 h-3"></i>
-                                    Owned
-                                </span>
-                            </div>
-                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
-                            <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
-                        </div>
-                    </template>
-                </div>
-            </section>
-            
-            <!-- Trending Section -->
-            <section x-show="!searchQuery && !loading && hardcoverTrending.length > 0">
-                <div class="section-header">
-                    <h2 class="section-title">Trending This Month</h2>
-                    <a href="https://hardcover.app/trending/month" target="_blank" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
-                        View on Hardcover
-                        <i data-lucide="external-link" class="w-4 h-4"></i>
-                    </a>
-                </div>
-                <div class="scroll-section pl-1 -ml-1">
-                    <template x-for="book in hardcoverTrending" :key="book.id">
-                        <div @click="openHardcoverModal(book)" class="book-card cursor-pointer">
-                            <div class="book-cover relative">
-                                <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
-                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                                <span x-show="book.inLibrary" class="absolute top-2 right-2 badge badge-library">
-                                    <i data-lucide="check" class="w-3 h-3"></i>
-                                    Owned
-                                </span>
-                            </div>
-                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
-                            <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
-                        </div>
-                    </template>
-                </div>
-            </section>
-            
-            <!-- Curated Lists from @hardcover -->
-            <template x-for="(section, index) in hardcoverSections" :key="index">
-                <section x-show="!searchQuery && !loading && section.books.length > 0">
-                    <div class="section-header">
-                        <h2 class="section-title" x-text="section.name"></h2>
-                        <a href="https://hardcover.app/@hardcover/lists" target="_blank" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
-                            View List
-                            <i data-lucide="external-link" class="w-4 h-4"></i>
-                        </a>
+            <section x-show="searchQuery && !libraryLoading" class="px-3 py-4 space-y-5">
+                <!-- Loading State -->
+                <div x-show="loadingSearchiTunes && searchiTunesResults.length === 0" class="py-12 px-4 text-center">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                        <div class="spinner w-6 h-6"></div>
                     </div>
-                    <p x-show="section.description" class="text-ink-500 text-sm mb-4 -mt-2" x-text="section.description"></p>
-                    <div class="scroll-section pl-1 -ml-1">
-                        <template x-for="book in section.books" :key="book.id">
+                    <h3 class="text-lg font-semibold text-ink-700 mb-2">Searching...</h3>
+                    <p class="text-ink-500 text-sm">Finding books for you</p>
+                </div>
+
+                <!-- iTunes Search Results -->
+                <div x-show="searchiTunesResults.length > 0">
+                    <div class="section-header">
+                        <h2 class="section-title">Search Results</h2>
+                        <span class="text-ink-500 text-sm" x-text="`${searchiTunesResults.length} books`"></span>
+                    </div>
+                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3" x-ref="searchResultsGrid">
+                        <template x-for="book in searchiTunesResults" :key="book.id">
                             <div @click="openHardcoverModal(book)" class="book-card cursor-pointer">
                                 <div class="book-cover relative">
                                     <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
                                          @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                                    <span x-show="book.inLibrary" class="absolute top-2 right-2 badge badge-library">
-                                        <i data-lucide="check" class="w-3 h-3"></i>
-                                        Owned
+                                    <!-- Overlay badge for library -->
+                                    <span x-show="book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                        <i class="bi bi-check-lg text-white text-xs"></i>
+                                    </span>
+                                    <!-- Overlay badge for requested -->
+                                    <span x-show="book.requested && !book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                        <i class="bi bi-download text-white text-xs"></i>
                                     </span>
                                 </div>
-                                <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
+                                <h3 class="mt-1.5 text-xs font-semibold text-ink-900 line-clamp-2 leading-tight" x-text="book.title"></h3>
                                 <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
+                                <!-- Rating stars -->
+                                <div x-show="book.rating" class="mt-1 flex items-center gap-1">
+                                    <div class="rating">
+                                        <template x-for="i in 5" :key="i">
+                                            <i :class="i <= Math.round(book.rating) ? 'bi bi-star-fill star' : 'bi bi-star star star-empty'"></i>
+                                        </template>
+                                    </div>
+                                    <span class="text-xs text-ink-400 ml-1" x-text="book.rating?.toFixed(1)"></span>
+                                </div>
                             </div>
                         </template>
                     </div>
-                </section>
-            </template>
-            
-            <!-- More from Author Section -->
-            <section x-show="!searchQuery && !loading && hardcoverAuthorBooks.length > 0">
-                <div class="section-header">
-                    <h2 class="section-title">
-                        More from <span class="text-ocean-600" x-text="hardcoverAuthor"></span>
-                    </h2>
-                    <button @click="loadHardcoverAuthorBooks()" class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold flex items-center gap-1">
-                        <i data-lucide="shuffle" class="w-4 h-4"></i>
-                        Random Author
-                    </button>
-                </div>
-                <div class="scroll-section pl-1 -ml-1">
-                    <template x-for="book in hardcoverAuthorBooks" :key="book.id">
-                        <div @click="openHardcoverModal(book)" class="book-card cursor-pointer">
-                            <div class="book-cover relative">
-                                <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
-                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                                <span x-show="book.inLibrary" class="absolute top-2 right-2 badge badge-library">
-                                    <i data-lucide="check" class="w-3 h-3"></i>
-                                    Owned
-                                </span>
-                            </div>
-                            <h3 class="mt-2 text-sm font-semibold text-ink-800 line-clamp-2" x-text="book.title"></h3>
-                            <p class="text-xs text-ink-500" x-text="book.year"></p>
+                    <!-- Loading more indicator -->
+                    <div x-show="loadingSearchiTunes && searchiTunesResults.length > 0" class="py-4 text-center">
+                        <div class="flex items-center justify-center gap-2 text-ink-500">
+                            <div class="spinner w-4 h-4"></div>
+                            <span class="text-sm">Loading more results...</span>
                         </div>
-                    </template>
+                    </div>
+                </div>
+
+                <!-- No Results -->
+                <div x-show="!loadingSearchiTunes && searchiTunesResults.length === 0 && searchQuery" class="py-12 px-4 text-center">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                        <i class="bi bi-search text-2xl text-ink-400"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-ink-700 mb-2">No results found</h3>
+                    <p class="text-ink-500 text-sm">Try a different search term</p>
                 </div>
             </section>
             
-            <!-- Empty State -->
-            <div x-show="!loading && books.length === 0 && !searchQuery" class="py-16 text-center">
-                <div class="inline-flex items-center justify-center w-20 h-20 bg-ink-100 rounded-full mb-6">
-                    <i data-lucide="book-x" class="w-10 h-10 text-ink-400"></i>
-                </div>
-                <h3 class="text-xl font-semibold text-ink-700 mb-2">No books found</h3>
-                <p class="text-ink-500 max-w-md mx-auto">Your Calibre library appears to be empty. Add some books to get started!</p>
+            <!-- ============================================ -->
+            <!-- YOUR LIBRARY - Primary Section -->
+            <!-- ============================================ -->
+            <section x-show="!searchQuery && !libraryLoading && books.length > 0" class="pt-3 pb-4">
+                <!-- Library Header -->
+                <div class="px-3 mb-3">
+                    <div class="flex items-center justify-between">
+                        <h2 class="section-title-large">Your Library</h2>
+                        <button 
+                            @click="openBookshelf('library-all', 'Your Library')" 
+                            class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700"
+                        >
+                            <span>View all</span>
+                            <i class="bi bi-chevron-right text-xs"></i>
+                        </button>
             </div>
-            
-            <!-- No Search Results -->
-            <div x-show="searchQuery && filteredBooks.length === 0 && !loading" class="py-16 text-center">
-                <div class="inline-flex items-center justify-center w-20 h-20 bg-ink-100 rounded-full mb-6">
-                    <i data-lucide="search-x" class="w-10 h-10 text-ink-400"></i>
+
+                    <!-- Sorting Options and View Toggle -->
+                    <div class="flex items-center justify-between gap-3 mt-2">
+                        <select x-model="sortBy" @change="sortBooks()" class="sort-select flex-1">
+                            <option value="recent">Date Added</option>
+                            <option value="title">Title A-Z</option>
+                            <option value="title-desc">Title Z-A</option>
+                            <option value="author">Author A-Z</option>
+                            <option value="author-desc">Author Z-A</option>
+                        </select>
+                        
+                        <!-- View Toggle -->
+                        <div class="flex items-center gap-1 bg-ink-100 rounded-lg p-1">
+                            <button 
+                                @click="libraryView = 'list'; currentListPage = 1"
+                                :class="libraryView === 'list' ? 'bg-ink-100 text-ink-900 shadow-sm' : 'text-ink-500'"
+                                class="p-1.5 rounded transition-colors"
+                                title="List View"
+                            >
+                                <i class="bi bi-list"></i>
+                            </button>
+                            <button 
+                                @click="libraryView = 'grid'; currentListPage = 1"
+                                :class="libraryView === 'grid' ? 'bg-ink-100 text-ink-900 shadow-sm' : 'text-ink-500'"
+                                class="p-1.5 rounded transition-colors"
+                                title="Grid View"
+                            >
+                                <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                        </div>
+                    </div>
                 </div>
-                <h3 class="text-xl font-semibold text-ink-700 mb-2">No results found</h3>
-                <p class="text-ink-500">Try a different search term</p>
-            </div>
+
+                <!-- List View -->
+                <div x-show="libraryView === 'list'" class="px-3">
+                    <!-- Pagination Controls -->
+                    <div class="flex items-center justify-between mb-4 gap-2">
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-ink-600">Books per page:</label>
+                            <select x-model.number="booksPerPage" @change="currentListPage = 1" class="px-3 py-1.5 border border-ink-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500">
+                                <option :value="10">10</option>
+                                <option :value="20">20</option>
+                                <option :value="50">50</option>
+                                <option :value="100">100</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-ink-600">
+                            <span x-text="`Page ${currentListPage} of ${totalListPages()}`"></span>
+                            <button @click="prevListPage()" :disabled="currentListPage === 1" 
+                                    :class="currentListPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-ink-50'"
+                                    class="p-2 rounded-lg transition-colors flex items-center justify-center">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button @click="nextListPage()" :disabled="currentListPage === totalListPages()" 
+                                    :class="currentListPage === totalListPages() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-ink-50'"
+                                    class="p-2 rounded-lg transition-colors flex items-center justify-center">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                    </div>
+                </div>
+
+                    <div class="space-y-3">
+                        <template x-for="book in paginatedListBooks()" :key="book.id">
+                            <div class="flex items-center gap-3 p-3 bg-white border border-ink-200 rounded-xl hover:border-ink-300 transition-colors">
+                                <!-- Cover -->
+                                <div class="relative flex-shrink-0">
+                                    <img 
+                                        @click="openBookModal(book)"
+                                        :src="`/api/cover/${book.id}?v=${coverVersion}`" 
+                                        :alt="book.title" 
+                                        class="w-16 h-24 object-cover rounded-lg cursor-pointer"
+                                        @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'"
+                                    >
+                                    <!-- Badge for library books -->
+                                    <span class="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                        <i class="bi bi-check-lg text-white text-[10px]"></i>
+                                    </span>
+                                </div>
+                                
+                                <!-- Details -->
+                                <div @click="openBookModal(book)" class="flex-1 min-w-0 cursor-pointer">
+                                    <h3 class="text-sm font-semibold text-ink-900 line-clamp-2 mb-1" x-text="book.title"></h3>
+                                    <p class="text-xs text-ink-600 mb-1" x-text="formatAuthors(book.authors)"></p>
+                                    <p class="text-xs text-ink-400" x-text="book.timestamp ? new Date(book.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown date'"></p>
+                </div>
+
+                                <!-- Reading List Toggle Button -->
+                                <button 
+                                    @click.stop="toggleReadingList(book.id)"
+                                    :class="isInReadingList(book.id) ? 'text-accent-500 hover:text-accent-600 hover:bg-accent-50' : 'text-ink-400 hover:text-accent-500 hover:bg-accent-50'"
+                                    class="p-2 rounded-lg transition-colors flex-shrink-0"
+                                    :title="isInReadingList(book.id) ? 'Remove from Reading List' : 'Add to Reading List'"
+                                >
+                                    <i :class="isInReadingList(book.id) ? 'bi bi-bookmark-fill' : 'bi bi-bookmark-plus'"></i>
+                                </button>
+                        </div>
+                        </template>
+                                        </div>
+                                    </div>
+                
+                <!-- Grid View (Swipeable Pages) -->
+                <div x-show="libraryView === 'grid'">
+                    <div class="library-pages" x-ref="libraryPages" @scroll="updatePageIndicator()">
+                        <template x-for="(page, pageIndex) in libraryPages" :key="pageIndex">
+                            <div class="library-page">
+                                <template x-for="book in page" :key="book.id">
+                                    <div @click="openBookModal(book)" class="book-card cursor-pointer">
+                                        <div class="book-cover relative">
+                                            <img :src="`/api/cover/${book.id}?v=${coverVersion}`" :alt="book.title" loading="lazy"
+                                                 @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                            <!-- Badge for library books (always show since these are library books) -->
+                                            <span class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                                <i class="bi bi-check-lg text-white text-xs"></i>
+                                            </span>
+                                        </div>
+                                        <h3 class="mt-1.5 text-xs font-semibold text-ink-900 line-clamp-2 leading-tight" x-text="book.title"></h3>
+                                        <p class="text-xs text-ink-500 line-clamp-1" x-text="formatAuthors(book.authors)"></p>
+                                    </div>
+                                            </template>
+                                </div>
+                            </template>
+                        </div>
+                    
+                    <!-- Page Indicators -->
+                    <div x-show="libraryPages.length > 1" class="flex items-center justify-center gap-1.5 mt-3">
+                        <template x-for="(page, index) in libraryPages" :key="index">
+                            <div 
+                                @click="goToPage(index)"
+                                :class="currentPage === index ? 'active' : ''"
+                                class="page-indicator cursor-pointer"
+                            ></div>
+                                        </template>
+                    </div>
+                </div>
+            </section>
             
+            <!-- ============================================ -->
+            <!-- RECOMMENDATIONS DIVIDER -->
+            <!-- ============================================ -->
+            <div x-show="!searchQuery && !libraryLoading && (hardcoverTrending.length > 0 || hardcoverRecentReleases.length > 0)" 
+                 class="px-3 py-4">
+                <div class="divider-text">
+                    <i class="bi bi-stars"></i>
+                    Discover from Hardcover
+                            </div>
+                                            </div>
+
+            <!-- Recent Releases Section -->
+            <section x-show="!searchQuery && !libraryLoading && hardcoverRecentReleases.length > 0" class="px-3 pb-4">
+                <div class="section-header">
+                    <h2 class="section-title">Recent Releases</h2>
+                    <button @click="openBookshelf('recent', 'Recent Releases')" class="p-1.5 -mr-1.5 text-ink-400 hover:text-ink-600 transition-colors">
+                        <i class="bi bi-chevron-right text-lg"></i>
+                        </button>
+                                        </div>
+                <div class="scroll-section">
+                    <template x-for="book in hardcoverRecentReleases" :key="book.id">
+                        <div @click="openHardcoverModal(book)" class="hc-book-card cursor-pointer">
+                            <div class="book-cover relative">
+                                <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                <!-- Overlay badge for library -->
+                                <span x-show="book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <i class="bi bi-check-lg text-white text-xs"></i>
+                                </span>
+                                <!-- Overlay badge for requested -->
+                                <span x-show="book.requested && !book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <i class="bi bi-download text-white text-xs"></i>
+                                </span>
+                                            </div>
+                            <h3 class="mt-1.5 text-xs font-semibold text-ink-800 line-clamp-2 leading-tight" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
+                                    </div>
+                                </template>
+                            </div>
+            </section>
+            
+            <!-- Most Popular Releases from 2025 Section -->
+            <section x-show="!searchQuery && !libraryLoading && hardcoverTrendingMonth.length > 0" class="px-3 pb-4">
+                <div class="section-header">
+                    <h2 class="section-title">Most popular releases from 2025</h2>
+                    <button @click="openBookshelf('trending-month', 'Most popular releases from 2025')" class="p-1.5 -mr-1.5 text-ink-400 hover:text-ink-600 transition-colors">
+                        <i class="bi bi-chevron-right text-lg"></i>
+                    </button>
+                        </div>
+                <div class="scroll-section">
+                    <template x-for="book in hardcoverTrendingMonth" :key="book.id">
+                        <div @click="openHardcoverModal(book)" class="hc-book-card cursor-pointer">
+                            <div class="book-cover relative">
+                                <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                     @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                <!-- Overlay badge for library -->
+                                <span x-show="book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <i class="bi bi-check-lg text-white text-xs"></i>
+                                </span>
+                                <!-- Overlay badge for requested -->
+                                <span x-show="book.requested && !book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <i class="bi bi-download text-white text-xs"></i>
+                                </span>
+                </div>
+                            <h3 class="mt-1.5 text-xs font-semibold text-ink-900 line-clamp-2 leading-tight" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
+                </div>
+                    </template>
+            </div>
+            </section>
+            
+            <!-- Curated Lists from @hardcover -->
+            <template x-for="section in hardcoverSections" :key="section.id">
+                <section x-show="!searchQuery && !libraryLoading && section.books.length > 0" class="px-3 pb-4">
+                    <div class="section-header">
+                        <h2 class="section-title" x-text="section.name"></h2>
+                        <button @click="openBookshelf('list-' + section.id, section.name)" class="p-1.5 -mr-1.5 text-ink-400 hover:text-ink-600 transition-colors">
+                            <i class="bi bi-chevron-right text-lg"></i>
+                        </button>
+                    </div>
+                    <p x-show="section.description" class="text-ink-500 text-xs mb-2 -mt-1 line-clamp-1" x-text="section.description"></p>
+                    <div class="scroll-section">
+                        <template x-for="book in section.books" :key="book.id">
+                            <div @click="openHardcoverModal(book)" class="hc-book-card cursor-pointer">
+                                <div class="book-cover relative">
+                                    <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                         @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                    <!-- Overlay badge for library -->
+                                    <span x-show="book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                        <i class="bi bi-check-lg text-white text-xs"></i>
+                                    </span>
+                                    <!-- Overlay badge for requested -->
+                                    <span x-show="book.requested && !book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                        <i class="bi bi-download text-white text-xs"></i>
+                                    </span>
+                                    </div>
+                                <h3 class="mt-1.5 text-xs font-semibold text-ink-900 line-clamp-2 leading-tight" x-text="book.title"></h3>
+                                <p class="text-xs text-ink-500 line-clamp-1" x-text="book.author"></p>
+                                </div>
+                                </template>
+                                </div>
+                </section>
+                        </template>
+            
+                <!-- Empty State -->
+            <div x-show="!libraryLoading && books.length === 0 && !searchQuery" class="py-12 px-4 text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                    <i class="bi bi-journal-x text-2xl text-ink-400"></i>
+                    </div>
+                <h3 class="text-lg font-semibold text-ink-700 mb-2">No books found</h3>
+                <p class="text-ink-500 text-sm max-w-xs mx-auto">Your Calibre library appears to be empty. Add some books to get started!</p>
+                </div>
+
+
         </main>
-    </div>
-    
-    <!-- Book Detail Modal (Local Library) -->
-    <div x-show="selectedBook" x-cloak @click.self="selectedBook = null" 
-         class="fixed inset-0 z-50 modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div x-show="selectedBook" x-transition:enter="slide-up" 
-             class="bg-white w-full sm:max-w-lg sm:rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <!-- Cover Image -->
-            <div class="relative h-64 sm:h-72 bg-gradient-to-b from-ink-200 to-ink-100">
-                <img :src="`/api/cover/${selectedBook?.id}`" :alt="selectedBook?.title" 
-                     class="w-full h-full object-contain">
-                <button @click="selectedBook = null" 
-                        class="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-lg">
-                    <i data-lucide="x" class="w-5 h-5 text-ink-600"></i>
+        
+        <!-- Footer with Settings Link -->
+        <footer x-show="!showSetup && !searchQuery" class="py-4 px-3 border-t border-ink-200 bg-ink-50">
+            <div class="max-w-7xl mx-auto flex items-center justify-center">
+                <button 
+                    @click="showSettings = true; hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" 
+                    class="text-sm text-ink-500 hover:text-ink-700 transition-colors flex items-center gap-2"
+                >
+                    <i class="bi bi-gear"></i>
+                    <span>Settings</span>
                 </button>
             </div>
+        </footer>
+    </div>
+
+    <!-- Book Detail Modal (Local Library) -->
+    <div x-show="selectedBook" x-cloak @click.self="closeBookModal()" 
+         class="fixed inset-0 z-[60] modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div x-show="selectedBook" x-transition:enter="slide-up" 
+             class="bg-ink-100 w-full sm:max-w-[720px] sm:rounded-2xl rounded-t-[20px] max-h-[90vh] flex flex-col shadow-2xl border border-ink-200">
             
-            <!-- Book Info -->
-            <div class="p-6 space-y-4">
-                <div>
-                    <h2 class="font-display text-2xl font-bold text-ink-900" x-text="selectedBook?.title"></h2>
-                    <p class="text-ink-600 mt-1" x-text="Array.isArray(selectedBook?.authors) ? selectedBook?.authors.join(', ') : selectedBook?.authors"></p>
-                </div>
-                
-                <!-- Meta Info -->
-                <div class="flex flex-wrap gap-2">
-                    <span x-show="selectedBook?.publisher" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="selectedBook?.publisher"></span>
-                    <span x-show="selectedBook?.pubdate" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="selectedBook?.pubdate ? new Date(selectedBook.pubdate).getFullYear() : ''"></span>
-                    <template x-for="format in (selectedBook?.formats || [])" :key="format">
-                        <span class="px-3 py-1 bg-ocean-100 text-ocean-700 rounded-full text-xs font-semibold" x-text="format"></span>
-                    </template>
-                </div>
-                
-                <!-- Series -->
-                <p x-show="selectedBook?.series" class="text-sm text-ink-500">
-                    Part of <span class="font-semibold" x-text="selectedBook?.series"></span>
-                    <span x-show="selectedBook?.series_index" x-text="` (#${selectedBook?.series_index})`"></span>
-                </p>
-                
-                <!-- Description -->
-                <div x-show="selectedBook?.comments" class="prose prose-sm text-ink-600 max-h-40 overflow-y-auto" x-html="selectedBook?.comments"></div>
-                
-                <!-- Tags -->
-                <div x-show="selectedBook?.tags?.length" class="flex flex-wrap gap-2">
-                    <template x-for="tag in (selectedBook?.tags || [])" :key="tag">
-                        <span class="px-2 py-1 bg-sage-100 text-sage-700 rounded text-xs" x-text="tag"></span>
-                    </template>
-                </div>
-                
-                <!-- Actions -->
-                <div class="flex gap-3 pt-4">
-                    <template x-for="format in (selectedBook?.formats || [])" :key="format">
-                        <a :href="`/api/download/${selectedBook?.id}/${format}`" 
-                           class="btn btn-primary flex-1">
-                            <i data-lucide="download" class="w-4 h-4"></i>
-                            <span x-text="format"></span>
-                        </a>
-                    </template>
+            <!-- Sticky Header -->
+            <div class="flex justify-between items-center p-4 border-b border-ink-100 sticky top-0 bg-white z-10 rounded-t-[20px] sm:rounded-t-2xl">
+                <strong class="text-ink-900 font-semibold">Book Details</strong>
+                <div class="flex gap-2">
+                    <button @click="enterEditMode()" title="Edit" class="p-2 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center">
+                        <i class="bi bi-pencil text-ink-600"></i>
+                                        </button>
+                    <button x-show="selectedBookiTunesMatch" @click="updateMetadataFromiTunes()" :disabled="updatingMetadata" title="Update from iTunes" class="p-2 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center">
+                        <i class="bi bi-search text-ink-600"></i>
+                                        </button>
+                    <button @click="closeBookModal()" title="Close" class="p-2 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center">
+                        <i class="bi bi-x-lg text-ink-600"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+            <!-- Scrollable Body -->
+            <div class="flex-1 overflow-y-auto p-5">
+                <!-- View Mode -->
+                <div x-show="!isEditMode" class="sm:grid sm:grid-cols-[180px_1fr] sm:gap-6">
+                                    <!-- Cover -->
+                    <div class="mb-5 sm:mb-0">
+                        <img :src="`/api/cover/${selectedBook?.id}?v=${coverVersion}`" :alt="selectedBook?.title" 
+                             class="w-full max-w-[180px] mx-auto sm:mx-0 block rounded-xl shadow-lg">
+                                    </div>
+
+                    <!-- Content -->
+                    <div class="space-y-3">
+                                        <div>
+                            <h1 class="text-[22px] font-semibold text-ink-900 mb-1" x-text="selectedBook?.title"></h1>
+                            <div class="text-base text-ink-600" x-text="formatAuthors(selectedBook?.authors)"></div>
+                            <div x-show="selectedBook?.pubdate" class="text-sm text-ink-500 mt-0.5" x-text="selectedBook?.pubdate ? new Date(selectedBook.pubdate).getFullYear() : ''"></div>
+                                        </div>
+
+                        <!-- Description -->
+                        <div x-show="selectedBook?.comments" class="text-[15px] leading-relaxed text-ink-700" x-html="selectedBook?.comments"></div>
+
+                        <!-- Tags/Genres -->
+                        <div x-show="selectedBook?.tags?.length" class="flex flex-wrap gap-1.5 pt-2">
+                            <template x-for="tag in (selectedBook?.tags || [])" :key="tag">
+                                <span class="px-3.5 py-1.5 bg-primary-50 text-primary-600 border border-primary-200 rounded-full text-xs" x-text="tag"></span>
+                            </template>
+                                        </div>
+
+                        <!-- Series -->
+                        <div x-show="selectedBook?.series" class="text-sm text-ink-500 pt-2">
+                            <span class="font-semibold">Series:</span> <span x-text="selectedBook?.series"></span><span x-show="selectedBook?.series_index" x-text="` (#${selectedBook?.series_index})`"></span>
+                                            </div>
+
+                        <!-- Publisher -->
+                        <div x-show="selectedBook?.publisher" class="text-sm text-ink-500">
+                            <span class="font-semibold">Publisher:</span> <span x-text="selectedBook?.publisher"></span>
+                                        </div>
+
+                        <!-- Formats -->
+                        <div x-show="selectedBook?.formats?.length" class="text-sm text-ink-500">
+                            <span class="font-semibold">Formats:</span> 
+                            <template x-for="(format, index) in (selectedBook?.formats || [])" :key="format">
+                                <span><span x-text="format"></span><span x-show="index < selectedBook.formats.length - 1">, </span></span>
+                                                </template>
+                                        </div>
+                                    </div>
+                                </div>
+
+                <!-- Edit Mode -->
+                <div x-show="isEditMode" class="sm:grid sm:grid-cols-[180px_1fr] sm:gap-6">
+                    <!-- Cover Upload -->
+                    <div class="mb-5 sm:mb-0">
+                        <label 
+                            @drop.prevent="handleCoverUpload($event)" 
+                                                     @dragover.prevent
+                            class="block cursor-pointer group">
+                            <input type="file" accept="image/*" @change="handleCoverUpload($event)" class="hidden" />
+                            <div class="relative">
+                                <img :src="editingBook?.coverPreview" :alt="editingBook?.title" 
+                                     class="w-full max-w-[180px] mx-auto sm:mx-0 block rounded-xl shadow-lg group-hover:opacity-75 transition-opacity">
+                                <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div class="bg-ink-900/75 text-white px-3 py-2 rounded-lg text-sm">
+                                        <i class="bi bi-upload"></i> Change Cover
+                                                    </div>
+                                                    </div>
+                                                </div>
+                            <div class="text-xs text-ink-500 text-center mt-2">Drag & drop or tap to upload</div>
+                        </label>
+                                        </div>
+
+                    <!-- Edit Form -->
+                    <div class="space-y-4">
+                                            <!-- Title -->
+                                            <div>
+                            <label class="block text-sm font-semibold text-ink-700 mb-1">Title</label>
+                            <input type="text" x-model="editingBook.title" 
+                                   class="w-full px-3 py-2 border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ocean-500">
+                                            </div>
+
+                                            <!-- Author -->
+                        <div class="relative">
+                            <label class="block text-sm font-semibold text-ink-700 mb-1">Author</label>
+                            <input type="text" x-model="editingBook.authors" 
+                                   @input="filterAuthorSuggestions()"
+                                   @focus="filterAuthorSuggestions()"
+                                   @blur="setTimeout(() => showAuthorSuggestions = false, 200)"
+                                   class="w-full px-3 py-2 border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ocean-500">
+                            <div x-show="showAuthorSuggestions" class="absolute z-20 w-full mt-1 bg-white border border-ink-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                <template x-for="author in authorSuggestions" :key="author">
+                                    <button @click="selectAuthor(author)" 
+                                            class="w-full px-3 py-2 text-left hover:bg-ink-50 text-sm text-ink-700">
+                                        <span x-text="author"></span>
+                                    </button>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                        <!-- Year -->
+                                                <div>
+                            <label class="block text-sm font-semibold text-ink-700 mb-1">Year</label>
+                            <input type="text" x-model="editingBook.year" placeholder="2024"
+                                   class="w-full px-3 py-2 border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ocean-500">
+                                                </div>
+
+                        <!-- Tags/Genres -->
+                        <div class="relative">
+                            <label class="block text-sm font-semibold text-ink-700 mb-1">Genres (comma-separated)</label>
+                            <input type="text" x-model="editingBook.tags" 
+                                   @input="filterTagSuggestions()"
+                                   @focus="filterTagSuggestions()"
+                                   @blur="setTimeout(() => showTagSuggestions = false, 200)"
+                                   placeholder="Science Fiction, Fantasy, Adventure"
+                                   class="w-full px-3 py-2 border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ocean-500">
+                            <div x-show="showTagSuggestions" class="absolute z-20 w-full mt-1 bg-white border border-ink-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                <template x-for="tag in tagSuggestions" :key="tag">
+                                    <button @click="selectTag(tag)" 
+                                            class="w-full px-3 py-2 text-left hover:bg-ink-50 text-sm text-ink-700">
+                                        <span x-text="tag"></span>
+                                            </button>
+                                                        </template>
+                                                </div>
+                                            </div>
+
+                                            <!-- Description -->
+                                            <div>
+                            <label class="block text-sm font-semibold text-ink-700 mb-1">Description</label>
+                            <textarea x-model="editingBook.comments" rows="6"
+                                      class="w-full px-3 py-2 border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ocean-500 resize-none"></textarea>
+                                            </div>
                 </div>
             </div>
         </div>
-    </div>
-    
+
+            <!-- Sticky Footer -->
+            <div class="p-4 border-t border-ink-200 sticky bottom-0 bg-ink-100">
+                <!-- Edit Mode Footer -->
+                <template x-if="isEditMode">
+                                    <div class="flex gap-2">
+                        <button @click="exitEditMode()" class="btn btn-secondary flex-1 py-3.5 justify-center">
+                            Cancel
+                        </button>
+                        <button @click="saveEditedMetadata()" class="btn btn-primary flex-1 py-3.5 justify-center">
+                            <i class="bi bi-check-lg"></i>
+                            Save Changes
+                                        </button>
+                                    </div>
+                </template>
+                
+                <!-- View Mode Footer -->
+                <template x-if="!isEditMode">
+                    <button 
+                        @click="toggleReadingListFromLibrary()" 
+                        class="w-full btn btn-primary py-3.5 justify-center"
+                    >
+                        <template x-if="isInReadingList(selectedBook?.id) && readingListStatus === 'remove'">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="bi bi-bookmark-dash"></i>
+                                Remove from Reading List
+                                        </span>
+                                                </template>
+                        <template x-if="isInReadingList(selectedBook?.id) && readingListStatus !== 'remove'">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="bi bi-check-lg"></i>
+                                Added!
+                                        </span>
+                        </template>
+                        <template x-if="!isInReadingList(selectedBook?.id)">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="bi bi-bookmark-plus"></i>
+                                Add to Reading List
+                            </span>
+                                                </template>
+                                            </button>
+                </template>
+                                        </div>
+                                        </div>
+                                    </div>
+
     <!-- Hardcover Book Modal -->
     <div x-show="selectedHardcoverBook" x-cloak @click.self="selectedHardcoverBook = null" 
-         class="fixed inset-0 z-50 modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
+         class="fixed inset-0 z-[60] modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
         <div x-show="selectedHardcoverBook" x-transition:enter="slide-up" 
-             class="bg-white w-full sm:max-w-lg sm:rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <!-- Cover Image -->
-            <div class="relative h-64 sm:h-72 bg-gradient-to-b from-ink-200 to-ink-100">
-                <img :src="selectedHardcoverBook?.image" :alt="selectedHardcoverBook?.title" 
-                     class="w-full h-full object-contain">
-                <button @click="selectedHardcoverBook = null" 
-                        class="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-lg">
-                    <i data-lucide="x" class="w-5 h-5 text-ink-600"></i>
-                </button>
-                <!-- Status Badge -->
-                <div class="absolute top-4 left-4">
-                    <span x-show="selectedHardcoverBook?.inLibrary" class="badge badge-library">
-                        <i data-lucide="check" class="w-3 h-3"></i>
-                        In Library
-                    </span>
-                    <span x-show="selectedHardcoverBook?.requested && !selectedHardcoverBook?.inLibrary" class="badge badge-requested">
-                        <i data-lucide="clock" class="w-3 h-3"></i>
-                        Requested
-                    </span>
-                </div>
-            </div>
+             class="bg-ink-100 w-full sm:max-w-[720px] sm:rounded-2xl rounded-t-[20px] max-h-[90vh] flex flex-col shadow-2xl border border-ink-200">
             
-            <!-- Book Info -->
-            <div class="p-6 space-y-4">
-                <div>
-                    <h2 class="font-display text-2xl font-bold text-ink-900" x-text="selectedHardcoverBook?.title"></h2>
-                    <p class="text-ink-600 mt-1" x-text="selectedHardcoverBook?.author"></p>
-                </div>
-                
-                <!-- Rating -->
-                <div x-show="selectedHardcoverBook?.rating" class="flex items-center gap-2">
-                    <div class="rating">
-                        <template x-for="i in 5" :key="i">
-                            <i data-lucide="star" 
-                               :class="i <= Math.round(selectedHardcoverBook?.rating) ? 'text-amber-400 fill-amber-400' : 'text-ink-200'"
-                               class="w-4 h-4"></i>
-                        </template>
-                    </div>
-                    <span class="text-sm text-ink-500" x-text="`${selectedHardcoverBook?.rating?.toFixed(1)} (${selectedHardcoverBook?.ratings_count} ratings)`"></span>
-                </div>
-                
-                <!-- Meta Info -->
-                <div class="flex flex-wrap gap-2">
-                    <span x-show="selectedHardcoverBook?.publisher" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="selectedHardcoverBook?.publisher"></span>
-                    <span x-show="selectedHardcoverBook?.year" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="selectedHardcoverBook?.year"></span>
-                    <span x-show="selectedHardcoverBook?.pages" class="px-3 py-1 bg-ink-100 rounded-full text-xs text-ink-600" x-text="`${selectedHardcoverBook?.pages} pages`"></span>
-                </div>
-                
-                <!-- Description -->
-                <div x-show="selectedHardcoverBook?.description" class="prose prose-sm text-ink-600 max-h-40 overflow-y-auto" x-html="selectedHardcoverBook?.description"></div>
-                
-                <!-- Genres -->
-                <div x-show="selectedHardcoverBook?.genres?.length" class="flex flex-wrap gap-2">
-                    <template x-for="genre in (selectedHardcoverBook?.genres || [])" :key="genre">
-                        <span class="px-2 py-1 bg-sage-100 text-sage-700 rounded text-xs" x-text="genre"></span>
-                    </template>
-                </div>
-                
-                <!-- Actions -->
-                <div class="flex gap-3 pt-4">
-                    <template x-if="selectedHardcoverBook?.inLibrary">
-                        <button @click="viewInLibrary(selectedHardcoverBook)" class="btn btn-secondary flex-1">
-                            <i data-lucide="book-open" class="w-4 h-4"></i>
-                            View in Library
-                        </button>
-                    </template>
-                    <template x-if="!selectedHardcoverBook?.inLibrary && !selectedHardcoverBook?.requested">
-                        <button @click="requestBook(selectedHardcoverBook)" class="btn btn-primary flex-1">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                            Request This Book
-                        </button>
-                    </template>
-                    <template x-if="selectedHardcoverBook?.requested && !selectedHardcoverBook?.inLibrary">
-                        <button @click="cancelRequest(selectedHardcoverBook)" class="btn btn-secondary flex-1">
-                            <i data-lucide="x" class="w-4 h-4"></i>
-                            Cancel Request
-                        </button>
-                    </template>
-                    <a :href="`https://hardcover.app/books/${selectedHardcoverBook?.slug}`" 
-                       target="_blank"
-                       class="btn btn-secondary">
-                        <i data-lucide="external-link" class="w-4 h-4"></i>
-                    </a>
+            <!-- Sticky Header -->
+            <div class="flex justify-between items-center p-4 border-b border-ink-100 sticky top-0 bg-white z-10 rounded-t-[20px] sm:rounded-t-2xl">
+                                <div class="flex items-center gap-2">
+                    <strong class="text-ink-900 font-semibold">Book Details</strong>
+                    <span x-show="selectedHardcoverBook?.inLibrary" class="px-2 py-0.5 bg-accent-100 text-accent-700 rounded text-xs font-semibold">
+                        <i class="bi bi-check-lg"></i> In Library
+                                        </span>
+                    <span x-show="selectedHardcoverBook?.requested && !selectedHardcoverBook?.inLibrary" class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-semibold">
+                        <i class="bi bi-clock"></i> Requested
+                                        </span>
+                                    </div>
+                <button @click="selectedHardcoverBook = null" title="Close" class="p-2 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="bi bi-x-lg text-ink-600"></i>
+                                </button>
+                                </div>
+
+            <!-- Scrollable Body -->
+            <div class="flex-1 overflow-y-auto p-5">
+                <div class="sm:grid sm:grid-cols-[180px_1fr] sm:gap-6">
+                                <!-- Cover -->
+                    <div class="mb-5 sm:mb-0">
+                        <img :src="selectedHardcoverBook?.image" :alt="selectedHardcoverBook?.title" 
+                             class="w-full max-w-[180px] mx-auto sm:mx-0 block rounded-xl shadow-lg">
+                            </div>
+
+                    <!-- Content -->
+                    <div class="space-y-3">
+                            <div>
+                            <h1 class="text-[22px] font-semibold text-ink-900 mb-1" x-text="selectedHardcoverBook?.title"></h1>
+                            <div class="text-base text-ink-600" x-text="selectedHardcoverBook?.author"></div>
+                            <div x-show="selectedHardcoverBook?.year" class="text-sm text-ink-500 mt-0.5" x-text="selectedHardcoverBook?.year"></div>
+                                    </div>
+
+                                    <!-- Rating -->
+                        <div x-show="selectedHardcoverBook?.rating" class="flex items-center gap-2">
+                            <div class="rating flex">
+                                        <template x-for="i in 5" :key="i">
+                                    <i class="bi bi-star-fill text-sm" 
+                                       :class="i <= Math.round(selectedHardcoverBook?.rating) ? 'text-amber-400' : 'text-ink-200'"></i>
+                                        </template>
+                                </div>
+                            <span class="text-xs text-ink-500" x-text="`${selectedHardcoverBook?.rating?.toFixed(1)} (${selectedHardcoverBook?.ratings_count} ratings)`"></span>
+                            </div>
+
+                        <!-- Description -->
+                        <div x-show="selectedHardcoverBook?.description" class="text-[15px] leading-relaxed text-ink-700" x-html="selectedHardcoverBook?.description"></div>
+
+                        <!-- Pages -->
+                        <div x-show="selectedHardcoverBook?.pages" class="text-sm text-ink-500">
+                            <span class="font-semibold">Pages:</span> <span x-text="selectedHardcoverBook?.pages"></span>
                 </div>
             </div>
         </div>
     </div>
-    
+
+            <!-- Sticky Footer -->
+            <div class="p-4 border-t border-ink-200 sticky bottom-0 bg-ink-100">
+                <template x-if="selectedHardcoverBook?.inLibrary">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button @click="viewInLibrary(selectedHardcoverBook)" class="w-full btn btn-secondary py-3.5 justify-center">
+                            <i class="bi bi-book"></i>
+                            View in Library
+                                            </button>
+                        <button @click="addLibraryBookToReadingList(selectedHardcoverBook)" class="w-full btn btn-primary py-3.5 justify-center">
+                            <i class="bi bi-bookmark-plus"></i>
+                            Add to Reading List
+                        </button>
+                                </div>
+                                        </template>
+                <template x-if="!selectedHardcoverBook?.inLibrary && !selectedHardcoverBook?.requested">
+                    <button @click="requestBookAndClose()" class="w-full btn btn-primary py-3.5 justify-center">
+                        <i class="bi bi-plus-lg"></i>
+                        Request This Book
+                                            </button>
+                                        </template>
+                <template x-if="selectedHardcoverBook?.requested && !selectedHardcoverBook?.inLibrary">
+                    <button @click="cancelRequest(selectedHardcoverBook)" class="w-full btn btn-secondary py-3.5 justify-center">
+                                    <i class="bi bi-x-lg"></i>
+                        Cancel Request
+                                </button>
+                                        </template>
+                            </div>
+                                    </div>
+                                    </div>
+
     <!-- Settings Modal -->
     <div x-show="showSettings" x-cloak @click.self="showSettings = false" 
-         class="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-4">
-        <div x-show="showSettings" x-transition class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
-            <div class="p-6 border-b border-ink-100 flex items-center justify-between">
-                <h2 class="font-display text-xl font-bold text-ink-900">Settings</h2>
-                <button @click="showSettings = false" class="p-2 hover:bg-ink-100 rounded-lg transition-colors">
-                    <i data-lucide="x" class="w-5 h-5 text-ink-500"></i>
+         class="fixed inset-0 z-[60] modal-overlay flex items-center justify-center p-4">
+        <div x-show="showSettings" x-transition class="bg-ink-100 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-ink-100 flex items-center justify-between">
+                <h2 class="font-display text-lg font-bold text-ink-900">Settings</h2>
+                <button @click="showSettings = false" class="p-2 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="bi bi-x-lg text-ink-500"></i>
                 </button>
-            </div>
-            
-            <div class="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+                                </div>
+
+            <div class="p-5 space-y-5 max-h-[60vh] overflow-y-auto">
+                <!-- Hardcover API -->
+                <div>
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">Hardcover API Key</label>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl">
+                            <i class="bi bi-key text-ink-400"></i>
+                            <input type="password" 
+                                   x-model="hardcoverApiKeyInput"
+                                   placeholder="Enter your Hardcover API key"
+                                   class="flex-1 bg-transparent border-none outline-none text-sm text-ink-700 placeholder-ink-400">
+                            <span x-show="hardcoverToken" class="w-2 h-2 bg-green-500 rounded-full"></span>
+                        </div>
+                        <button @click="validateHardcoverKey()" 
+                                :disabled="validatingApiKey || !hardcoverApiKeyInput.trim()"
+                                class="w-full px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-semibold">
+                            <span x-show="!validatingApiKey">Save Hardcover API Key</span>
+                            <span x-show="validatingApiKey">Validating...</span>
+                        </button>
+                        <p x-show="apiKeyError" class="text-xs text-red-600" x-text="apiKeyError"></p>
+                        <p x-show="apiKeySuccess" class="text-xs text-green-600">API key saved successfully!</p>
+                    </div>
+                </div>
+
                 <!-- Calibre Library -->
                 <div>
                     <label class="block text-sm font-semibold text-ink-700 mb-2">Calibre Library</label>
                     <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl">
-                        <i data-lucide="database" class="w-5 h-5 text-ink-400"></i>
+                        <i class="bi bi-database text-ink-400"></i>
                         <span class="text-sm text-ink-600 truncate flex-1" x-text="calibreLibraryPath || 'Not configured'"></span>
+                        <span x-show="calibreLibraryPath" class="w-2 h-2 bg-green-500 rounded-full"></span>
                         <button @click="showSetup = true; setupStep = 2; showSettings = false; openBrowser()" 
-                                class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold">
-                            Change
+                                class="text-primary-600 hover:text-primary-700 text-sm font-semibold">
+                            <span x-text="calibreLibraryPath ? 'Change' : 'Configure'"></span>
                         </button>
                     </div>
                 </div>
-                
-                <!-- Hardcover API -->
+
+                <!-- Prowlarr (Optional) -->
                 <div>
-                    <label class="block text-sm font-semibold text-ink-700 mb-2">Hardcover API</label>
-                    <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl">
-                        <i data-lucide="key" class="w-5 h-5 text-ink-400"></i>
-                        <span class="text-sm text-ink-600 flex-1" x-text="hardcoverToken ? 'Connected' : 'Not configured'"></span>
-                        <span x-show="hardcoverToken" class="w-2 h-2 bg-green-500 rounded-full"></span>
-                        <button @click="showSetup = true; setupStep = 1; showSettings = false" 
-                                class="text-ocean-600 hover:text-ocean-700 text-sm font-semibold">
-                            Change
+                    <label class="block text-sm font-semibold text-ink-700 mb-2">
+                        Prowlarr
+                        <span class="text-xs font-normal text-ink-400">(Optional)</span>
+                    </label>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl">
+                            <i class="bi bi-link-45deg text-ink-400"></i>
+                            <input type="text" 
+                                   x-model="prowlarrUrlInput"
+                                   placeholder="Prowlarr URL (e.g., http://localhost:9696)"
+                                   class="flex-1 bg-transparent border-none outline-none text-sm text-ink-700 placeholder-ink-400">
+                        </div>
+                        <div class="flex items-center gap-2 p-3 bg-ink-50 rounded-xl">
+                            <i class="bi bi-key text-ink-400"></i>
+                            <input type="password" 
+                                   x-model="prowlarrApiKeyInput"
+                                   placeholder="Prowlarr API Key"
+                                   class="flex-1 bg-transparent border-none outline-none text-sm text-ink-700 placeholder-ink-400">
+                            <span x-show="prowlarrUrl && prowlarrApiKey" class="w-2 h-2 bg-green-500 rounded-full"></span>
+                        </div>
+                        <button @click="validateProwlarr()" 
+                                :disabled="validatingProwlarr || !prowlarrUrlInput.trim() || !prowlarrApiKeyInput.trim()"
+                                class="w-full px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-semibold">
+                            <span x-show="!validatingProwlarr">Save Prowlarr Settings</span>
+                            <span x-show="validatingProwlarr">Validating...</span>
                         </button>
+                        <p x-show="prowlarrError" class="text-xs text-red-600" x-text="prowlarrError"></p>
+                        <p x-show="prowlarrSuccess" class="text-xs text-green-600">Prowlarr configured successfully!</p>
                     </div>
                 </div>
-                
+
                 <!-- Requests -->
-                <div>
+                                <div>
                     <label class="block text-sm font-semibold text-ink-700 mb-2">
                         Book Requests 
                         <span class="text-ink-400 font-normal" x-text="`(${requestedBooks.length})`"></span>
-                    </label>
+                                    </label>
                     <div x-show="requestedBooks.length === 0" class="p-4 bg-ink-50 rounded-xl text-center text-ink-500 text-sm">
                         No pending requests
-                    </div>
-                    <div x-show="requestedBooks.length > 0" class="space-y-2 max-h-48 overflow-y-auto">
+                                    </div>
+                    <div x-show="requestedBooks.length > 0" class="space-y-2 max-h-40 overflow-y-auto">
                         <template x-for="book in requestedBooks" :key="book.id">
                             <div class="flex items-center gap-3 p-3 bg-ink-50 rounded-xl">
-                                <img :src="book.image" class="w-10 h-14 rounded object-cover">
+                                <img :src="book.image" class="w-8 h-12 rounded object-cover">
                                 <div class="flex-1 min-w-0">
                                     <p class="text-sm font-semibold text-ink-800 truncate" x-text="book.title"></p>
                                     <p class="text-xs text-ink-500 truncate" x-text="book.author"></p>
-                                </div>
+                                        </div>
                                 <button @click="cancelRequest(book)" class="p-1.5 hover:bg-ink-200 rounded-lg transition-colors">
-                                    <i data-lucide="x" class="w-4 h-4 text-ink-400"></i>
-                                </button>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-                
+                                    <i class="bi bi-x-lg text-ink-400"></i>
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+
                 <!-- About -->
                 <div class="pt-4 border-t border-ink-100">
                     <p class="text-xs text-ink-400 text-center">
-                        Folio • Your Personal Library Manager<br>
-                        Powered by <a href="https://hardcover.app" target="_blank" class="text-ocean-600 hover:underline">Hardcover.app</a>
+                        folio • Your Personal Library Manager<br>
+                        Powered by <a href="https://hardcover.app" target="_blank" class="text-primary-600 hover:text-primary-700 hover:underline">Hardcover.app</a>
                     </p>
+                            </div>
+                        </div>
                 </div>
+            </div>
+
+    <!-- Requests View (List format) -->
+    <div x-show="showRequests" x-cloak class="fixed inset-0 z-50 bg-ink-50">
+        <!-- Header -->
+        <div class="sticky top-0 z-10 glass border-b border-ink-200 safe-area-top">
+            <div class="flex items-center h-12 px-3">
+                <button @click="closeRequests()" class="p-2 -ml-2 text-ink-600 hover:text-ink-800 transition-colors">
+                    <i class="bi bi-arrow-left text-lg"></i>
+                </button>
+                <h1 class="flex-1 text-center font-display text-base font-semibold text-ink-800 truncate px-4">Book Requests</h1>
+                <div class="w-8"></div>
+        </div>
+    </div>
+
+        <!-- Requests List -->
+        <div class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 48px);">
+            <!-- Empty State -->
+            <div x-show="requestedBooks.length === 0" class="py-12 text-center">
+                <i class="bi bi-inbox text-4xl text-ink-300 mb-3"></i>
+                <p class="text-ink-500 text-sm">No book requests yet</p>
+                            </div>
+
+            <!-- Requests List -->
+            <div x-show="requestedBooks.length > 0" class="space-y-3">
+                <template x-for="book in requestedBooks" :key="book.id">
+                    <div class="flex items-center gap-3 p-3 bg-white border border-ink-200 rounded-xl hover:border-ink-300 transition-colors">
+                        <!-- Cover -->
+                        <img 
+                            :src="book.image" 
+                            :alt="book.title" 
+                            class="w-16 h-24 object-cover rounded-lg flex-shrink-0"
+                            @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'"
+                        >
+                        
+                        <!-- Details -->
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-semibold text-ink-900 line-clamp-2 mb-1" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-600 mb-1" x-text="book.author || 'Unknown Author'"></p>
+                            <p class="text-xs text-ink-400" x-text="formatRequestDate(book.requested_at)"></p>
+                                        </div>
+                        
+                        <!-- Search Button -->
+                        <button 
+                            @click="searchProwlarr(book)"
+                            :disabled="!prowlarrUrl || !prowlarrApiKey"
+                            class="px-4 py-2 bg-coral-500 hover:bg-coral-600 disabled:bg-ink-200 disabled:text-ink-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 flex-shrink-0"
+                            title="Search in Prowlarr"
+                        >
+                            <i class="bi bi-search"></i>
+                            <span class="hidden sm:inline">Search</span>
+                                        </button>
+                                    </div>
+                                </template>
             </div>
         </div>
     </div>
-    
-    <!-- Initialize Lucide Icons -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            lucide.createIcons();
-        });
-        
-        // Re-initialize icons when Alpine updates DOM
-        document.addEventListener('alpine:initialized', () => {
-            // Watch for DOM changes
-            const observer = new MutationObserver(() => {
-                lucide.createIcons();
-            });
-            observer.observe(document.body, { childList: true, subtree: true });
-        });
-    </script>
-    
+
+    <!-- Bookshelf View (Full page grid of books) -->
+    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-50 bg-white">
+        <!-- Header -->
+        <div class="sticky top-0 z-10 glass border-b border-ink-200 safe-area-top">
+            <div class="flex items-center h-12 px-3">
+                <button @click="closeBookshelf()" class="p-2 -ml-2 text-ink-600 hover:text-ink-800 transition-colors">
+                    <i class="bi bi-arrow-left text-lg"></i>
+                </button>
+                <h1 class="flex-1 text-center font-display text-base font-semibold text-ink-800 truncate px-4" x-text="bookshelfTitle"></h1>
+                <div class="w-8"></div>
+                                </div>
+                            </div>
+
+        <!-- View Toggle -->
+        <div class="sticky top-12 z-10 bg-white border-b border-ink-200 px-3 py-2">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1 bg-ink-100 rounded-lg p-1">
+                    <button 
+                        @click="bookshelfView = 'list'; currentListPage = 1"
+                        :class="bookshelfView === 'list' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'"
+                        class="p-1.5 rounded transition-colors"
+                        title="List View"
+                    >
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <button 
+                        @click="bookshelfView = 'grid'; currentListPage = 1"
+                        :class="bookshelfView === 'grid' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'"
+                        class="p-1.5 rounded transition-colors"
+                        title="Grid View"
+                    >
+                        <i class="bi bi-grid-3x3-gap"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+        <!-- List View -->
+        <div x-show="bookshelfView === 'list'" class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 96px);">
+            <!-- Pagination Controls -->
+            <div class="flex items-center justify-between mb-4 gap-2">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-ink-600">Books per page:</label>
+                    <select x-model.number="booksPerPage" @change="currentListPage = 1" class="px-3 py-1.5 border border-ink-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500">
+                        <option :value="10">10</option>
+                        <option :value="20">20</option>
+                        <option :value="50">50</option>
+                        <option :value="100">100</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2 text-sm text-ink-600">
+                    <span x-text="`Page ${currentListPage} of ${totalBookshelfPages()}`"></span>
+                    <button @click="prevListPage()" :disabled="currentListPage === 1" 
+                            :class="currentListPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-ink-50'"
+                            class="p-2 rounded-lg transition-colors">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button @click="nextListPage()" :disabled="currentListPage === totalBookshelfPages()" 
+                            :class="currentListPage === totalBookshelfPages() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-ink-50'"
+                            class="p-2 rounded-lg transition-colors">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+            </div>
+        </div>
+
+            <div class="space-y-3">
+                <template x-for="book in paginatedBookshelfBooks()" :key="book.id">
+                    <div class="flex items-center gap-3 p-3 bg-white border border-ink-200 rounded-xl hover:border-ink-300 transition-colors">
+                        <!-- Cover -->
+                        <img 
+                            @click="book.authors ? openBookModal(book) : openHardcoverModal(book)"
+                            :src="book.authors ? `/api/cover/${book.id}?v=${coverVersion}` : book.image" 
+                            :alt="book.title" 
+                            class="w-16 h-24 object-cover rounded-lg flex-shrink-0 cursor-pointer"
+                            @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'"
+                        >
+                        
+                        <!-- Details -->
+                        <div @click="book.authors ? openBookModal(book) : openHardcoverModal(book)" class="flex-1 min-w-0 cursor-pointer">
+                            <h3 class="text-sm font-semibold text-ink-900 line-clamp-2 mb-1" x-text="book.title"></h3>
+                            <p class="text-xs text-ink-600 mb-1" x-text="book.authors ? formatAuthors(book.authors) : (book.author || 'Unknown Author')"></p>
+                            <span x-show="book.inLibrary" class="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                <i class="bi bi-check-lg"></i> In Library
+                            </span>
+                            </div>
+                        </div>
+                </template>
+                            </div>
+                                </div>
+
+        <!-- Grid View -->
+        <div x-show="bookshelfView === 'grid'" class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 96px);">
+            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                <template x-for="book in bookshelfBooks" :key="book.id">
+                    <div @click="book.authors ? openBookModal(book) : openHardcoverModal(book)" class="book-card cursor-pointer">
+                        <div class="book-cover relative">
+                            <img 
+                                :src="book.authors ? `/api/cover/${book.id}?v=${coverVersion}` : book.image" 
+                                :alt="book.title" 
+                                loading="lazy" 
+                                class="w-full h-full object-cover"
+                                @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'"
+                            >
+                            <span x-show="book.inLibrary" class="absolute top-1 right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                <i class="bi bi-check-lg"></i>
+                            </span>
+                                        </div>
+                        <h3 class="mt-1.5 text-xs font-semibold text-ink-800 line-clamp-2 leading-tight" x-text="book.title"></h3>
+                        <p class="text-xs text-ink-500 line-clamp-1" x-text="book.authors ? formatAuthors(book.authors) : (book.author || 'Unknown Author')"></p>
+                                    </div>
+                </template>
+                                </div>
+
+            <!-- Empty State -->
+            <div x-show="bookshelfBooks.length === 0" class="py-12 text-center">
+                <div class="spinner w-6 h-6 mx-auto"></div>
+                <p class="text-ink-500 text-sm mt-3">Loading books...</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+        <!-- Back to top button -->
+        <button 
+            x-show="showBackToTop"
+            @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
+            x-cloak
+            class="fixed bottom-20 right-4 z-50 px-4 py-2 rounded-full shadow-lg bg-primary-600 text-white hover:bg-primary-500 transition flex items-center gap-2"
+        >
+            <i class="bi bi-arrow-up"></i>
+            <span>Back to top</span>
+        </button>
+
+    <!-- Prowlarr Search Modal -->
+    <div x-show="selectedRequestBook" x-cloak @click.self="selectedRequestBook = null; prowlarrSearchResults = []" 
+         class="fixed inset-0 z-[60] modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div x-show="selectedRequestBook" x-transition:enter="slide-up" 
+             class="bg-ink-100 w-full sm:max-w-[720px] sm:rounded-2xl rounded-t-[20px] max-h-[90vh] flex flex-col shadow-2xl border border-ink-200">
+            
+            <!-- Sticky Header -->
+            <div class="flex justify-between items-center p-4 border-b border-ink-100 sticky top-0 bg-white z-10 rounded-t-[20px] sm:rounded-t-2xl">
+                <div>
+                    <h2 class="text-lg font-semibold text-ink-900">Prowlarr Search Results</h2>
+                    <p class="text-sm text-ink-500" x-text="selectedRequestBook?.title"></p>
+                                </div>
+                <button @click="selectedRequestBook = null; prowlarrSearchResults = []" class="p-2 hover:bg-ink-50 rounded-lg transition-colors">
+                    <i class="bi bi-x-lg text-ink-600"></i>
+                </button>
+                            </div>
+
+            <!-- Scrollable Body -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <!-- Loading State -->
+                <div x-show="searchingProwlarr" class="py-8 text-center">
+                    <div class="spinner w-6 h-6 mx-auto"></div>
+                    <p class="text-ink-500 text-sm mt-3">Searching Prowlarr...</p>
+                        </div>
+
+                <!-- Error State -->
+                <div x-show="prowlarrError && !searchingProwlarr" class="p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <p class="text-sm text-red-700" x-text="prowlarrError"></p>
+        </div>
+
+                <!-- No Results -->
+                <div x-show="!searchingProwlarr && !prowlarrError && prowlarrSearchResults.length === 0" class="py-8 text-center">
+                    <i class="bi bi-search text-3xl text-ink-300 mb-3"></i>
+                    <p class="text-ink-500 text-sm">No results found</p>
+                            </div>
+
+                <!-- Results List -->
+                <div x-show="!searchingProwlarr && prowlarrSearchResults.length > 0" class="space-y-3">
+                    <!-- Sort Controls -->
+                    <div class="flex items-center gap-2 mb-3 pb-3 border-b border-ink-200">
+                        <span class="text-xs text-ink-500 font-medium">Sort by:</span>
+                        <button 
+                            @click="changeProwlarrSort('seeders')"
+                            :class="prowlarrSortBy === 'seeders' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
+                        >
+                            <span>Seeders</span>
+                            <i x-show="prowlarrSortBy === 'seeders'" :class="prowlarrSortOrder === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down'" class="bi text-xs"></i>
+                        </button>
+                        <button 
+                            @click="changeProwlarrSort('size')"
+                            :class="prowlarrSortBy === 'size' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
+                        >
+                            <span>Size</span>
+                            <i x-show="prowlarrSortBy === 'size'" :class="prowlarrSortOrder === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down'" class="bi text-xs"></i>
+                        </button>
+                        <button 
+                            @click="changeProwlarrSort('title')"
+                            :class="prowlarrSortBy === 'title' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
+                        >
+                            <span>Title</span>
+                            <i x-show="prowlarrSortBy === 'title'" :class="prowlarrSortOrder === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down'" class="bi text-xs"></i>
+                                        </button>
+                                    </div>
+                    
+                    <template x-for="(result, index) in prowlarrSearchResults" :key="index">
+                        <div class="p-3 border border-ink-200 rounded-xl hover:border-ink-300 transition-colors">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-sm font-medium text-ink-900 mb-1.5 leading-relaxed" x-text="result.title"></h3>
+                                    <p class="text-xs text-ink-500 mb-2" x-text="result.indexer"></p>
+                                    <div class="flex items-center gap-2.5 text-xs text-ink-600 flex-wrap">
+                                        <span x-show="result.size" class="flex items-center gap-1 whitespace-nowrap">
+                                            <i class="bi bi-file-earmark text-ink-400"></i>
+                                            <span x-text="formatFileSize(result.size)"></span>
+                                        </span>
+                                        <span class="flex items-center gap-1 whitespace-nowrap">
+                                            <i class="bi bi-arrow-up-circle text-green-500"></i>
+                                            <span x-text="result.seeders || 0"></span>
+                                        </span>
+                                        <span x-show="result.leechers !== undefined" class="flex items-center gap-1 whitespace-nowrap">
+                                            <i class="bi bi-arrow-down-circle text-ink-400"></i>
+                                            <span x-text="result.leechers"></span>
+                                        </span>
+                                </div>
+                            </div>
+                                <button 
+                                    @click="downloadFromProwlarr(result, selectedRequestBook)"
+                                    class="p-2.5 bg-sage-500 hover:bg-sage-600 text-white rounded-lg transition-colors flex-shrink-0 self-start"
+                                    title="Add to Calibre"
+                                >
+                                    <i class="bi bi-download text-base"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     <!-- App Script -->
     <script src="/js/app.js"></script>
 </body>
