@@ -1421,6 +1421,253 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(400, f"Bad Request: {e}")
             return
 
+        # API: Download from Prowlarr (send to bittorrent client)
+        if self.path == '/api/prowlarr/download':
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length)
+
+            try:
+                data = json.loads(body.decode('utf-8'))
+                guid = data.get('guid')
+                
+                if not guid:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': 'GUID is required'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                prowlarr_url = config.get('prowlarr_url', '').rstrip('/')
+                prowlarr_api_key = config.get('prowlarr_api_key', '')
+                
+                if not prowlarr_url or not prowlarr_api_key:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': 'Prowlarr not configured'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                try:
+                    # Prowlarr command endpoint to send download to bittorrent client
+                    # The DownloadRelease command requires guid parameter
+                    command_url = f"{prowlarr_url}/api/v1/command"
+                    command_payload = json.dumps({
+                        'name': 'DownloadRelease',
+                        'guid': guid
+                    }).encode('utf-8')
+                    
+                    req = urllib.request.Request(command_url, data=command_payload, method='POST')
+                    req.add_header('Content-Type', 'application/json')
+                    req.add_header('X-Api-Key', prowlarr_api_key)
+                    
+                    with urllib.request.urlopen(req) as response:
+                        result = json.loads(response.read().decode('utf-8'))
+                        
+                        # Check if command was successful
+                        if response.status == 201 or response.status == 200:
+                            self.send_response(200)
+                            self.send_header('Content-Type', 'application/json')
+                            self.end_headers()
+                            response = json.dumps({
+                                'success': True,
+                                'message': 'Download sent to bittorrent client successfully'
+                            })
+                            self.wfile.write(response.encode('utf-8'))
+                            print(f"✅ Sent download to Prowlarr: {data.get('title', guid)}")
+                        else:
+                            error_msg = result.get('message', 'Unknown error')
+                            self.send_response(500)
+                            self.send_header('Content-Type', 'application/json')
+                            self.end_headers()
+                            response = json.dumps({'success': False, 'error': f'Prowlarr error: {error_msg}'})
+                            self.wfile.write(response.encode('utf-8'))
+                            
+                except urllib.error.HTTPError as e:
+                    error_body = ''
+                    try:
+                        error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+                        error_data = json.loads(error_body) if error_body else {}
+                        error_msg = error_data.get('message') or error_data.get('error') or error_body or str(e)
+                    except:
+                        error_msg = error_body or str(e)
+                    
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': f'Prowlarr API error: {error_msg}'})
+                    self.wfile.write(response.encode('utf-8'))
+                    print(f"❌ Prowlarr download error: {error_msg}")
+                    
+                except Exception as e:
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': f'Failed to send download: {str(e)}'})
+                    self.wfile.write(response.encode('utf-8'))
+                    print(f"❌ Download error: {e}")
+                    
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Invalid JSON in request body'})
+                self.wfile.write(response.encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': f'Server error: {str(e)}'})
+                self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Bulk delete books from Calibre library
+        if self.path == '/api/books/bulk-delete':
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length)
+
+            try:
+                data = json.loads(body.decode('utf-8'))
+                book_ids = data.get('book_ids', [])
+                
+                if not book_ids or not isinstance(book_ids, list):
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': 'book_ids array is required'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                deleted_count = 0
+                errors = []
+
+                # Delete each book using calibredb remove
+                for book_id in book_ids:
+                    try:
+                        book_id_int = int(book_id)
+                        # Use calibredb remove command
+                        result = run_calibredb(['remove', str(book_id_int)])
+                        if result['success']:
+                            deleted_count += 1
+                            print(f"✅ Deleted book {book_id_int} from library")
+                        else:
+                            errors.append(f"Book {book_id_int}: {result.get('error', 'Unknown error')}")
+                    except ValueError:
+                        errors.append(f"Invalid book ID: {book_id}")
+                    except Exception as e:
+                        errors.append(f"Book {book_id}: {str(e)}")
+
+                if deleted_count > 0:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': True,
+                        'deleted_count': deleted_count,
+                        'errors': errors if errors else None
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                else:
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False,
+                        'error': 'Failed to delete books',
+                        'errors': errors
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Invalid JSON in request body'})
+                self.wfile.write(response.encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': f'Server error: {str(e)}'})
+                self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Bulk add books to reading list
+        if self.path == '/api/reading-list/bulk-add':
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length)
+
+            try:
+                data = json.loads(body.decode('utf-8'))
+                book_ids = data.get('book_ids', [])
+                
+                if not book_ids or not isinstance(book_ids, list):
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': 'book_ids array is required'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                added_count = 0
+                errors = []
+
+                # Add each book to reading list using calibredb set_metadata
+                for book_id in book_ids:
+                    try:
+                        book_id_int = int(book_id)
+                        # Set custom column #reading_list:true via calibredb
+                        result = run_calibredb(['set_metadata', str(book_id_int), '--field', '#reading_list:true'])
+                        if result['success']:
+                            added_count += 1
+                            print(f"✅ Added book {book_id_int} to reading list")
+                        else:
+                            errors.append(f"Book {book_id_int}: {result.get('error', 'Unknown error')}")
+                    except ValueError:
+                        errors.append(f"Invalid book ID: {book_id}")
+                    except Exception as e:
+                        errors.append(f"Book {book_id}: {str(e)}")
+
+                # Get updated reading list IDs
+                ids = get_reading_list_ids()
+
+                if added_count > 0:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': True,
+                        'added_count': added_count,
+                        'ids': ids,
+                        'errors': errors if errors else None
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                else:
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False,
+                        'error': 'Failed to add books to reading list',
+                        'errors': errors
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Invalid JSON in request body'})
+                self.wfile.write(response.encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': f'Server error: {str(e)}'})
+                self.wfile.write(response.encode('utf-8'))
+            return
+
         # API: Add book to reading list (set #reading_list:true)
         if self.path == '/api/reading-list':
             content_length = int(self.headers['Content-Length'])

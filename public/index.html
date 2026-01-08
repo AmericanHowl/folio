@@ -966,14 +966,81 @@
                 <div class="px-3 mb-3">
                     <div class="flex items-center justify-between">
                         <h2 class="section-title-large">Your Library</h2>
-                        <button 
-                            @click="openBookshelf('library-all', 'Your Library')" 
-                            class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700"
-                        >
-                            <span>View all</span>
-                            <i class="bi bi-chevron-right text-xs"></i>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <!-- Selection Mode Toggle -->
+                            <button 
+                                x-show="!selectionMode"
+                                @click="toggleSelectionMode()" 
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
+                                title="Select multiple books"
+                            >
+                                <i class="bi bi-check-square"></i>
+                                <span class="hidden sm:inline">Select</span>
+                            </button>
+                            <!-- Cancel Selection -->
+                            <button 
+                                x-show="selectionMode"
+                                @click="toggleSelectionMode(); selectedBookIds = []" 
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
+                            >
+                                <i class="bi bi-x-lg"></i>
+                                <span class="hidden sm:inline">Cancel</span>
+                            </button>
+                            <button 
+                                x-show="!selectionMode"
+                                @click="openBookshelf('library-all', 'Your Library')" 
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700"
+                            >
+                                <span>View all</span>
+                                <i class="bi bi-chevron-right text-xs"></i>
+                            </button>
+                        </div>
             </div>
+
+                    <!-- Bulk Action Toolbar -->
+                    <div x-show="selectionMode && selectedBookIds.length > 0" class="flex items-center justify-between gap-2 p-3 bg-primary-50 border border-primary-200 rounded-lg mt-2 mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium text-ink-900">
+                                <span x-text="selectedBookIds.length"></span> selected
+                            </span>
+                            <button 
+                                @click="selectAllOnPage()" 
+                                class="text-xs text-ink-500 hover:text-ink-700 underline"
+                            >
+                                Select page
+                            </button>
+                            <button 
+                                @click="deselectAll()" 
+                                class="text-xs text-ink-500 hover:text-ink-700 underline"
+                            >
+                                Deselect all
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button 
+                                @click="bulkAddToReadingList()"
+                                :disabled="bulkActionLoading"
+                                class="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 disabled:bg-accent-300 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+                            >
+                                <span x-show="!bulkActionLoading">
+                                    <i class="bi bi-bookmark-plus"></i>
+                                    Add to Reading List
+                                </span>
+                                <span x-show="bulkActionLoading" class="spinner w-4 h-4"></span>
+                            </button>
+                            <button 
+                                @click="bulkDeleteBooks()"
+                                :disabled="bulkActionLoading"
+                                class="px-3 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+                            >
+                                <span x-show="!bulkActionLoading">
+                                    <i class="bi bi-trash"></i>
+                                    Delete
+                                </span>
+                                <span x-show="bulkActionLoading" class="spinner w-4 h-4"></span>
+                            </button>
+                        </div>
+                    </div>
 
                     <!-- Sorting Options and View Toggle -->
                     <div class="flex items-center justify-between gap-3 mt-2">
@@ -1037,24 +1104,37 @@
 
                     <div class="space-y-3">
                         <template x-for="book in paginatedListBooks()" :key="book.id">
-                            <div class="flex items-center gap-3 p-3 bg-white border border-ink-200 rounded-xl hover:border-ink-300 transition-colors">
+                            <div class="flex items-center gap-3 p-3 bg-white border rounded-xl transition-colors" 
+                                 :class="selectionMode && isBookSelected(book.id) ? 'border-primary-500 bg-primary-50' : 'border-ink-200 hover:border-ink-300'">
+                                <!-- Selection Checkbox -->
+                                <div x-show="selectionMode" class="flex-shrink-0">
+                                    <input 
+                                        type="checkbox" 
+                                        :checked="isBookSelected(book.id)"
+                                        @click.stop="toggleBookSelection(book.id)"
+                                        class="w-5 h-5 text-primary-500 border-ink-300 rounded focus:ring-primary-500 cursor-pointer"
+                                    >
+                                </div>
                                 <!-- Cover -->
                                 <div class="relative flex-shrink-0">
                                     <img 
-                                        @click="openBookModal(book)"
+                                        @click="selectionMode ? toggleBookSelection(book.id) : openBookModal(book)"
                                         :src="`/api/cover/${book.id}?v=${coverVersion}`" 
                                         :alt="book.title" 
-                                        class="w-16 h-24 object-cover rounded-lg cursor-pointer"
+                                        :class="selectionMode ? 'cursor-pointer' : 'cursor-pointer'"
+                                        class="w-16 h-24 object-cover rounded-lg"
                                         @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'"
                                     >
                                     <!-- Badge for library books -->
-                                    <span class="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <span x-show="!selectionMode" class="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
                                         <i class="bi bi-check-lg text-white text-[10px]"></i>
                                     </span>
                                 </div>
                                 
                                 <!-- Details -->
-                                <div @click="openBookModal(book)" class="flex-1 min-w-0 cursor-pointer">
+                                <div @click="selectionMode ? toggleBookSelection(book.id) : openBookModal(book)" 
+                                     :class="selectionMode ? 'cursor-pointer' : 'cursor-pointer'"
+                                     class="flex-1 min-w-0">
                                     <h3 class="text-sm font-semibold text-ink-900 line-clamp-2 mb-1" x-text="book.title"></h3>
                                     <p class="text-xs text-ink-600 mb-1" x-text="formatAuthors(book.authors)"></p>
                                     <p class="text-xs text-ink-400" x-text="book.timestamp ? new Date(book.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown date'"></p>
@@ -1062,6 +1142,7 @@
 
                                 <!-- Reading List Toggle Button -->
                                 <button 
+                                    x-show="!selectionMode"
                                     @click.stop="toggleReadingList(book.id)"
                                     :class="isInReadingList(book.id) ? 'text-accent-500 hover:text-accent-600 hover:bg-accent-50' : 'text-ink-400 hover:text-accent-500 hover:bg-accent-50'"
                                     class="p-3 rounded-lg transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -1080,12 +1161,21 @@
                         <template x-for="(page, pageIndex) in libraryPages" :key="pageIndex">
                             <div class="library-page">
                                 <template x-for="book in page" :key="book.id">
-                                    <div @click="openBookModal(book)" class="book-card cursor-pointer">
+                                    <div @click="selectionMode ? toggleBookSelection(book.id) : openBookModal(book)" 
+                                         class="book-card cursor-pointer relative"
+                                         :class="selectionMode && isBookSelected(book.id) ? 'ring-2 ring-primary-500 ring-offset-2' : ''">
+                                        <!-- Selection Checkbox -->
+                                        <div x-show="selectionMode" class="absolute top-2 left-2 z-10">
+                                            <div class="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-lg">
+                                                <i x-show="isBookSelected(book.id)" class="bi bi-check-circle-fill text-primary-500 text-lg"></i>
+                                                <i x-show="!isBookSelected(book.id)" class="bi bi-circle text-ink-300 text-lg"></i>
+                                            </div>
+                                        </div>
                                         <div class="book-cover relative">
                                             <img :src="`/api/cover/${book.id}?v=${coverVersion}`" :alt="book.title" loading="lazy"
                                                  @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                                            <!-- Badge for library books (always show since these are library books) -->
-                                            <span class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                            <!-- Badge for library books (hide when in selection mode) -->
+                                            <span x-show="!selectionMode" class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
                                                 <i class="bi bi-check-lg text-white text-xs"></i>
                                             </span>
                                         </div>
@@ -1845,7 +1935,7 @@
         </button>
 
     <!-- Prowlarr Search Modal -->
-    <div x-show="selectedRequestBook" x-cloak @click.self="selectedRequestBook = null; prowlarrSearchResults = []" 
+    <div x-show="selectedRequestBook" x-cloak @click.self="selectedRequestBook = null; prowlarrSearchResults = []; downloadingProwlarr = null; downloadProwlarrSuccess = null; downloadProwlarrError = null;" 
          class="fixed inset-0 z-[60] modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
         <div x-show="selectedRequestBook" x-transition:enter="slide-up" 
              class="bg-ink-100 w-full sm:max-w-[720px] sm:rounded-2xl rounded-t-[20px] max-h-[90vh] flex flex-col shadow-2xl border border-ink-200">
@@ -1856,7 +1946,7 @@
                     <h2 class="text-lg font-semibold text-ink-900">Prowlarr Search Results</h2>
                     <p class="text-sm text-ink-500" x-text="selectedRequestBook?.title"></p>
                                 </div>
-                <button @click="selectedRequestBook = null; prowlarrSearchResults = []" class="p-3 hover:bg-ink-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+                <button @click="selectedRequestBook = null; prowlarrSearchResults = []; downloadingProwlarr = null; downloadProwlarrSuccess = null; downloadProwlarrError = null;" class="p-3 hover:bg-ink-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
                     <i class="bi bi-x-lg text-ink-600"></i>
                 </button>
                             </div>
@@ -1870,9 +1960,19 @@
                         </div>
 
                 <!-- Error State -->
-                <div x-show="prowlarrError && !searchingProwlarr" class="p-4 bg-red-50 border border-red-200 rounded-xl">
+                <div x-show="prowlarrError && !searchingProwlarr" class="p-4 bg-red-50 border border-red-200 rounded-xl mb-4">
                     <p class="text-sm text-red-700" x-text="prowlarrError"></p>
-        </div>
+                </div>
+
+                <!-- Download Error State -->
+                <div x-show="downloadProwlarrError" class="p-4 bg-red-50 border border-red-200 rounded-xl mb-4">
+                    <p class="text-sm text-red-700" x-text="downloadProwlarrError"></p>
+                </div>
+
+                <!-- Download Success State -->
+                <div x-show="downloadProwlarrSuccess !== null" class="p-4 bg-green-50 border border-green-200 rounded-xl mb-4">
+                    <p class="text-sm text-green-700">✓ Download sent to bittorrent client successfully!</p>
+                </div>
 
                 <!-- No Results -->
                 <div x-show="!searchingProwlarr && !prowlarrError && prowlarrSearchResults.length === 0" class="py-8 text-center">
@@ -1912,7 +2012,7 @@
                                     </div>
                     
                     <template x-for="(result, index) in prowlarrSearchResults" :key="index">
-                        <div class="p-3 border border-ink-200 rounded-xl hover:border-ink-300 transition-colors">
+                        <div class="p-3 border border-ink-200 rounded-xl hover:border-ink-300 transition-colors" :class="{'bg-green-50 border-green-200': downloadProwlarrSuccess === index}">
                             <div class="flex items-start gap-3">
                                 <div class="flex-1 min-w-0">
                                     <h3 class="text-sm font-medium text-ink-900 mb-1.5 leading-relaxed" x-text="result.title"></h3>
@@ -1930,14 +2030,26 @@
                                             <i class="bi bi-arrow-down-circle text-ink-400"></i>
                                             <span x-text="result.leechers"></span>
                                         </span>
+                                    </div>
+                                    <!-- Success indicator -->
+                                    <div x-show="downloadProwlarrSuccess === index" class="mt-2 text-xs text-green-600 flex items-center gap-1">
+                                        <i class="bi bi-check-circle"></i>
+                                        <span>Download sent!</span>
+                                    </div>
                                 </div>
-                            </div>
                                 <button 
                                     @click="downloadFromProwlarr(result, selectedRequestBook)"
-                                    class="p-2.5 bg-sage-500 hover:bg-sage-600 text-white rounded-lg transition-colors flex-shrink-0 self-start"
-                                    title="Add to Calibre"
+                                    :disabled="downloadingProwlarr === index || downloadProwlarrSuccess === index"
+                                    class="p-2.5 bg-sage-500 hover:bg-sage-600 disabled:bg-sage-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex-shrink-0 self-start min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                    :title="downloadProwlarrSuccess === index ? 'Download sent' : 'Send to bittorrent client'"
                                 >
-                                    <i class="bi bi-download text-base"></i>
+                                    <span x-show="downloadingProwlarr !== index && downloadProwlarrSuccess !== index">
+                                        <i class="bi bi-download text-base"></i>
+                                    </span>
+                                    <span x-show="downloadingProwlarr === index" class="spinner w-5 h-5"></span>
+                                    <span x-show="downloadProwlarrSuccess === index">
+                                        <i class="bi bi-check-lg text-base"></i>
+                                    </span>
                                 </button>
                             </div>
                         </div>

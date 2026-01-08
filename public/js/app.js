@@ -33,6 +33,11 @@ function folioApp() {
         libraryLoading: false,
         loadingMoreBooks: false, // Track if we're loading more books in background
         
+        // Selection mode for bulk operations
+        selectionMode: false,
+        selectedBookIds: [],
+        bulkActionLoading: false,
+        
         // Edit mode for local books
         isEditMode: false,
         editingBook: null,
@@ -87,6 +92,9 @@ function folioApp() {
         prowlarrSortOrder: 'desc', // 'asc', 'desc'
         searchingProwlarr: false,
         prowlarrError: null,
+        downloadingProwlarr: null, // Track which result is being downloaded (by index)
+        downloadProwlarrSuccess: null, // Track successful download (by index)
+        downloadProwlarrError: null, // Track download error
         // Reading list (IDs of library books)
         readingListIds: [],
         readingListStatus: null, // 'added' | 'remove' | null
@@ -430,11 +438,65 @@ function folioApp() {
         },
 
         /**
-         * Download from Prowlarr and add to Calibre
+         * Download from Prowlarr and send to bittorrent client
          */
         async downloadFromProwlarr(result, book) {
-            // TODO: Implement download and add to Calibre
-            alert('Download functionality will be implemented next. This will download the file and add it to your Calibre library.');
+            if (!result || !result.guid) {
+                alert('Invalid download link. Please try a different result.');
+                return;
+            }
+
+            // Find the index of this result for tracking
+            const resultIndex = this.prowlarrSearchResults.findIndex(r => r.guid === result.guid);
+            
+            // Reset previous error/success states
+            this.downloadProwlarrError = null;
+            this.downloadProwlarrSuccess = null;
+            this.downloadingProwlarr = resultIndex;
+            
+            try {
+                const response = await fetch('/api/prowlarr/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        guid: result.guid,
+                        indexer: result.indexer,
+                        title: result.title
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    console.log('✅ Download sent to Prowlarr:', result.title);
+                    this.downloadProwlarrSuccess = resultIndex;
+                    
+                    // Clear success message after 3 seconds
+                    setTimeout(() => {
+                        if (this.downloadProwlarrSuccess === resultIndex) {
+                            this.downloadProwlarrSuccess = null;
+                        }
+                    }, 3000);
+                } else {
+                    this.downloadProwlarrError = data.error || 'Failed to send download to Prowlarr';
+                    console.error('Download error:', this.downloadProwlarrError);
+                    
+                    // Clear error after 5 seconds
+                    setTimeout(() => {
+                        this.downloadProwlarrError = null;
+                    }, 5000);
+                }
+            } catch (error) {
+                console.error('Failed to download from Prowlarr:', error);
+                this.downloadProwlarrError = 'Failed to send download. Please check your Prowlarr configuration.';
+                
+                // Clear error after 5 seconds
+                setTimeout(() => {
+                    this.downloadProwlarrError = null;
+                }, 5000);
+            } finally {
+                this.downloadingProwlarr = null;
+            }
         },
 
         /**
@@ -699,6 +761,11 @@ function folioApp() {
          * Open book detail modal (local library)
          */
         openBookModal(book) {
+            // Don't open modal if in selection mode
+            if (this.selectionMode) {
+                return;
+            }
+            
             this.selectedBook = book;
             this.selectedHardcoverBook = null;
             
@@ -1614,6 +1681,10 @@ function folioApp() {
             this.showRequests = false;
             this.selectedRequestBook = null;
             this.prowlarrSearchResults = [];
+            // Clear download states
+            this.downloadingProwlarr = null;
+            this.downloadProwlarrSuccess = null;
+            this.downloadProwlarrError = null;
         },
         
         /**
@@ -1623,6 +1694,10 @@ function folioApp() {
             this.selectedRequestBook = book;
             this.prowlarrSearchResults = [];
             this.prowlarrError = null;
+            // Clear previous download states
+            this.downloadingProwlarr = null;
+            this.downloadProwlarrSuccess = null;
+            this.downloadProwlarrError = null;
             this.searchingProwlarr = true;
             
             try {
@@ -1843,6 +1918,158 @@ function folioApp() {
             this.bookshelfTitle = '';
             this.bookshelfBooks = [];
             this.currentListPage = 1; // Reset pagination
+        },
+
+        // ============================================
+        // Selection Mode & Bulk Operations
+        // ============================================
+
+        /**
+         * Toggle selection mode
+         */
+        toggleSelectionMode() {
+            this.selectionMode = !this.selectionMode;
+            if (!this.selectionMode) {
+                // Clear selection when exiting selection mode
+                this.selectedBookIds = [];
+            }
+        },
+
+        /**
+         * Toggle book selection
+         */
+        toggleBookSelection(bookId) {
+            const index = this.selectedBookIds.indexOf(bookId);
+            if (index === -1) {
+                this.selectedBookIds.push(bookId);
+            } else {
+                this.selectedBookIds.splice(index, 1);
+            }
+        },
+
+        /**
+         * Check if book is selected
+         */
+        isBookSelected(bookId) {
+            return this.selectedBookIds.includes(bookId);
+        },
+
+        /**
+         * Select all books on current page
+         */
+        selectAllOnPage() {
+            const booksToSelect = this.libraryView === 'list' 
+                ? this.paginatedListBooks()
+                : (this.libraryPages[this.currentPage] || []);
+            
+            booksToSelect.forEach(book => {
+                if (!this.selectedBookIds.includes(book.id)) {
+                    this.selectedBookIds.push(book.id);
+                }
+            });
+        },
+
+        /**
+         * Deselect all books
+         */
+        deselectAll() {
+            this.selectedBookIds = [];
+        },
+
+        /**
+         * Bulk delete selected books
+         */
+        async bulkDeleteBooks() {
+            if (this.selectedBookIds.length === 0) {
+                alert('Please select at least one book to delete.');
+                return;
+            }
+
+            const confirmed = confirm(`Are you sure you want to delete ${this.selectedBookIds.length} book(s) from your library? This action cannot be undone.`);
+            if (!confirmed) {
+                return;
+            }
+
+            this.bulkActionLoading = true;
+
+            try {
+                const response = await fetch('/api/books/bulk-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ book_ids: this.selectedBookIds }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    console.log(`✅ Deleted ${this.selectedBookIds.length} book(s)`);
+                    
+                    // Remove deleted books from the books array
+                    this.books = this.books.filter(book => !this.selectedBookIds.includes(book.id));
+                    
+                    // Clear selection and exit selection mode
+                    this.selectedBookIds = [];
+                    this.selectionMode = false;
+                    
+                    // Re-sort and re-paginate
+                    this.sortBooks();
+                    
+                    // Show success message
+                    alert(`Successfully deleted ${data.deleted_count} book(s) from your library.`);
+                } else {
+                    alert('Failed to delete books: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to delete books:', error);
+                alert('Error deleting books: ' + error.message);
+            } finally {
+                this.bulkActionLoading = false;
+            }
+        },
+
+        /**
+         * Bulk add selected books to reading list
+         */
+        async bulkAddToReadingList() {
+            if (this.selectedBookIds.length === 0) {
+                alert('Please select at least one book to add to reading list.');
+                return;
+            }
+
+            this.bulkActionLoading = true;
+
+            try {
+                const response = await fetch('/api/reading-list/bulk-add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ book_ids: this.selectedBookIds }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    console.log(`✅ Added ${this.selectedBookIds.length} book(s) to reading list`);
+                    
+                    // Update reading list IDs
+                    if (Array.isArray(data.ids)) {
+                        this.readingListIds = [...data.ids];
+                    }
+                    
+                    // Clear selection and exit selection mode
+                    this.selectedBookIds = [];
+                    this.selectionMode = false;
+                    
+                    // Show success message
+                    alert(`Successfully added ${data.added_count} book(s) to your reading list.`);
+                } else {
+                    alert('Failed to add books to reading list: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to add books to reading list:', error);
+                alert('Error adding books to reading list: ' + error.message);
+            } finally {
+                this.bulkActionLoading = false;
+            }
         },
     };
 }
