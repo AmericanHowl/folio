@@ -2,16 +2,12 @@ version: '3.8'
 
 services:
   folio:
-    build: .
-    image: folio:latest
+    # Use the pre-built image from GitHub Container Registry
+    image: ghcr.io/mykierowan/folio:latest
     container_name: folio
     ports:
       - "9099:9099"
     volumes:
-      # Mount the public directory (read-only for security)
-      - ./public:/app/public:ro
-      # Mount config.json for persistent configuration
-      - ./config.json:/app/config.json:rw
       # Mount your Calibre library - REQUIRED: Update this path!
       - ${CALIBRE_LIBRARY:-/data/calibre-library}:/data/calibre-library:ro
     environment:
@@ -32,9 +28,3 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
-    networks:
-      - folio-network
-
-networks:
-  folio-network:
-    driver: bridge
