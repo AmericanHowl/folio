@@ -35,14 +35,47 @@ config = {
 
 
 def load_config():
-    """Load configuration from file"""
+    """Load configuration from file, merging with environment variables.
+
+    Environment variables take precedence over file values when set.
+    This allows Docker deployments to override config via env vars.
+    """
     global config
+
+    # Start with environment variable defaults
+    env_config = {
+        'calibre_library': os.getenv('CALIBRE_LIBRARY', ''),
+        'calibredb_path': os.getenv('CALIBREDB_PATH', ''),
+        'hardcover_token': os.getenv('HARDCOVER_TOKEN', ''),
+        'prowlarr_url': os.getenv('PROWLARR_URL', ''),
+        'prowlarr_api_key': os.getenv('PROWLARR_API_KEY', ''),
+    }
+
+    # Load file config if it exists
+    file_config = {}
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r') as f:
-                config = json.load(f)
+                file_config = json.load(f)
         except Exception as e:
             print(f"⚠️  Failed to load config: {e}")
+
+    # Merge: start with file config, then overlay non-empty env vars
+    config.update(file_config)
+
+    # Environment variables override file config when set (non-empty)
+    for key, value in env_config.items():
+        if value:  # Only override if env var is actually set
+            config[key] = value
+
+    # Ensure required keys exist with defaults
+    config.setdefault('calibre_library', os.path.expanduser('~/Calibre Library'))
+    config.setdefault('calibredb_path', '')
+    config.setdefault('hardcover_token', '')
+    config.setdefault('prowlarr_url', '')
+    config.setdefault('prowlarr_api_key', '')
+    config.setdefault('requested_books', [])
+
     return config
 
 
