@@ -9,7 +9,8 @@ services:
       - "9099:9099"
     volumes:
       # Mount your Calibre library - REQUIRED: Update this path!
-      - ${CALIBRE_LIBRARY:-/data/calibre-library}:/data/calibre-library:ro
+      # Use :rw (read-write) to allow metadata editing via calibredb
+      - ${CALIBRE_LIBRARY:-/data/calibre-library}:/data/calibre-library:rw
     environment:
       # Calibre Library location inside container (must match volume mount)
       - CALIBRE_LIBRARY=/data/calibre-library
