@@ -31,6 +31,7 @@ function folioApp() {
         booksPerPage: 10, // Books per page in list view
         currentListPage: 1, // Current page in list view
         libraryLoading: false,
+        loadingMoreBooks: false, // Track if we're loading more books in background
         
         // Edit mode for local books
         isEditMode: false,
@@ -73,6 +74,7 @@ function folioApp() {
         // iTunes matching for local books
         selectedBookiTunesMatch: null,
         updatingMetadata: false,
+        savingMetadata: false, // Track if we're saving edited metadata
 
         // Requests
         requestedBooks: [],
@@ -185,14 +187,22 @@ function folioApp() {
             this.libraryLoading = true;
             
             try {
-                // Load local library first (priority)
-                await this.loadBooks();
-            await this.loadRequestedBooks();
-                await this.loadReadingList();
+                // Load first 6 books immediately for fast initial display
+                await this.loadBooks(6, 0, true);
+                
+                // Load requested books and reading list in parallel
+                await Promise.all([
+                    this.loadRequestedBooks(),
+                    this.loadReadingList()
+                ]);
 
                 this.libraryLoading = false;
 
-                // Load Hardcover data asynchronously (not blocking)
+                // Load remaining books in background (non-blocking)
+                // Load up to 500 more books (which should cover most libraries)
+                this.loadBooks(494, 6, false);
+
+                // Load Hardcover data asynchronously - prioritize recent releases
                 this.loadHardcoverData();
 
             console.log('✅ Folio ready!');
@@ -486,18 +496,41 @@ function folioApp() {
 
         /**
          * Load books from Calibre database
+         * @param {number} limit - Number of books to load (default: 500)
+         * @param {number} offset - Offset for pagination (default: 0)
+         * @param {boolean} isInitialLoad - If true, this is the initial load and should replace books array
          */
-        async loadBooks() {
+        async loadBooks(limit = 500, offset = 0, isInitialLoad = false) {
             try {
-                const response = await fetch('/api/books?limit=500&offset=0');
-                this.books = await response.json();
+                if (!isInitialLoad && offset > 0) {
+                    this.loadingMoreBooks = true;
+                }
+                
+                const response = await fetch(`/api/books?limit=${limit}&offset=${offset}`);
+                const newBooks = await response.json();
+                
+                if (isInitialLoad || offset === 0) {
+                    // Replace all books for initial load
+                    this.books = newBooks;
+                    console.log(`📖 Loaded ${this.books.length} books from library`);
+                } else {
+                    // Append new books, avoiding duplicates
+                    const existingIds = new Set(this.books.map(b => b.id));
+                    const uniqueNewBooks = newBooks.filter(b => !existingIds.has(b.id));
+                    this.books = [...this.books, ...uniqueNewBooks];
+                    console.log(`📖 Loaded ${uniqueNewBooks.length} more books (total: ${this.books.length})`);
+                }
+                
                 this.sortBooks();
-                console.log(`📖 Loaded ${this.books.length} books from library`);
             } catch (error) {
                 console.error('Failed to load books:', error);
-                this.books = [];
-                this.sortedBooks = [];
-                this.filteredBooks = [];
+                if (isInitialLoad) {
+                    this.books = [];
+                    this.sortedBooks = [];
+                    this.filteredBooks = [];
+                }
+            } finally {
+                this.loadingMoreBooks = false;
             }
         },
 
@@ -762,15 +795,32 @@ function folioApp() {
                 if (result.success) {
                     console.log('✅ Metadata updated from iTunes');
                     
-                    // Reload books to show updated data
-                    await this.loadBooks();
-                    
-                    // Update selected book reference and stay on modal
-                    const updatedBook = this.books.find(b => b.id === bookId);
-                    if (updatedBook) {
-                        this.selectedBook = updatedBook;
-                        this.selectedBookiTunesMatch = null;
+                    // Optimize: Update only the specific book instead of reloading all
+                    const bookIndex = this.books.findIndex(b => b.id === bookId);
+                    if (bookIndex !== -1) {
+                        // Update the book in place with iTunes data (faster than fetching from server)
+                        const book = this.books[bookIndex];
+                        book.title = itunesBook.title || book.title;
+                        book.authors = itunesBook.author ? [itunesBook.author] : book.authors;
+                        book.comments = itunesBook.description || book.comments;
+                        book.tags = itunesBook.genres && Array.isArray(itunesBook.genres) ? itunesBook.genres : book.tags;
+                        if (itunesBook.year) {
+                            book.pubdate = new Date(itunesBook.year, 0, 1).toISOString();
+                        }
+                        // Cover was updated
+                        book.has_cover = true;
+                        
+                        // Update selected book reference
+                        if (this.selectedBook && this.selectedBook.id === bookId) {
+                            this.selectedBook = {...book};
+                        }
+                        
+                        // Re-sort to reflect any changes (e.g., title change)
+                        this.sortBooks();
                     }
+                    
+                    // Clear iTunes match after update
+                    this.selectedBookiTunesMatch = null;
                     
                     // Bust cover cache so the new cover shows immediately
                     this.coverVersion = Date.now();
@@ -848,6 +898,8 @@ function folioApp() {
         async saveEditedMetadata() {
             if (!this.editingBook) return;
             
+            this.savingMetadata = true;
+            
             try {
                 const updateData = {
                     title: this.editingBook.title,
@@ -869,14 +921,31 @@ function folioApp() {
                 if (result.success) {
                     console.log('✅ Book metadata saved');
                     
-                    // Reload books
-                await this.loadBooks();
-
-                    // Update selected book and exit edit mode
-                const updatedBook = this.books.find(b => b.id === this.editingBook.id);
-                if (updatedBook) {
-                    this.selectedBook = updatedBook;
-                }
+                    // Optimize: Update only the specific book in the array instead of reloading all books
+                    const bookIndex = this.books.findIndex(b => b.id === this.editingBook.id);
+                    if (bookIndex !== -1) {
+                        // Update the book in place with the data we sent (faster than fetching from server)
+                        const book = this.books[bookIndex];
+                        book.title = this.editingBook.title;
+                        book.authors = this.editingBook.authors ? this.editingBook.authors.split(',').map(a => a.trim()).filter(a => a) : [];
+                        book.comments = this.editingBook.comments || '';
+                        book.tags = this.editingBook.tags ? this.editingBook.tags.split(',').map(t => t.trim()).filter(t => t) : [];
+                        if (this.editingBook.year) {
+                            book.pubdate = new Date(parseInt(this.editingBook.year), 0, 1).toISOString();
+                        }
+                        // Update has_cover if cover was updated
+                        if (this.editingBook.coverData) {
+                            book.has_cover = true;
+                        }
+                        
+                        // Update selected book reference
+                        if (this.selectedBook && this.selectedBook.id === this.editingBook.id) {
+                            this.selectedBook = {...book};
+                        }
+                        
+                        // Re-sort to reflect any changes (e.g., title change)
+                        this.sortBooks();
+                    }
 
                     // Bust cover cache so the new cover shows immediately
                     this.coverVersion = Date.now();
@@ -888,6 +957,8 @@ function folioApp() {
             } catch (error) {
                 console.error('Failed to save metadata:', error);
                 alert('Error saving metadata: ' + error.message);
+            } finally {
+                this.savingMetadata = false;
             }
         },
 
@@ -1101,6 +1172,7 @@ function folioApp() {
 
         /**
          * Load all Hardcover data
+         * Prioritizes recent releases for mobile performance
          */
         async loadHardcoverData() {
             if (!this.hardcoverToken) return;
@@ -1108,10 +1180,13 @@ function folioApp() {
             this.hardcoverLoading = true;
             
             try {
+                // Load recent releases first (priority for mobile)
+                await this.loadHardcoverRecent();
+                
+                // Then load other data in parallel
                 await Promise.all([
                     this.loadHardcoverTrending(),
                     this.loadHardcoverTrendingMonth(),
-                    this.loadHardcoverRecent(),
                     this.loadHardcoverLists()
                 ]);
                 

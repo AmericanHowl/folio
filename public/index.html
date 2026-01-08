@@ -1254,7 +1254,8 @@
                         <i class="bi bi-pencil text-ink-600"></i>
                                         </button>
                     <button x-show="selectedBookiTunesMatch" @click="updateMetadataFromiTunes()" :disabled="updatingMetadata" title="Update from iTunes" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
-                        <i class="bi bi-search text-ink-600"></i>
+                        <span x-show="!updatingMetadata"><i class="bi bi-search text-ink-600"></i></span>
+                        <span x-show="updatingMetadata" class="spinner w-5 h-5"></span>
                                         </button>
                     <button @click="closeBookModal()" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                         <i class="bi bi-x-lg text-ink-600"></i>
@@ -1403,9 +1404,15 @@
                         <button @click="exitEditMode()" class="btn btn-secondary flex-1 py-3.5 justify-center">
                             Cancel
                         </button>
-                        <button @click="saveEditedMetadata()" class="btn btn-primary flex-1 py-3.5 justify-center">
-                            <i class="bi bi-check-lg"></i>
-                            Save Changes
+                        <button @click="saveEditedMetadata()" :disabled="savingMetadata" class="btn btn-primary flex-1 py-3.5 justify-center">
+                            <span x-show="!savingMetadata" class="inline-flex items-center gap-2">
+                                <i class="bi bi-check-lg"></i>
+                                Save Changes
+                            </span>
+                            <span x-show="savingMetadata" class="inline-flex items-center gap-2">
+                                <span class="spinner w-4 h-4"></span>
+                                Saving...
+                            </span>
                                         </button>
                                     </div>
                 </template>
