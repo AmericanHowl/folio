@@ -248,29 +248,27 @@ docker-compose up -d
 
 All configuration can also be managed through the Settings UI in the web interface.
 
-**Manual Docker:**
-
-```dockerfile
-FROM python:3.11-slim
-RUN apt-get update && apt-get install -y calibre
-WORKDIR /app
-COPY . .
-EXPOSE 9099
-CMD ["python3", "serve.py"]
-```
-
-Build and run:
+**Manual Docker Build:**
 
 ```bash
+# Build the image
 docker build -t folio .
+
+# Run the container
 docker run -d \
+  --name folio \
   -p 9099:9099 \
   -v /path/to/Calibre\ Library:/data/calibre-library:ro \
   -v $(pwd)/config.json:/app/config.json:rw \
   -e CALIBRE_LIBRARY=/data/calibre-library \
+  -e CALIBREDB_PATH=/usr/bin/calibredb \
   -e HARDCOVER_TOKEN=your-api-token \
+  -e PROWLARR_URL=http://prowlarr:9696 \
+  -e PROWLARR_API_KEY=your-prowlarr-api-key \
   folio
 ```
+
+**Note:** The Dockerfile is included in the repository. The `docker-compose.yml` file uses `build: .` to build from the included Dockerfile.
 
 ## Features in Detail
 

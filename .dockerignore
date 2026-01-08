@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Config and data (mounted as volumes)
+config.json
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+
+# Documentation (not needed in container)
+README.md
+*.md
+
+# Development files
+create_simple_icons.py
+generate_icons.py
+folio-muted-theme.html
+modal.html
+itunes-genre.json
