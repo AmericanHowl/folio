@@ -1767,28 +1767,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         if indexer_id is None:
                             missing_indexer_count += 1
                         
-                        # #region agent log
-                        if idx < 3:  # Log first 3 results
-                            import json as json_module
-                            with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
-                                f.write(json_module.dumps({
-                                    'sessionId': 'debug-session',
-                                    'runId': 'run1',
-                                    'hypothesisId': 'D',
-                                    'location': 'serve.py:1765',
-                                    'message': 'Prowlarr search result',
-                                    'data': {
-                                        'result_index': idx,
-                                        'title': item.get('title', 'Unknown')[:50],
-                                        'indexerId': indexer_id,
-                                        'indexerId_type': type(indexer_id).__name__ if indexer_id is not None else None,
-                                        'indexer': item.get('indexer', 'Unknown'),
-                                        'guid': item.get('guid', ''),
-                                        'all_keys': list(item.keys())
-                                    },
-                                    'timestamp': int(time.time() * 1000)
-                                }) + '\n')
-                        # #endregion
+                        # Log first few results to stdout (visible in Docker logs)
+                        if idx < 3:
+                            print(f"🔍 Search result {idx}: title={item.get('title', 'Unknown')[:50]}, indexerId={indexer_id}, indexer={item.get('indexer', 'Unknown')}, guid={item.get('guid', '')[:50]}")
                         
                         formatted_results.append({
                             'title': item.get('title', 'Unknown'),
@@ -2264,27 +2245,12 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 indexer_id = data.get('indexerId')
                 title = data.get('title', 'Unknown')
 
-                # #region agent log
-                import json as json_module
-                with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
-                    f.write(json_module.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'A',
-                        'location': 'serve.py:2238',
-                        'message': 'Download request received from client',
-                        'data': {
-                            'full_request': data,
-                            'guid': guid,
-                            'indexerId': indexer_id,
-                            'indexerId_type': type(indexer_id).__name__ if indexer_id is not None else None,
-                            'title': title
-                        },
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-                # #endregion
-
-                print(f"📥 Download request: guid={guid}, indexerId={indexer_id}, title={title}")
+                # Log to stdout (visible in Docker logs)
+                print(f"📥 Download request received:")
+                print(f"   guid={guid}")
+                print(f"   indexerId={indexer_id} (type: {type(indexer_id).__name__})")
+                print(f"   title={title}")
+                print(f"   full_request={data}")
 
                 if not guid:
                     self.send_response(400)
@@ -2318,9 +2284,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 try:
-                    # Prowlarr command endpoint to send download to bittorrent client
-                    # The DownloadRelease command requires guid and indexerId parameters
-                    command_url = f"{prowlarr_url}/api/v1/command"
+                    # Use Prowlarr release grab endpoint (simpler than command endpoint)
+                    # POST /api/v1/release/grab with {"guid": "...", "indexerId": 3}
+                    grab_url = f"{prowlarr_url}/api/v1/release/grab"
                     
                     # Ensure indexerId is an integer (Prowlarr expects int, not string)
                     try:
@@ -2328,63 +2294,132 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     except (ValueError, TypeError):
                         indexer_id_int = indexer_id
                     
-                    command_payload_dict = {
-                        'name': 'DownloadRelease',
+                    grab_payload_dict = {
                         'guid': guid,
                         'indexerId': indexer_id_int
                     }
-                    command_payload = json.dumps(command_payload_dict).encode('utf-8')
+                    grab_payload = json.dumps(grab_payload_dict).encode('utf-8')
                     
-                    # #region agent log
-                    import json as json_module
-                    with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
-                        f.write(json_module.dumps({
-                            'sessionId': 'debug-session',
-                            'runId': 'run1',
-                            'hypothesisId': 'B',
-                            'location': 'serve.py:2288',
-                            'message': 'Prowlarr DownloadRelease command payload',
-                            'data': {
-                                'command_url': command_url,
-                                'payload': command_payload_dict,
-                                'indexerId_original': indexer_id,
-                                'indexerId_converted': indexer_id_int,
-                                'indexerId_type': type(indexer_id_int).__name__,
-                                'guid': guid,
-                                'title': title
-                            },
-                            'timestamp': int(time.time() * 1000)
-                        }) + '\n')
-                    # #endregion
+                    # Log to stdout (visible in Docker logs)
+                    print(f"🔍 Prowlarr grab request: URL={grab_url}, payload={grab_payload_dict}, title={title}")
                     
-                    req = urllib.request.Request(command_url, data=command_payload, method='POST')
-                    req.add_header('Content-Type', 'application/json')
-                    req.add_header('X-Api-Key', prowlarr_api_key)
+                    # Helper function to attempt the grab
+                    def attempt_grab():
+                        req = urllib.request.Request(grab_url, data=grab_payload, method='POST')
+                        req.add_header('Content-Type', 'application/json')
+                        req.add_header('X-Api-Key', prowlarr_api_key)
+                        return urllib.request.urlopen(req)
                     
-                    with urllib.request.urlopen(req) as response:
-                        result = json.loads(response.read().decode('utf-8'))
+                    # Helper function to refresh search cache
+                    def refresh_search_cache(search_title):
+                        """Re-run search to refresh Prowlarr's internal cache"""
+                        print(f"🔄 Refreshing Prowlarr search cache for: {search_title}")
+                        search_url = f"{prowlarr_url}/api/v1/search?query={urllib.parse.quote(search_title)}&indexerIds={indexer_id_int}"
+                        search_req = urllib.request.Request(search_url)
+                        search_req.add_header('X-Api-Key', prowlarr_api_key)
+                        try:
+                            with urllib.request.urlopen(search_req, timeout=30) as search_resp:
+                                results = json.loads(search_resp.read().decode('utf-8'))
+                                print(f"🔄 Search cache refreshed: {len(results)} results")
+                                return True
+                        except Exception as e:
+                            print(f"⚠️ Failed to refresh search cache: {e}")
+                            return False
+                    
+                    grab_success = False
+                    grab_response = None
+                    grab_result = None
+                    last_error = None
+                    
+                    # First attempt
+                    try:
+                        grab_response = attempt_grab()
+                        grab_result = json.loads(grab_response.read().decode('utf-8'))
+                        grab_success = grab_response.status in (200, 201)
+                    except urllib.error.HTTPError as e:
+                        error_body = e.read().decode('utf-8') if hasattr(e, 'read') else ''
+                        last_error = (e, error_body)
                         
-                        # Check if command was successful
-                        if response.status == 201 or response.status == 200:
-                            self.send_response(200)
-                            self.send_header('Content-Type', 'application/json')
-                            self.end_headers()
-                            response = json.dumps({
-                                'success': True,
-                                'message': 'Download sent to bittorrent client successfully'
-                            })
-                            self.wfile.write(response.encode('utf-8'))
-                            print(f"✅ Sent download to Prowlarr: {data.get('title', guid)}")
-                        else:
-                            error_msg = result.get('message', 'Unknown error')
-                            self.send_response(500)
-                            self.send_header('Content-Type', 'application/json')
-                            self.end_headers()
-                            response = json.dumps({'success': False, 'error': f'Prowlarr error: {error_msg}'})
-                            self.wfile.write(response.encode('utf-8'))
+                        # Check if this is the "Sequence contains no matching element" error
+                        # This means Prowlarr's search cache has expired
+                        if 'Sequence contains no matching element' in error_body or e.code == 500:
+                            print(f"⚠️ Prowlarr cache expired, refreshing search...")
+                            
+                            # Refresh the search cache
+                            if refresh_search_cache(title):
+                                # Wait a moment for cache to populate
+                                time.sleep(0.5)
+                                
+                                # Retry the grab
+                                try:
+                                    grab_response = attempt_grab()
+                                    grab_result = json.loads(grab_response.read().decode('utf-8'))
+                                    grab_success = grab_response.status in (200, 201)
+                                    last_error = None
+                                    print(f"✅ Retry successful after cache refresh")
+                                except urllib.error.HTTPError as retry_e:
+                                    error_body = retry_e.read().decode('utf-8') if hasattr(retry_e, 'read') else ''
+                                    last_error = (retry_e, error_body)
+                                    print(f"❌ Retry also failed: {retry_e.code} - {error_body}")
+                    
+                    # Handle the result
+                    if grab_success:
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        response = json.dumps({
+                            'success': True,
+                            'message': 'Download sent to bittorrent client successfully'
+                        })
+                        self.wfile.write(response.encode('utf-8'))
+                        print(f"✅ Sent download to Prowlarr: {data.get('title', guid)}")
+                    elif last_error:
+                        # Handle the error directly here since we have the captured error body
+                        e, error_body = last_error
+                        error_data = {}
+                        try:
+                            error_data = json.loads(error_body) if error_body else {}
+                            error_msg = error_data.get('message') or error_data.get('error') or error_body or str(e)
+                        except Exception:
+                            error_msg = error_body or str(e)
+                        
+                        # Log detailed error to stdout (visible in Docker logs)
+                        print(f"❌ Prowlarr HTTP error {e.code} ({e.reason}):")
+                        print(f"   URL: {grab_url}")
+                        print(f"   Payload: {grab_payload_dict}")
+                        print(f"   Error body: {error_body}")
+                        print(f"   Parsed error: {error_data}")
+                        
+                        # Return detailed error to client
+                        self.send_response(500)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        error_response = {
+                            'success': False,
+                            'error': f'Prowlarr API error: {error_msg}',
+                            'details': {
+                                'http_code': e.code,
+                                'http_reason': e.reason,
+                                'error_body': error_body[:500] if error_body else None,  # Limit length
+                                'request_payload': grab_payload_dict
+                            }
+                        }
+                        response = json.dumps(error_response)
+                        self.wfile.write(response.encode('utf-8'))
+                        print(f"❌ Prowlarr download error: {error_msg}")
+                    else:
+                        error_msg = grab_result.get('message', 'Unknown error') if grab_result else 'Unknown error'
+                        print(f"❌ Prowlarr grab failed: {error_msg}, result={grab_result}")
+                        self.send_response(500)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        response = json.dumps({'success': False, 'error': f'Prowlarr error: {error_msg}'})
+                        self.wfile.write(response.encode('utf-8'))
                             
                 except urllib.error.HTTPError as e:
+                    # This catches any unexpected HTTP errors not handled above
                     error_body = ''
+                    error_data = {}
                     try:
                         error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
                         error_data = json.loads(error_body) if error_body else {}
@@ -2392,40 +2427,28 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     except Exception as parse_err:
                         error_msg = error_body or str(e)
                     
-                    # #region agent log
-                    import json as json_module
-                    try:
-                        payload_for_log = command_payload_dict
-                        url_for_log = command_url
-                    except NameError:
-                        payload_for_log = {'name': 'DownloadRelease', 'guid': guid, 'indexerId': indexer_id}
-                        url_for_log = f"{prowlarr_url}/api/v1/command"
-                    with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
-                        f.write(json_module.dumps({
-                            'sessionId': 'debug-session',
-                            'runId': 'run1',
-                            'hypothesisId': 'C',
-                            'location': 'serve.py:2321',
-                            'message': 'Prowlarr HTTP error response',
-                            'data': {
-                                'http_code': e.code,
-                                'http_reason': e.reason,
-                                'error_body_raw': error_body,
-                                'error_data_parsed': error_data if error_body else None,
-                                'error_msg': error_msg,
-                                'request_payload': payload_for_log,
-                                'command_url': url_for_log,
-                                'guid': guid,
-                                'indexerId': indexer_id
-                            },
-                            'timestamp': int(time.time() * 1000)
-                        }) + '\n')
-                    # #endregion
+                    # Log detailed error to stdout (visible in Docker logs)
+                    print(f"❌ Prowlarr HTTP error {e.code} ({e.reason}):")
+                    print(f"   URL: {grab_url}")
+                    print(f"   Payload: {grab_payload_dict}")
+                    print(f"   Error body: {error_body}")
+                    print(f"   Parsed error: {error_data}")
                     
+                    # Return detailed error to client
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
-                    response = json.dumps({'success': False, 'error': f'Prowlarr API error: {error_msg}'})
+                    error_response = {
+                        'success': False,
+                        'error': f'Prowlarr API error: {error_msg}',
+                        'details': {
+                            'http_code': e.code,
+                            'http_reason': e.reason,
+                            'error_body': error_body[:500] if error_body else None,  # Limit length
+                            'request_payload': grab_payload_dict
+                        }
+                    }
+                    response = json.dumps(error_response)
                     self.wfile.write(response.encode('utf-8'))
                     print(f"❌ Prowlarr download error: {error_msg}")
                     
