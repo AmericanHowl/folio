@@ -1650,7 +1650,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             if cover_data:
                 self.send_response(200)
                 self.send_header('Content-Type', 'image/jpeg')
-                self.send_header('Cache-Control', 'public, max-age=86400')
+                # Use aggressive caching since URL is versioned with ?v= parameter
+                # immutable tells browser this URL's content will never change
+                self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
                 self.end_headers()
                 self.wfile.write(cover_data)
             else:
