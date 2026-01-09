@@ -82,6 +82,100 @@ class APICache:
 # - iTunes search: 30 minutes (metadata is stable)
 api_cache = APICache()
 
+# ============================================
+# Cover Metadata Cache (for concurrent cover requests)
+# ============================================
+
+class CoverCache:
+    """Cache book cover metadata to avoid DB hits on every cover request.
+    
+    This solves the issue where many concurrent cover requests cause SQLite
+    contention, leading to random timeouts and inconsistent cover loading.
+    """
+    
+    def __init__(self, ttl_seconds=300):  # 5 minute TTL
+        self._cache = {}  # book_id -> {'path': str, 'has_cover': bool}
+        self._lock = threading.Lock()
+        self._ttl = ttl_seconds
+        self._expiry = 0
+        self._loading = False
+    
+    def get(self, book_id):
+        """Get cached cover info for a book"""
+        with self._lock:
+            if time.time() > self._expiry:
+                return None
+            return self._cache.get(book_id)
+    
+    def get_all(self):
+        """Get all cached cover info (for bulk lookups)"""
+        with self._lock:
+            if time.time() > self._expiry:
+                return None
+            return self._cache.copy()
+    
+    def load_all(self, force=False):
+        """Load all book cover metadata from DB into cache.
+        
+        This is called once on startup and periodically refreshed.
+        Uses a loading flag to prevent concurrent loads.
+        """
+        with self._lock:
+            # Check if already loading or cache is still valid
+            if self._loading:
+                return False
+            if not force and time.time() < self._expiry:
+                return True
+            self._loading = True
+        
+        try:
+            library_path = get_calibre_library()
+            db_path = os.path.join(library_path, 'metadata.db')
+            
+            if not os.path.exists(db_path):
+                return False
+            
+            # Use WAL mode and read-only for better concurrency
+            conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=30.0)
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, path, has_cover FROM books")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            new_cache = {}
+            for row in rows:
+                new_cache[row['id']] = {
+                    'path': row['path'],
+                    'has_cover': bool(row['has_cover'])
+                }
+            
+            with self._lock:
+                self._cache = new_cache
+                self._expiry = time.time() + self._ttl
+                self._loading = False
+            
+            print(f"📦 Cover cache loaded: {len(new_cache)} books")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Cover cache load error: {e}")
+            with self._lock:
+                self._loading = False
+            return False
+    
+    def invalidate(self, book_id=None):
+        """Invalidate cache for a specific book or all books"""
+        with self._lock:
+            if book_id is not None:
+                self._cache.pop(book_id, None)
+            else:
+                self._expiry = 0  # Force full reload on next access
+
+# Global cover cache instance
+cover_cache = CoverCache(ttl_seconds=300)  # 5 minute TTL
+
 CACHE_TTL_HARDCOVER_TRENDING = 300  # 5 minutes
 CACHE_TTL_HARDCOVER_RECENT = 300    # 5 minutes  
 CACHE_TTL_HARDCOVER_LISTS = 600     # 10 minutes
@@ -191,8 +285,12 @@ def get_calibre_library():
     return config.get('calibre_library', os.path.expanduser('~/Calibre Library'))
 
 
-def get_db_connection():
-    """Get a connection to the Calibre metadata database"""
+def get_db_connection(readonly=False):
+    """Get a connection to the Calibre metadata database
+    
+    Args:
+        readonly: If True, open in read-only mode for better concurrency
+    """
     library_path = get_calibre_library()
     db_path = os.path.join(library_path, 'metadata.db')
 
@@ -200,7 +298,18 @@ def get_db_connection():
         raise FileNotFoundError(f"Calibre database not found at {db_path}")
 
     # Add timeout for concurrent access (threaded server)
-    conn = sqlite3.connect(db_path, timeout=30.0)
+    # Use URI mode to support read-only connections
+    if readonly:
+        conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=30.0)
+    else:
+        conn = sqlite3.connect(db_path, timeout=30.0)
+        # Enable WAL mode for better concurrent read/write performance
+        # This only needs to be set once per database, but is safe to call repeatedly
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except Exception:
+            pass  # May fail on read-only filesystems, which is fine
+    
     conn.row_factory = sqlite3.Row
 
     # Some Calibre databases use custom SQLite functions (e.g. title_sort)
@@ -219,7 +328,7 @@ def get_db_connection():
 def get_books(limit=50, offset=0, search=None):
     """Get books from the Calibre database"""
     try:
-        conn = get_db_connection()
+        conn = get_db_connection(readonly=True)
         cursor = conn.cursor()
 
         # Base query
@@ -360,29 +469,49 @@ def get_books(limit=50, offset=0, search=None):
 
 
 def get_book_cover(book_id):
-    """Get the cover image for a book"""
+    """Get the cover image for a book.
+    
+    Uses the cover cache to avoid database hits on every request.
+    This prevents SQLite contention when many covers load simultaneously.
+    """
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT path, has_cover FROM books WHERE id = ?", (book_id,))
-        row = cursor.fetchone()
-        conn.close()
-
-        if not row or not row['has_cover']:
+        # Try to get from cache first (avoids DB contention)
+        cached = cover_cache.get(book_id)
+        
+        if cached is None:
+            # Cache miss or expired - try to refresh cache
+            cover_cache.load_all()
+            cached = cover_cache.get(book_id)
+        
+        if cached is None:
+            # Still no cache - fall back to direct DB query
+            conn = get_db_connection(readonly=True)
+            cursor = conn.cursor()
+            cursor.execute("SELECT path, has_cover FROM books WHERE id = ?", (book_id,))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if not row:
+                return None
+            
+            cached = {
+                'path': row['path'],
+                'has_cover': bool(row['has_cover'])
+            }
+        
+        if not cached.get('has_cover'):
             return None
 
         library_path = get_calibre_library()
-        cover_path = os.path.join(library_path, row['path'], 'cover.jpg')
+        cover_path = os.path.join(library_path, cached['path'], 'cover.jpg')
 
         if os.path.exists(cover_path):
-            # Close DB connection before reading file to avoid holding it during I/O
             with open(cover_path, 'rb') as f:
                 return f.read()
 
         return None
     except Exception as e:
-        print(f"❌ Error loading cover: {e}")
+        print(f"❌ Error loading cover for book {book_id}: {e}")
         return None
 
 
@@ -559,6 +688,8 @@ def import_books_from_folder():
     import_state['total_imported'] += imported_count
     if imported_count > 0:
         import_state['last_import'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        # Invalidate cover cache so new books are picked up
+        cover_cache.invalidate()
     if errors:
         import_state['errors'] = errors[-10:]  # Keep last 10 errors
 
@@ -1603,14 +1734,27 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 with urllib.request.urlopen(req) as response:
                     results = json.loads(response.read().decode('utf-8'))
                     
+                    # Log first result for debugging indexer ID issues
+                    if results:
+                        first = results[0]
+                        print(f"🔍 Prowlarr first result keys: {list(first.keys())}")
+                        print(f"🔍 indexerId={first.get('indexerId')}, indexer={first.get('indexer')}")
+                    
                     # Transform results to a simpler format
                     formatted_results = []
                     for item in results:
+                        # Get indexerId - Prowlarr should return it directly
+                        indexer_id = item.get('indexerId')
+                        
+                        # Log warning if indexerId is missing
+                        if indexer_id is None:
+                            print(f"⚠️  Result missing indexerId: {item.get('title', 'Unknown')[:50]}")
+                        
                         formatted_results.append({
                             'title': item.get('title', 'Unknown'),
                             'author': item.get('author', 'Unknown'),
                             'indexer': item.get('indexer', 'Unknown'),
-                            'indexerId': item.get('indexerId'),
+                            'indexerId': indexer_id,
                             'size': item.get('size', 0),
                             'seeders': item.get('seeders', 0),
                             'leechers': item.get('leechers', 0),
@@ -1619,6 +1763,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             'publishDate': item.get('publishDate', ''),
                             'categories': item.get('categories', [])
                         })
+                    
+                    print(f"🔍 Prowlarr search returned {len(formatted_results)} results")
                     
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
@@ -2075,6 +2221,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 data = json.loads(body.decode('utf-8'))
                 guid = data.get('guid')
                 indexer_id = data.get('indexerId')
+                title = data.get('title', 'Unknown')
+
+                print(f"📥 Download request: guid={guid}, indexerId={indexer_id}, title={title}")
 
                 if not guid:
                     self.send_response(400)
@@ -2085,10 +2234,14 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 if not indexer_id:
+                    print(f"⚠️  No indexerId provided. Data received: {data}")
                     self.send_response(400)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
-                    response = json.dumps({'success': False, 'error': 'Indexer ID is required'})
+                    response = json.dumps({
+                        'success': False, 
+                        'error': 'Indexer ID is required. This indexer may not support automatic downloads.'
+                    })
                     self.wfile.write(response.encode('utf-8'))
                     return
 
@@ -2214,6 +2367,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         errors.append(f"Book {book_id}: {str(e)}")
 
                 if deleted_count > 0:
+                    # Invalidate cover cache after deleting books
+                    cover_cache.invalidate()
+                    
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
@@ -2507,6 +2663,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         # Update has_cover flag in database
                         cursor.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (book_id,))
                         conn.commit()
+                        
+                        # Invalidate cover cache so new cover is served immediately
+                        cover_cache.invalidate(int(book_id))
 
                         print(f"✅ Cover updated for book {book_id}")
                     else:
@@ -2564,6 +2723,10 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     # Load config on startup
     load_config()
+
+    # Pre-load cover cache to avoid DB contention on startup
+    print("📦 Pre-loading cover cache...")
+    cover_cache.load_all()
 
     # Start import watcher if configured
     start_import_watcher()
