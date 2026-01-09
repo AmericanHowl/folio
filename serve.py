@@ -358,8 +358,8 @@ def get_books(limit=50, offset=0, search=None, sort='recent'):
                 b.series_index,
                 b.path,
                 b.has_cover,
-                GROUP_CONCAT(DISTINCT a.name, ' & ') as authors,
-                GROUP_CONCAT(DISTINCT t.name, ', ') as tags,
+                GROUP_CONCAT(a.name, ' & ') as authors,
+                GROUP_CONCAT(t.name, ', ') as tags,
                 c.text as comments,
                 p.name as publisher,
                 s.name as series
@@ -469,11 +469,21 @@ def get_books(limit=50, offset=0, search=None, sort='recent'):
                                 seen_authors.add(key)
                                 authors_list.append(normalized_author)
             
+            # Deduplicate tags while preserving order
+            tags_list = []
+            if row['tags']:
+                seen_tags = set()
+                for tag in row['tags'].split(','):
+                    tag = tag.strip()
+                    if tag and tag.lower() not in seen_tags:
+                        seen_tags.add(tag.lower())
+                        tags_list.append(tag)
+
             book = {
                 'id': row['id'],
                 'title': row['title'],
                 'authors': authors_list,
-                'tags': [t.strip() for t in row['tags'].split(',')] if row['tags'] else [],
+                'tags': tags_list,
                 'comments': row['comments'],
                 'publisher': row['publisher'],
                 'series': row['series'],
