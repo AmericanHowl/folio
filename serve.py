@@ -18,6 +18,8 @@ from pathlib import Path
 import time
 import random
 import shutil
+import threading
+import glob as glob_module
 
 PORT = 9099
 CONFIG_FILE = "config.json"
@@ -30,7 +32,23 @@ config = {
     'hardcover_token': os.getenv('HARDCOVER_TOKEN', ''),
     'prowlarr_url': os.getenv('PROWLARR_URL', ''),
     'prowlarr_api_key': os.getenv('PROWLARR_API_KEY', ''),
-    'requested_books': []  # Store requested book IDs with timestamps
+    'requested_books': [],  # Store requested book IDs with timestamps
+    # Import folder settings
+    'import_folder': os.getenv('IMPORT_FOLDER', ''),  # Empty = disabled
+    'import_interval': int(os.getenv('IMPORT_INTERVAL', '60')),  # Seconds between scans
+    'import_recursive': os.getenv('IMPORT_RECURSIVE', 'true').lower() == 'true',  # Scan subdirs
+    'import_delete': os.getenv('IMPORT_DELETE', 'false').lower() == 'true',  # Delete after import
+}
+
+# Import watcher state
+import_state = {
+    'running': False,
+    'last_scan': None,
+    'last_import': None,
+    'imported_files': [],  # Track already imported files to avoid duplicates
+    'last_imported_count': 0,
+    'total_imported': 0,
+    'errors': []
 }
 
 
@@ -380,6 +398,160 @@ def run_calibredb(args):
         error_msg = f'calibredb not found at {calibredb_path}. Please install Calibre.'
         print(f"❌ {error_msg}")
         return {'success': False, 'error': error_msg}
+
+
+# Supported ebook formats for import
+EBOOK_EXTENSIONS = {'.epub', '.pdf', '.mobi', '.azw', '.azw3', '.fb2', '.lit', '.prc', '.txt', '.rtf', '.djvu', '.cbz', '.cbr'}
+
+
+def scan_import_folder():
+    """Scan the import folder for ebook files."""
+    import_folder = config.get('import_folder', '')
+    if not import_folder or not os.path.isdir(import_folder):
+        return []
+
+    recursive = config.get('import_recursive', True)
+    files = []
+
+    if recursive:
+        # Walk through all subdirectories
+        for root, dirs, filenames in os.walk(import_folder):
+            for filename in filenames:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in EBOOK_EXTENSIONS:
+                    files.append(os.path.join(root, filename))
+    else:
+        # Only scan top-level directory
+        for filename in os.listdir(import_folder):
+            filepath = os.path.join(import_folder, filename)
+            if os.path.isfile(filepath):
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in EBOOK_EXTENSIONS:
+                    files.append(filepath)
+
+    return files
+
+
+def import_books_from_folder():
+    """Import books from the import folder into Calibre."""
+    global import_state
+
+    import_folder = config.get('import_folder', '')
+    if not import_folder:
+        return {'success': False, 'error': 'Import folder not configured'}
+
+    if not os.path.isdir(import_folder):
+        return {'success': False, 'error': f'Import folder does not exist: {import_folder}'}
+
+    # Find all ebook files
+    files = scan_import_folder()
+
+    # Filter out already imported files
+    already_imported = set(import_state.get('imported_files', []))
+    new_files = [f for f in files if f not in already_imported]
+
+    if not new_files:
+        import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        return {'success': True, 'imported': 0, 'message': 'No new files to import'}
+
+    imported_count = 0
+    errors = []
+    delete_after = config.get('import_delete', False)
+
+    for filepath in new_files:
+        try:
+            # Build calibredb add command
+            # --duplicates flag allows adding even if similar book exists
+            args = ['add', filepath, '--duplicates']
+
+            result = run_calibredb(args)
+
+            if result['success']:
+                imported_count += 1
+                import_state['imported_files'].append(filepath)
+                print(f"✅ Imported: {os.path.basename(filepath)}")
+
+                # Delete original if configured
+                if delete_after:
+                    try:
+                        os.remove(filepath)
+                        print(f"🗑️  Deleted original: {os.path.basename(filepath)}")
+                    except Exception as e:
+                        errors.append(f"Failed to delete {filepath}: {e}")
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                errors.append(f"{os.path.basename(filepath)}: {error_msg}")
+                print(f"❌ Failed to import {os.path.basename(filepath)}: {error_msg}")
+        except Exception as e:
+            errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+            print(f"❌ Error importing {os.path.basename(filepath)}: {e}")
+
+    # Update state
+    import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
+    import_state['last_imported_count'] = imported_count
+    import_state['total_imported'] += imported_count
+    if imported_count > 0:
+        import_state['last_import'] = time.strftime('%Y-%m-%d %H:%M:%S')
+    if errors:
+        import_state['errors'] = errors[-10:]  # Keep last 10 errors
+
+    return {
+        'success': True,
+        'imported': imported_count,
+        'errors': errors if errors else None,
+        'message': f'Imported {imported_count} book(s)'
+    }
+
+
+def import_watcher_thread():
+    """Background thread that periodically scans the import folder."""
+    global import_state
+
+    import_state['running'] = True
+    interval = config.get('import_interval', 60)
+
+    print(f"📂 Import watcher started (interval: {interval}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})")
+
+    while import_state['running']:
+        try:
+            result = import_books_from_folder()
+            if result.get('imported', 0) > 0:
+                print(f"📚 Import scan complete: {result.get('message', '')}")
+        except Exception as e:
+            print(f"❌ Import watcher error: {e}")
+            import_state['errors'].append(str(e))
+
+        # Sleep in small increments so we can stop quickly
+        for _ in range(interval):
+            if not import_state['running']:
+                break
+            time.sleep(1)
+
+    print("📂 Import watcher stopped")
+
+
+def start_import_watcher():
+    """Start the import watcher background thread if configured."""
+    import_folder = config.get('import_folder', '')
+
+    if not import_folder:
+        print("📂 Import folder not configured - watcher disabled")
+        return False
+
+    if not os.path.isdir(import_folder):
+        print(f"⚠️  Import folder does not exist: {import_folder}")
+        return False
+
+    # Start background thread
+    thread = threading.Thread(target=import_watcher_thread, daemon=True)
+    thread.start()
+    return True
+
+
+def stop_import_watcher():
+    """Stop the import watcher background thread."""
+    global import_state
+    import_state['running'] = False
 
 
 def ensure_reading_list_column():
@@ -1049,6 +1221,29 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         query_params = parse_qs(parsed_url.query)
         # Store parsed_url for use in handlers
         self.parsed_url = parsed_url
+        # API: Get import status
+        if path == '/api/import/status':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            status = {
+                'enabled': bool(config.get('import_folder')),
+                'running': import_state.get('running', False),
+                'folder': config.get('import_folder', ''),
+                'interval': config.get('import_interval', 60),
+                'recursive': config.get('import_recursive', True),
+                'delete_after_import': config.get('import_delete', False),
+                'last_scan': import_state.get('last_scan'),
+                'last_import': import_state.get('last_import'),
+                'last_imported_count': import_state.get('last_imported_count', 0),
+                'total_imported': import_state.get('total_imported', 0),
+                'pending_files': len(scan_import_folder()) - len(import_state.get('imported_files', [])),
+                'errors': import_state.get('errors', [])
+            }
+            response = json.dumps(status)
+            self.wfile.write(response.encode('utf-8'))
+            return
+
         # API: Get config
         if path == '/api/config':
             # Re-check env vars on each request to ensure they're fresh (fixes Docker env var persistence)
@@ -1526,6 +1721,24 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests"""
+        # API: Trigger manual import scan
+        if self.path == '/api/import/scan':
+            if not config.get('import_folder'):
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Import folder not configured'})
+                self.wfile.write(response.encode('utf-8'))
+                return
+
+            result = import_books_from_folder()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = json.dumps(result)
+            self.wfile.write(response.encode('utf-8'))
+            return
+
         # API: Update config
         if self.path == '/api/config':
             content_length = int(self.headers['Content-Length'])
@@ -2184,11 +2397,19 @@ if __name__ == "__main__":
     # Load config on startup
     load_config()
 
+    # Start import watcher if configured
+    start_import_watcher()
+
     with socketserver.TCPServer(("", PORT), FolioHandler) as httpd:
         print(f"🚀 Folio server running at http://localhost:{PORT}")
         print(f"📖 Calibre Library: {get_calibre_library()}")
         print(f"🔑 Hardcover API: {'Configured' if config.get('hardcover_token') else 'Not configured'}")
         print(f"🔍 Prowlarr: {'Configured (' + config.get('prowlarr_url', '') + ')' if config.get('prowlarr_url') and config.get('prowlarr_api_key') else 'Not configured'}")
+        import_folder = config.get('import_folder', '')
+        if import_folder:
+            print(f"📂 Import Folder: {import_folder} (interval: {config.get('import_interval', 60)}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})")
+        else:
+            print(f"📂 Import Folder: Not configured")
         print(f"\n   Library APIs:")
         print(f"   /api/books → Book list from metadata.db")
         print(f"   /api/cover/* → Book covers")
@@ -2203,6 +2424,9 @@ if __name__ == "__main__":
         print(f"\n   Config:")
         print(f"   /api/config → Configuration")
         print(f"   /api/browse → Directory browser")
+        print(f"\n   Import:")
+        print(f"   /api/import/status → Import watcher status")
+        print(f"   /api/import/scan → Trigger manual import (POST)")
         print(f"\n   📱 E-ink interface: http://localhost:{PORT}/eink.html")
         print("\nPress Ctrl+C to stop")
         httpd.serve_forever()
