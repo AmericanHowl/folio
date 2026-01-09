@@ -550,6 +550,489 @@ def get_book_cover(book_id):
         return None
 
 
+def get_reading_list_books(sort='added'):
+    """Get books that are on the reading list.
+    
+    Args:
+        sort: Sort order - 'added' (default, by timestamp), 'title', 'author'
+    
+    Returns:
+        List of book dicts with id, title, authors, timestamp, formats, has_cover, etc.
+    """
+    try:
+        reading_list_ids = get_reading_list_ids()
+        if not reading_list_ids:
+            return []
+        
+        conn = get_db_connection(readonly=True)
+        cursor = conn.cursor()
+        
+        # Build query to get books by IDs
+        placeholders = ','.join('?' * len(reading_list_ids))
+        
+        # Determine sort order
+        if sort == 'title':
+            order_clause = "ORDER BY b.sort"
+        elif sort == 'author':
+            order_clause = "ORDER BY authors, b.sort"
+        else:  # 'added' is default - sort by when added to library
+            order_clause = "ORDER BY b.timestamp DESC"
+        
+        query = f"""
+            SELECT
+                b.id,
+                b.title,
+                b.sort,
+                b.timestamp,
+                b.pubdate,
+                b.path,
+                b.has_cover,
+                GROUP_CONCAT(a.name, ' & ') as authors
+            FROM books b
+            LEFT JOIN books_authors_link bal ON b.id = bal.book
+            LEFT JOIN authors a ON bal.author = a.id
+            WHERE b.id IN ({placeholders})
+            GROUP BY b.id {order_clause}
+        """
+        
+        cursor.execute(query, reading_list_ids)
+        rows = cursor.fetchall()
+        
+        # Batch query for formats
+        book_ids = [row['id'] for row in rows]
+        formats_map = {}
+        if book_ids:
+            fmt_placeholders = ','.join('?' * len(book_ids))
+            cursor.execute(f"SELECT book, format, uncompressed_size FROM data WHERE book IN ({fmt_placeholders})", book_ids)
+            for fmt_row in cursor.fetchall():
+                book_id = fmt_row['book']
+                if book_id not in formats_map:
+                    formats_map[book_id] = []
+                formats_map[book_id].append({
+                    'format': fmt_row['format'].upper(),
+                    'size': fmt_row['uncompressed_size'] or 0
+                })
+        
+        books = []
+        for row in rows:
+            formats = formats_map.get(row['id'], [])
+            
+            # Parse authors - handle "LastName, FirstName" format
+            authors_list = []
+            seen_authors = set()
+            
+            def normalize_author(author_str):
+                author_str = author_str.strip()
+                if ', ' in author_str:
+                    parts = author_str.split(', ', 1)
+                    if len(parts) == 2:
+                        return f"{parts[1]} {parts[0]}"
+                elif '|' in author_str:
+                    parts = author_str.split('|', 1)
+                    if len(parts) == 2:
+                        return f"{parts[1].strip()} {parts[0].strip()}"
+                return author_str
+            
+            if row['authors']:
+                for author in row['authors'].split(' & '):
+                    normalized = normalize_author(author)
+                    key = normalized.lower()
+                    if key not in seen_authors:
+                        seen_authors.add(key)
+                        authors_list.append(normalized)
+            
+            book = {
+                'id': row['id'],
+                'title': row['title'],
+                'authors': authors_list if authors_list else ['Unknown Author'],
+                'timestamp': row['timestamp'],
+                'pubdate': row['pubdate'],
+                'has_cover': bool(row['has_cover']),
+                'formats': formats,
+                'path': row['path']
+            }
+            books.append(book)
+        
+        conn.close()
+        return books
+    except Exception as e:
+        print(f"❌ Error loading reading list books: {e}")
+        return []
+
+
+def render_kobo_page(books, page=1, sort='added', books_per_page=5):
+    """Render the Kobo e-ink HTML page server-side.
+    
+    This page works without JavaScript for the Kobo browser.
+    """
+    total_books = len(books)
+    total_pages = max(1, (total_books + books_per_page - 1) // books_per_page)
+    page = max(1, min(page, total_pages))
+    
+    start_idx = (page - 1) * books_per_page
+    end_idx = start_idx + books_per_page
+    page_books = books[start_idx:end_idx]
+    
+    def escape_html(text):
+        if not text:
+            return ''
+        return (str(text)
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;')
+            .replace("'", '&#39;'))
+    
+    def format_size(size_bytes):
+        if not size_bytes:
+            return ''
+        if size_bytes >= 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        elif size_bytes >= 1024:
+            return f"{size_bytes / 1024:.0f} KB"
+        return f"{size_bytes} B"
+    
+    def format_authors(authors_list):
+        if not authors_list:
+            return 'Unknown Author'
+        return ', '.join(authors_list)
+    
+    # Build book list HTML
+    book_items_html = ''
+    for book in page_books:
+        authors_str = escape_html(format_authors(book.get('authors', [])))
+        title_str = escape_html(book.get('title', 'Unknown Title'))
+        
+        # Find EPUB format preferentially, otherwise first format
+        formats = book.get('formats', [])
+        preferred_format = None
+        format_info = ''
+        
+        for fmt in formats:
+            if fmt['format'] == 'EPUB':
+                preferred_format = fmt
+                break
+        if not preferred_format and formats:
+            preferred_format = formats[0]
+        
+        if preferred_format:
+            size_str = format_size(preferred_format['size'])
+            format_info = f"KOBO {preferred_format['format']}"
+            if size_str:
+                format_info += f" · {size_str}"
+        
+        download_url = f"/api/download/{book['id']}/{preferred_format['format']}" if preferred_format else '#'
+        
+        book_items_html += f'''
+    <li class="book-item">
+      <img src="/api/cover/{book['id']}" alt="" class="book-cover">
+      <div class="book-info">
+        <h2 class="book-title">{title_str}</h2>
+        <p class="book-author">{authors_str}</p>
+      </div>
+      <div class="book-meta">
+        <div class="file-info">{escape_html(format_info)}</div>
+        <a href="{download_url}" class="download-btn">Download</a>
+      </div>
+    </li>'''
+    
+    # Empty state if no books
+    if not page_books:
+        book_items_html = '''
+    <li class="empty-state">
+      <p>No books in your reading list yet.</p>
+      <p>Add books from the main app to see them here.</p>
+    </li>'''
+    
+    # Sort dropdown options
+    sort_options = [
+        ('added', 'Date Added'),
+        ('title', 'Title'),
+        ('author', 'Author'),
+    ]
+    sort_options_html = ''
+    for value, label in sort_options:
+        selected = ' selected' if sort == value else ''
+        sort_options_html += f'<option value="{value}"{selected}>{label}</option>'
+    
+    # Previous/Next buttons
+    prev_disabled = ' disabled' if page <= 1 else ''
+    next_disabled = ' disabled' if page >= total_pages else ''
+    prev_page = page - 1 if page > 1 else 1
+    next_page = page + 1 if page < total_pages else total_pages
+    
+    html = f'''<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Folio - Reading List</title>
+  <style>
+    * {{
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }}
+    
+    html, body {{
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: #fff;
+      color: #000;
+    }}
+    
+    .header {{
+      background: #f0f0f0;
+      border-bottom: 2px solid #000;
+      padding: 12px 16px;
+      display: table;
+      width: 100%;
+    }}
+    
+    .header-logo {{
+      display: table-cell;
+      vertical-align: middle;
+      width: 40px;
+    }}
+    
+    .header-logo svg {{
+      width: 32px;
+      height: 32px;
+    }}
+    
+    .header-title {{
+      display: table-cell;
+      vertical-align: middle;
+      padding-left: 10px;
+    }}
+    
+    .header h1 {{
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.5px;
+    }}
+    
+    .header-sort {{
+      display: table-cell;
+      vertical-align: middle;
+      text-align: right;
+    }}
+    
+    .sort-form {{
+      display: inline;
+    }}
+    
+    .sort-select {{
+      background: #fff;
+      border: 2px solid #000;
+      padding: 10px 14px;
+      font-size: 16px;
+      font-weight: 500;
+      min-width: 120px;
+    }}
+    
+    .content {{
+      position: absolute;
+      top: 62px;
+      bottom: 70px;
+      left: 0;
+      right: 0;
+      overflow: hidden;
+    }}
+    
+    .book-list {{
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }}
+    
+    .book-item {{
+      display: table;
+      width: 100%;
+      padding: 10px 12px;
+      border-bottom: 1px solid #ccc;
+    }}
+    
+    .book-cover {{
+      display: table-cell;
+      vertical-align: top;
+      width: 55px;
+      height: 80px;
+      background: #ddd;
+      border: 1px solid #999;
+    }}
+    
+    .book-cover img {{
+      width: 55px;
+      height: 80px;
+      object-fit: cover;
+    }}
+    
+    .book-info {{
+      display: table-cell;
+      vertical-align: top;
+      padding: 0 12px;
+    }}
+    
+    .book-title {{
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 4px 0;
+      line-height: 1.2;
+    }}
+    
+    .book-author {{
+      font-size: 14px;
+      color: #444;
+      margin: 0;
+    }}
+    
+    .book-meta {{
+      display: table-cell;
+      vertical-align: middle;
+      text-align: right;
+      white-space: nowrap;
+      width: 100px;
+    }}
+    
+    .file-info {{
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 8px;
+    }}
+    
+    .download-btn {{
+      display: inline-block;
+      background: #000;
+      color: #fff;
+      border: none;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      text-align: center;
+    }}
+    
+    .empty-state {{
+      padding: 40px 20px;
+      text-align: center;
+      color: #666;
+    }}
+    
+    .empty-state p {{
+      margin: 10px 0;
+      font-size: 16px;
+    }}
+    
+    .pagination {{
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #f0f0f0;
+      border-top: 2px solid #000;
+      padding: 12px 16px;
+      display: table;
+      width: 100%;
+    }}
+    
+    .pagination-left {{
+      display: table-cell;
+      text-align: left;
+      width: 33%;
+    }}
+    
+    .pagination-center {{
+      display: table-cell;
+      text-align: center;
+      width: 34%;
+      font-size: 14px;
+      color: #444;
+      vertical-align: middle;
+    }}
+    
+    .pagination-right {{
+      display: table-cell;
+      text-align: right;
+      width: 33%;
+    }}
+    
+    .nav-btn {{
+      display: inline-block;
+      background: #000;
+      color: #fff;
+      border: 2px solid #000;
+      padding: 14px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      text-align: center;
+      min-width: 110px;
+    }}
+    
+    .nav-btn[disabled],
+    .nav-btn.disabled {{
+      background: #ccc;
+      color: #888;
+      border-color: #999;
+      pointer-events: none;
+    }}
+    
+    .page-info {{
+      font-weight: 500;
+    }}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-logo">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" rx="20" fill="#000"/>
+        <path d="M25 20h50v60H25z" fill="#fff"/>
+        <path d="M30 25h40v50H30z" fill="#000"/>
+        <path d="M35 35h25v3H35zM35 42h30v2H35zM35 48h28v2H35zM35 54h30v2H35zM35 60h20v2H35z" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="header-title">
+      <h1>Reading List</h1>
+    </div>
+    <div class="header-sort">
+      <form method="GET" action="/kobo" class="sort-form">
+        <input type="hidden" name="page" value="1">
+        <select name="sort" class="sort-select" onchange="this.form.submit()">
+          {sort_options_html}
+        </select>
+        <noscript><button type="submit" class="nav-btn" style="margin-left:8px;padding:10px 16px;">Go</button></noscript>
+      </form>
+    </div>
+  </div>
+  
+  <div class="content">
+    <ul class="book-list">
+{book_items_html}
+    </ul>
+  </div>
+  
+  <div class="pagination">
+    <div class="pagination-left">
+      <a href="/kobo?page={prev_page}&amp;sort={sort}" class="nav-btn{prev_disabled}">← Prev</a>
+    </div>
+    <div class="pagination-center">
+      <span class="page-info">{page} / {total_pages}</span>
+    </div>
+    <div class="pagination-right">
+      <a href="/kobo?page={next_page}&amp;sort={sort}" class="nav-btn{next_disabled}">Next →</a>
+    </div>
+  </div>
+</body>
+</html>'''
+    
+    return html
+
+
 def find_calibredb():
     """Find calibredb executable across platforms"""
     # Check if path is configured
@@ -1595,6 +2078,29 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         query_params = parse_qs(parsed_url.query)
         # Store parsed_url for use in handlers
         self.parsed_url = parsed_url
+        
+        # Kobo e-ink interface (server-rendered, no JavaScript)
+        if path == '/kobo':
+            try:
+                page = int(query_params.get('page', [1])[0])
+                sort = query_params.get('sort', ['added'])[0]
+                if sort not in ('added', 'title', 'author'):
+                    sort = 'added'
+                
+                books = get_reading_list_books(sort=sort)
+                html = render_kobo_page(books, page=page, sort=sort, books_per_page=5)
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Cache-Control', 'no-cache')
+                self.end_headers()
+                self.wfile.write(html.encode('utf-8'))
+                return
+            except Exception as e:
+                print(f"❌ Kobo page error: {e}")
+                self.send_error(500, f"Error rendering Kobo page: {str(e)}")
+                return
+        
         # API: Get import status
         if path == '/api/import/status':
             self.send_response(200)
@@ -2441,21 +2947,28 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             boundary = str(uuid.uuid4())
                             
                             # Build multipart body
+                            # Each part is: --boundary\r\nheaders\r\n\r\ncontent
                             body_parts = []
-                            # Add the torrent file
-                            body_parts.append(f'--{boundary}'.encode())
-                            body_parts.append(b'Content-Disposition: form-data; name="torrents"; filename="download.torrent"')
-                            body_parts.append(b'Content-Type: application/x-bittorrent')
-                            body_parts.append(b'')
-                            body_parts.append(torrent_data)
-                            # Add ebook category
-                            body_parts.append(f'--{boundary}'.encode())
-                            body_parts.append(b'Content-Disposition: form-data; name="category"')
-                            body_parts.append(b'')
-                            body_parts.append(b'ebook')
-                            body_parts.append(f'--{boundary}--'.encode())
                             
-                            add_data = b'\r\n\r\n'.join(body_parts)
+                            # Add the torrent file part
+                            body_parts.append(
+                                f'--{boundary}\r\n'.encode() +
+                                b'Content-Disposition: form-data; name="torrents"; filename="download.torrent"\r\n' +
+                                b'Content-Type: application/x-bittorrent\r\n' +
+                                b'\r\n' +
+                                torrent_data
+                            )
+                            
+                            # Add ebook category part
+                            body_parts.append(
+                                f'--{boundary}\r\n'.encode() +
+                                b'Content-Disposition: form-data; name="category"\r\n' +
+                                b'\r\n' +
+                                b'ebook'
+                            )
+                            
+                            # Join parts with \r\n and add closing boundary
+                            add_data = b'\r\n'.join(body_parts) + f'\r\n--{boundary}--\r\n'.encode()
                             add_req = urllib.request.Request(add_url, data=add_data, method='POST')
                             add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
                             
@@ -3106,5 +3619,6 @@ if __name__ == "__main__":
         print(f"   /api/import/status → Import watcher status")
         print(f"   /api/import/scan → Trigger manual import (POST)")
         print(f"\n   📱 E-ink interface: http://localhost:{PORT}/eink.html")
+        print(f"   📖 Kobo interface: http://localhost:{PORT}/kobo")
         print("\nPress Ctrl+C to stop")
         httpd.serve_forever()
