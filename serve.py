@@ -1762,10 +1762,33 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     # Transform results to a simpler format
                     formatted_results = []
                     missing_indexer_count = 0
-                    for item in results:
+                    for idx, item in enumerate(results):
                         indexer_id = item.get('indexerId')
                         if indexer_id is None:
                             missing_indexer_count += 1
+                        
+                        # #region agent log
+                        if idx < 3:  # Log first 3 results
+                            import json as json_module
+                            with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
+                                f.write(json_module.dumps({
+                                    'sessionId': 'debug-session',
+                                    'runId': 'run1',
+                                    'hypothesisId': 'D',
+                                    'location': 'serve.py:1765',
+                                    'message': 'Prowlarr search result',
+                                    'data': {
+                                        'result_index': idx,
+                                        'title': item.get('title', 'Unknown')[:50],
+                                        'indexerId': indexer_id,
+                                        'indexerId_type': type(indexer_id).__name__ if indexer_id is not None else None,
+                                        'indexer': item.get('indexer', 'Unknown'),
+                                        'guid': item.get('guid', ''),
+                                        'all_keys': list(item.keys())
+                                    },
+                                    'timestamp': int(time.time() * 1000)
+                                }) + '\n')
+                        # #endregion
                         
                         formatted_results.append({
                             'title': item.get('title', 'Unknown'),
@@ -2241,6 +2264,26 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 indexer_id = data.get('indexerId')
                 title = data.get('title', 'Unknown')
 
+                # #region agent log
+                import json as json_module
+                with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
+                    f.write(json_module.dumps({
+                        'sessionId': 'debug-session',
+                        'runId': 'run1',
+                        'hypothesisId': 'A',
+                        'location': 'serve.py:2238',
+                        'message': 'Download request received from client',
+                        'data': {
+                            'full_request': data,
+                            'guid': guid,
+                            'indexerId': indexer_id,
+                            'indexerId_type': type(indexer_id).__name__ if indexer_id is not None else None,
+                            'title': title
+                        },
+                        'timestamp': int(time.time() * 1000)
+                    }) + '\n')
+                # #endregion
+
                 print(f"📥 Download request: guid={guid}, indexerId={indexer_id}, title={title}")
 
                 if not guid:
@@ -2292,6 +2335,28 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     }
                     command_payload = json.dumps(command_payload_dict).encode('utf-8')
                     
+                    # #region agent log
+                    import json as json_module
+                    with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
+                        f.write(json_module.dumps({
+                            'sessionId': 'debug-session',
+                            'runId': 'run1',
+                            'hypothesisId': 'B',
+                            'location': 'serve.py:2288',
+                            'message': 'Prowlarr DownloadRelease command payload',
+                            'data': {
+                                'command_url': command_url,
+                                'payload': command_payload_dict,
+                                'indexerId_original': indexer_id,
+                                'indexerId_converted': indexer_id_int,
+                                'indexerId_type': type(indexer_id_int).__name__,
+                                'guid': guid,
+                                'title': title
+                            },
+                            'timestamp': int(time.time() * 1000)
+                        }) + '\n')
+                    # #endregion
+                    
                     req = urllib.request.Request(command_url, data=command_payload, method='POST')
                     req.add_header('Content-Type', 'application/json')
                     req.add_header('X-Api-Key', prowlarr_api_key)
@@ -2326,6 +2391,36 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         error_msg = error_data.get('message') or error_data.get('error') or error_body or str(e)
                     except Exception as parse_err:
                         error_msg = error_body or str(e)
+                    
+                    # #region agent log
+                    import json as json_module
+                    try:
+                        payload_for_log = command_payload_dict
+                        url_for_log = command_url
+                    except NameError:
+                        payload_for_log = {'name': 'DownloadRelease', 'guid': guid, 'indexerId': indexer_id}
+                        url_for_log = f"{prowlarr_url}/api/v1/command"
+                    with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
+                        f.write(json_module.dumps({
+                            'sessionId': 'debug-session',
+                            'runId': 'run1',
+                            'hypothesisId': 'C',
+                            'location': 'serve.py:2321',
+                            'message': 'Prowlarr HTTP error response',
+                            'data': {
+                                'http_code': e.code,
+                                'http_reason': e.reason,
+                                'error_body_raw': error_body,
+                                'error_data_parsed': error_data if error_body else None,
+                                'error_msg': error_msg,
+                                'request_payload': payload_for_log,
+                                'command_url': url_for_log,
+                                'guid': guid,
+                                'indexerId': indexer_id
+                            },
+                            'timestamp': int(time.time() * 1000)
+                        }) + '\n')
+                    # #endregion
                     
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
