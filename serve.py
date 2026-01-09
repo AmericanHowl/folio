@@ -5,6 +5,7 @@ No Calibre Content Server needed - reads directly from metadata.db
 """
 import http.server
 import socketserver
+from socketserver import ThreadingMixIn
 import urllib.request
 from urllib.parse import urlparse, parse_qs
 import json
@@ -198,7 +199,8 @@ def get_db_connection():
     if not os.path.exists(db_path):
         raise FileNotFoundError(f"Calibre database not found at {db_path}")
 
-    conn = sqlite3.connect(db_path)
+    # Add timeout for concurrent access (threaded server)
+    conn = sqlite3.connect(db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
 
     # Some Calibre databases use custom SQLite functions (e.g. title_sort)
@@ -2566,7 +2568,12 @@ if __name__ == "__main__":
     # Start import watcher if configured
     start_import_watcher()
 
-    with socketserver.TCPServer(("", PORT), FolioHandler) as httpd:
+    # Use threaded server to handle concurrent cover image requests
+    class ThreadedTCPServer(ThreadingMixIn, socketserver.TCPServer):
+        allow_reuse_address = True
+        daemon_threads = True  # Threads die when main thread exits
+
+    with ThreadedTCPServer(("", PORT), FolioHandler) as httpd:
         print(f"🚀 Folio server running at http://localhost:{PORT}")
         print(f"📖 Calibre Library: {get_calibre_library()}")
         print(f"🔑 Hardcover API: {'Configured' if config.get('hardcover_token') else 'Not configured'}")
