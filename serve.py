@@ -2334,6 +2334,43 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             print(f"⚠️ qBittorrent login response: {login_result}", flush=True)
                         else:
                             print(f"✅ qBittorrent login successful", flush=True)
+                    except urllib.error.HTTPError as e:
+                        if e.code == 404:
+                            print(f"❌ qBittorrent login 404 - Web UI may not be enabled or URL is wrong", flush=True)
+                            self.send_response(500)
+                            self.send_header('Content-Type', 'application/json')
+                            self.end_headers()
+                            response = json.dumps({
+                                'success': False,
+                                'error': f'qBittorrent Web UI not found at {qbt_url}. Please check: 1) Web UI is enabled in qBittorrent settings, 2) The URL is correct (e.g., http://localhost:8080)'
+                            })
+                            self.wfile.write(response.encode('utf-8'))
+                            return
+                        elif e.code == 403:
+                            print(f"❌ qBittorrent login 403 - Invalid credentials", flush=True)
+                            self.send_response(500)
+                            self.send_header('Content-Type', 'application/json')
+                            self.end_headers()
+                            response = json.dumps({
+                                'success': False,
+                                'error': 'qBittorrent login failed: Invalid username or password'
+                            })
+                            self.wfile.write(response.encode('utf-8'))
+                            return
+                        else:
+                            print(f"⚠️ qBittorrent login failed with HTTP {e.code}: {e}", flush=True)
+                            # Continue anyway - might work without auth
+                    except urllib.error.URLError as e:
+                        print(f"❌ Cannot connect to qBittorrent at {qbt_url}: {e.reason}", flush=True)
+                        self.send_response(500)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        response = json.dumps({
+                            'success': False,
+                            'error': f'Cannot connect to qBittorrent at {qbt_url}. Is it running? Error: {e.reason}'
+                        })
+                        self.wfile.write(response.encode('utf-8'))
+                        return
                     except Exception as e:
                         print(f"⚠️ qBittorrent login failed: {e}", flush=True)
                         # Continue anyway - maybe auth is disabled
@@ -2381,14 +2418,40 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         self.wfile.write(response.encode('utf-8'))
                     
                 except urllib.error.HTTPError as e:
-                    error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+                    error_body = ''
+                    try:
+                        error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+                    except:
+                        error_body = str(e)
                     print(f"❌ qBittorrent add error {e.code}: {error_body}", flush=True)
+                    
+                    # Provide helpful error messages based on HTTP status code
+                    if e.code == 404:
+                        error_msg = f'qBittorrent API not found (404). Please check: 1) Web UI is enabled in qBittorrent Preferences > Web UI, 2) QBITTORRENT_URL is correct (currently: {qbt_url})'
+                    elif e.code == 403:
+                        error_msg = 'qBittorrent rejected the request (403 Forbidden). Check your username/password or authentication settings.'
+                    elif e.code == 401:
+                        error_msg = 'qBittorrent authentication required (401). Please set QBITTORRENT_USERNAME and QBITTORRENT_PASSWORD.'
+                    else:
+                        error_msg = f'qBittorrent error ({e.code}): {error_body}'
+                    
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
                     response = json.dumps({
                         'success': False,
-                        'error': f'qBittorrent error: {error_body}'
+                        'error': error_msg
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                    
+                except urllib.error.URLError as e:
+                    print(f"❌ Cannot connect to qBittorrent: {e.reason}", flush=True)
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False,
+                        'error': f'Cannot connect to qBittorrent at {qbt_url}. Is it running? Error: {e.reason}'
                     })
                     self.wfile.write(response.encode('utf-8'))
                     
