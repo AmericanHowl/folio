@@ -516,6 +516,13 @@ function folioApp() {
                 alert('Invalid download link. Please try a different result.');
                 return;
             }
+            
+            // Check for indexerId (must exist and not be null/undefined)
+            if (result.indexerId === null || result.indexerId === undefined) {
+                console.error('Missing indexerId for result:', result);
+                alert('This result is missing indexer information and cannot be downloaded automatically. Try a different result.');
+                return;
+            }
 
             // Find the index of this result for tracking
             const resultIndex = this.prowlarrSearchResults.findIndex(r => r.guid === result.guid);
@@ -1912,6 +1919,11 @@ function folioApp() {
                 
                 if (data.success) {
                     this.prowlarrSearchResults = data.results || [];
+                    // Debug: log indexerIds for troubleshooting
+                    if (this.prowlarrSearchResults.length > 0) {
+                        const first = this.prowlarrSearchResults[0];
+                        console.log(`🔍 Prowlarr results: ${this.prowlarrSearchResults.length}, first indexerId: ${first.indexerId}, indexer: ${first.indexer}`);
+                    }
                     this.sortProwlarrResults();
                 } else {
                     this.prowlarrError = data.error || 'Failed to search Prowlarr';

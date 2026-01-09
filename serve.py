@@ -325,11 +325,26 @@ def get_db_connection(readonly=False):
     return conn
 
 
-def get_books(limit=50, offset=0, search=None):
-    """Get books from the Calibre database"""
+def get_books(limit=50, offset=0, search=None, sort='recent'):
+    """Get books from the Calibre database
+    
+    Args:
+        limit: Max books to return
+        offset: Pagination offset
+        search: Optional search term
+        sort: Sort order - 'recent' (default), 'title', 'author'
+    """
     try:
         conn = get_db_connection(readonly=True)
         cursor = conn.cursor()
+
+        # Determine sort order - default to recently added
+        if sort == 'title':
+            order_clause = "ORDER BY b.sort"
+        elif sort == 'author':
+            order_clause = "ORDER BY authors, b.sort"
+        else:  # 'recent' is default
+            order_clause = "ORDER BY b.timestamp DESC"
 
         # Base query
         query = """
@@ -342,8 +357,8 @@ def get_books(limit=50, offset=0, search=None):
                 b.series_index,
                 b.path,
                 b.has_cover,
-                GROUP_CONCAT(a.name, ' & ') as authors,
-                GROUP_CONCAT(t.name, ', ') as tags,
+                GROUP_CONCAT(DISTINCT a.name, ' & ') as authors,
+                GROUP_CONCAT(DISTINCT t.name, ', ') as tags,
                 c.text as comments,
                 p.name as publisher,
                 s.name as series
@@ -366,19 +381,28 @@ def get_books(limit=50, offset=0, search=None):
         else:
             params = (limit, offset)
 
-        query += " GROUP BY b.id ORDER BY b.sort LIMIT ? OFFSET ?"
+        query += f" GROUP BY b.id {order_clause} LIMIT ? OFFSET ?"
 
         cursor.execute(query, params)
         rows = cursor.fetchall()
+        
+        # Get all book IDs for batch format query
+        book_ids = [row['id'] for row in rows]
+        
+        # Batch query for formats (avoids N+1 queries)
+        formats_map = {}
+        if book_ids:
+            placeholders = ','.join('?' * len(book_ids))
+            cursor.execute(f"SELECT book, format FROM data WHERE book IN ({placeholders})", book_ids)
+            for fmt_row in cursor.fetchall():
+                book_id = fmt_row['book']
+                if book_id not in formats_map:
+                    formats_map[book_id] = []
+                formats_map[book_id].append(fmt_row['format'].upper())
 
         books = []
         for row in rows:
-            # Get formats
-            cursor.execute(
-                "SELECT format, name FROM data WHERE book = ?",
-                (row['id'],)
-            )
-            formats = [f['format'].upper() for f in cursor.fetchall()]
+            formats = formats_map.get(row['id'], [])
 
             # Parse authors - handle various separators and formats, and deduplicate
             # Calibre stores authors as "LastName, FirstName" or "LastName| FirstName" - convert to "FirstName LastName"
@@ -1734,21 +1758,24 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 with urllib.request.urlopen(req) as response:
                     results = json.loads(response.read().decode('utf-8'))
                     
-                    # Log first result for debugging indexer ID issues
+                    # Log raw response structure for debugging
                     if results:
                         first = results[0]
-                        print(f"🔍 Prowlarr first result keys: {list(first.keys())}")
-                        print(f"🔍 indexerId={first.get('indexerId')}, indexer={first.get('indexer')}")
+                        print(f"🔍 Prowlarr raw result keys: {sorted(first.keys())}")
+                        # Log all fields that might contain indexer info
+                        for key in ['indexerId', 'indexer', 'indexerFlags', 'indexer_id']:
+                            if key in first:
+                                print(f"🔍   {key} = {first.get(key)}")
                     
                     # Transform results to a simpler format
                     formatted_results = []
+                    missing_indexer_count = 0
                     for item in results:
-                        # Get indexerId - Prowlarr should return it directly
+                        # Get indexerId - Prowlarr returns it directly as 'indexerId'
                         indexer_id = item.get('indexerId')
                         
-                        # Log warning if indexerId is missing
                         if indexer_id is None:
-                            print(f"⚠️  Result missing indexerId: {item.get('title', 'Unknown')[:50]}")
+                            missing_indexer_count += 1
                         
                         formatted_results.append({
                             'title': item.get('title', 'Unknown'),
@@ -1764,7 +1791,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             'categories': item.get('categories', [])
                         })
                     
-                    print(f"🔍 Prowlarr search returned {len(formatted_results)} results")
+                    print(f"🔍 Prowlarr search: {len(formatted_results)} results, {missing_indexer_count} missing indexerId")
                     
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
@@ -1932,8 +1959,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             limit = int(query_params.get('limit', [50])[0])
             offset = int(query_params.get('offset', [0])[0])
             search = query_params.get('search', [None])[0]
+            sort = query_params.get('sort', ['recent'])[0]  # 'recent', 'title', 'author'
 
-            books = get_books(limit=limit, offset=offset, search=search)
+            books = get_books(limit=limit, offset=offset, search=search, sort=sort)
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -2233,7 +2261,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(response.encode('utf-8'))
                     return
 
-                if not indexer_id:
+                if indexer_id is None:
                     print(f"⚠️  No indexerId provided. Data received: {data}")
                     self.send_response(400)
                     self.send_header('Content-Type', 'application/json')
@@ -2724,9 +2752,13 @@ if __name__ == "__main__":
     # Load config on startup
     load_config()
 
-    # Pre-load cover cache to avoid DB contention on startup
-    print("📦 Pre-loading cover cache...")
-    cover_cache.load_all()
+    # Pre-load cover cache asynchronously (don't block server startup)
+    def preload_cover_cache():
+        print("📦 Pre-loading cover cache in background...")
+        cover_cache.load_all()
+    
+    cache_thread = threading.Thread(target=preload_cover_cache, daemon=True)
+    cache_thread.start()
 
     # Start import watcher if configured
     start_import_watcher()
