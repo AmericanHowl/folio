@@ -2285,9 +2285,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 try:
-                    # Prowlarr release grab endpoint - use /api/v1/release/grab
-                    # This endpoint requires guid and indexerId parameters
-                    grab_url = f"{prowlarr_url}/api/v1/release/grab"
+                    # Prowlarr command endpoint to send download to bittorrent client
+                    # The DownloadRelease command requires guid and indexerId parameters
+                    command_url = f"{prowlarr_url}/api/v1/command"
                     
                     # Ensure indexerId is an integer (Prowlarr expects int, not string)
                     try:
@@ -2295,20 +2295,21 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     except (ValueError, TypeError):
                         indexer_id_int = indexer_id
                     
-                    grab_payload_dict = {
+                    command_payload_dict = {
+                        'name': 'DownloadRelease',
                         'guid': guid,
                         'indexerId': indexer_id_int
                     }
-                    grab_payload = json.dumps(grab_payload_dict).encode('utf-8')
+                    command_payload = json.dumps(command_payload_dict).encode('utf-8')
                     
-                    req = urllib.request.Request(grab_url, data=grab_payload, method='POST')
+                    req = urllib.request.Request(command_url, data=command_payload, method='POST')
                     req.add_header('Content-Type', 'application/json')
                     req.add_header('X-Api-Key', prowlarr_api_key)
                     
                     with urllib.request.urlopen(req) as response:
                         result = json.loads(response.read().decode('utf-8'))
                         
-                        # Check if release grab was successful (200 or 201)
+                        # Check if command was successful
                         if response.status == 201 or response.status == 200:
                             self.send_response(200)
                             self.send_header('Content-Type', 'application/json')
