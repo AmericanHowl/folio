@@ -3399,29 +3399,22 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             import uuid
                             boundary = str(uuid.uuid4())
                             
-                            # Build multipart body
-                            # Each part is: --boundary\r\nheaders\r\n\r\ncontent
-                            body_parts = []
-                            
-                            # Add the torrent file part
-                            body_parts.append(
+                            # Build multipart body following RFC 2046 format exactly
+                            add_data = (
+                                # Torrent file part
                                 f'--{boundary}\r\n'.encode() +
                                 b'Content-Disposition: form-data; name="torrents"; filename="download.torrent"\r\n' +
                                 b'Content-Type: application/x-bittorrent\r\n' +
                                 b'\r\n' +
-                                torrent_data
-                            )
-                            
-                            # Add ebook category part
-                            body_parts.append(
-                                f'--{boundary}\r\n'.encode() +
+                                torrent_data +
+                                # Category part (must match category name in qBittorrent)
+                                f'\r\n--{boundary}\r\n'.encode() +
                                 b'Content-Disposition: form-data; name="category"\r\n' +
                                 b'\r\n' +
-                                b'ebook'
+                                b'ebooks' +
+                                # Closing boundary
+                                f'\r\n--{boundary}--\r\n'.encode()
                             )
-                            
-                            # Join parts with \r\n and add closing boundary
-                            add_data = b'\r\n'.join(body_parts) + f'\r\n--{boundary}--\r\n'.encode()
                             add_req = urllib.request.Request(add_url, data=add_data, method='POST')
                             add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
                             
