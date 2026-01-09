@@ -2229,28 +2229,32 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
         # API: Download from Prowlarr (send to bittorrent client)
         if self.path == '/api/prowlarr/download':
-            # Re-check env vars on each request to ensure they're fresh
-            env_prowlarr_url = os.getenv('PROWLARR_URL', '').strip()
-            env_prowlarr_key = sanitize_token(os.getenv('PROWLARR_API_KEY', ''))
-            if env_prowlarr_url:
-                config['prowlarr_url'] = env_prowlarr_url
-            if env_prowlarr_key:
-                config['prowlarr_api_key'] = env_prowlarr_key
-            content_length = int(self.headers['Content-Length'])
-            body = self.rfile.read(content_length)
-
+            import sys
+            print(f"📥 Prowlarr download endpoint hit", flush=True)
+            
             try:
+                # Re-check env vars on each request to ensure they're fresh
+                env_prowlarr_url = os.getenv('PROWLARR_URL', '').strip()
+                env_prowlarr_key = sanitize_token(os.getenv('PROWLARR_API_KEY', ''))
+                if env_prowlarr_url:
+                    config['prowlarr_url'] = env_prowlarr_url
+                if env_prowlarr_key:
+                    config['prowlarr_api_key'] = env_prowlarr_key
+                content_length = int(self.headers['Content-Length'])
+                body = self.rfile.read(content_length)
+
                 data = json.loads(body.decode('utf-8'))
                 guid = data.get('guid')
                 indexer_id = data.get('indexerId')
                 title = data.get('title', 'Unknown')
 
-                # Log to stdout (visible in Docker logs)
-                print(f"📥 Download request received:")
-                print(f"   guid={guid}")
-                print(f"   indexerId={indexer_id} (type: {type(indexer_id).__name__})")
-                print(f"   title={title}")
-                print(f"   full_request={data}")
+                # Log to stdout (visible in Docker logs) - with flush for immediate output
+                print(f"📥 Download request received:", flush=True)
+                print(f"   guid={guid}", flush=True)
+                print(f"   indexerId={indexer_id} (type: {type(indexer_id).__name__})", flush=True)
+                print(f"   title={title}", flush=True)
+                print(f"   full_request={data}", flush=True)
+                sys.stdout.flush()
 
                 if not guid:
                     self.send_response(400)
@@ -2300,8 +2304,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     }
                     grab_payload = json.dumps(grab_payload_dict).encode('utf-8')
                     
-                    # Log to stdout (visible in Docker logs)
-                    print(f"🔍 Prowlarr grab request: URL={grab_url}, payload={grab_payload_dict}, title={title}")
+                    # Log to stdout (visible in Docker logs) - with flush for immediate output
+                    print(f"🔍 Prowlarr grab request: URL={grab_url}, payload={grab_payload_dict}, title={title}", flush=True)
                     
                     # Helper function to attempt the grab
                     def attempt_grab():
@@ -2313,17 +2317,17 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     # Helper function to refresh search cache
                     def refresh_search_cache(search_title):
                         """Re-run search to refresh Prowlarr's internal cache"""
-                        print(f"🔄 Refreshing Prowlarr search cache for: {search_title}")
+                        print(f"🔄 Refreshing Prowlarr search cache for: {search_title}", flush=True)
                         search_url = f"{prowlarr_url}/api/v1/search?query={urllib.parse.quote(search_title)}&indexerIds={indexer_id_int}"
                         search_req = urllib.request.Request(search_url)
                         search_req.add_header('X-Api-Key', prowlarr_api_key)
                         try:
                             with urllib.request.urlopen(search_req, timeout=30) as search_resp:
                                 results = json.loads(search_resp.read().decode('utf-8'))
-                                print(f"🔄 Search cache refreshed: {len(results)} results")
+                                print(f"🔄 Search cache refreshed: {len(results)} results", flush=True)
                                 return True
                         except Exception as e:
-                            print(f"⚠️ Failed to refresh search cache: {e}")
+                            print(f"⚠️ Failed to refresh search cache: {e}", flush=True)
                             return False
                     
                     grab_success = False
@@ -2343,7 +2347,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         # Check if this is the "Sequence contains no matching element" error
                         # This means Prowlarr's search cache has expired
                         if 'Sequence contains no matching element' in error_body or e.code == 500:
-                            print(f"⚠️ Prowlarr cache expired, refreshing search...")
+                            print(f"⚠️ Prowlarr cache expired, refreshing search...", flush=True)
                             
                             # Refresh the search cache
                             if refresh_search_cache(title):
@@ -2356,11 +2360,11 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                                     grab_result = json.loads(grab_response.read().decode('utf-8'))
                                     grab_success = grab_response.status in (200, 201)
                                     last_error = None
-                                    print(f"✅ Retry successful after cache refresh")
+                                    print(f"✅ Retry successful after cache refresh", flush=True)
                                 except urllib.error.HTTPError as retry_e:
                                     error_body = retry_e.read().decode('utf-8') if hasattr(retry_e, 'read') else ''
                                     last_error = (retry_e, error_body)
-                                    print(f"❌ Retry also failed: {retry_e.code} - {error_body}")
+                                    print(f"❌ Retry also failed: {retry_e.code} - {error_body}", flush=True)
                     
                     # Handle the result
                     if grab_success:
@@ -2372,7 +2376,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             'message': 'Download sent to bittorrent client successfully'
                         })
                         self.wfile.write(response.encode('utf-8'))
-                        print(f"✅ Sent download to Prowlarr: {data.get('title', guid)}")
+                        print(f"✅ Sent download to Prowlarr: {data.get('title', guid)}", flush=True)
                     elif last_error:
                         # Handle the error directly here since we have the captured error body
                         e, error_body = last_error
@@ -2384,11 +2388,11 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             error_msg = error_body or str(e)
                         
                         # Log detailed error to stdout (visible in Docker logs)
-                        print(f"❌ Prowlarr HTTP error {e.code} ({e.reason}):")
-                        print(f"   URL: {grab_url}")
-                        print(f"   Payload: {grab_payload_dict}")
-                        print(f"   Error body: {error_body}")
-                        print(f"   Parsed error: {error_data}")
+                        print(f"❌ Prowlarr HTTP error {e.code} ({e.reason}):", flush=True)
+                        print(f"   URL: {grab_url}", flush=True)
+                        print(f"   Payload: {grab_payload_dict}", flush=True)
+                        print(f"   Error body: {error_body}", flush=True)
+                        print(f"   Parsed error: {error_data}", flush=True)
                         
                         # Return detailed error to client
                         self.send_response(500)
@@ -2406,10 +2410,10 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         }
                         response = json.dumps(error_response)
                         self.wfile.write(response.encode('utf-8'))
-                        print(f"❌ Prowlarr download error: {error_msg}")
+                        print(f"❌ Prowlarr download error: {error_msg}", flush=True)
                     else:
                         error_msg = grab_result.get('message', 'Unknown error') if grab_result else 'Unknown error'
-                        print(f"❌ Prowlarr grab failed: {error_msg}, result={grab_result}")
+                        print(f"❌ Prowlarr grab failed: {error_msg}, result={grab_result}", flush=True)
                         self.send_response(500)
                         self.send_header('Content-Type', 'application/json')
                         self.end_headers()
@@ -2453,20 +2457,26 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Prowlarr download error: {error_msg}")
                     
                 except Exception as e:
+                    import traceback
+                    print(f"❌ Inner download error: {e}", flush=True)
+                    print(f"❌ Traceback: {traceback.format_exc()}", flush=True)
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
                     response = json.dumps({'success': False, 'error': f'Failed to send download: {str(e)}'})
                     self.wfile.write(response.encode('utf-8'))
-                    print(f"❌ Download error: {e}")
                     
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON decode error in prowlarr download: {e}", flush=True)
                 self.send_response(400)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 response = json.dumps({'success': False, 'error': 'Invalid JSON in request body'})
                 self.wfile.write(response.encode('utf-8'))
             except Exception as e:
+                import traceback
+                print(f"❌ Outer prowlarr download error: {e}", flush=True)
+                print(f"❌ Traceback: {traceback.format_exc()}", flush=True)
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
