@@ -2622,6 +2622,122 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
             return
 
+        # API: Validate qBittorrent connection
+        if self.path == '/api/qbittorrent/validate':
+            print(f"🔍 qBittorrent validate endpoint hit", flush=True)
+
+            try:
+                # Get qBittorrent config from environment
+                qbt_url = os.getenv('QBITTORRENT_URL', '').strip().rstrip('/')
+                qbt_username = os.getenv('QBITTORRENT_USERNAME', '').strip()
+                qbt_password = os.getenv('QBITTORRENT_PASSWORD', '').strip()
+
+                print(f"🔍 qBittorrent config - URL: {qbt_url}, Username: {'***' if qbt_username else '(none)'}, Password: {'***' if qbt_password else '(none)'}", flush=True)
+
+                if not qbt_url:
+                    print(f"❌ qBittorrent validation failed: URL not configured", flush=True)
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False,
+                        'error': 'qBittorrent not configured. Set QBITTORRENT_URL environment variable.',
+                        'configured': False
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                # Cookie jar for session management
+                cookie_jar = http.cookiejar.CookieJar()
+                opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
+
+                # Try to login (if credentials provided)
+                if qbt_username and qbt_password:
+                    login_url = f"{qbt_url}/api/v2/auth/login"
+                    login_data = urllib.parse.urlencode({
+                        'username': qbt_username,
+                        'password': qbt_password
+                    }).encode('utf-8')
+
+                    try:
+                        login_req = urllib.request.Request(login_url, data=login_data, method='POST')
+                        login_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+                        login_resp = opener.open(login_req, timeout=10)
+                        login_result = login_resp.read().decode('utf-8')
+
+                        if login_result.strip().lower() != 'ok.':
+                            print(f"❌ qBittorrent login failed: {login_result}", flush=True)
+                            self.send_response(400)
+                            self.send_header('Content-Type', 'application/json')
+                            self.end_headers()
+                            response = json.dumps({
+                                'success': False,
+                                'error': f'qBittorrent login failed: {login_result}',
+                                'configured': True,
+                                'login_failed': True
+                            })
+                            self.wfile.write(response.encode('utf-8'))
+                            return
+                        else:
+                            print(f"✅ qBittorrent login successful", flush=True)
+                    except Exception as e:
+                        print(f"❌ qBittorrent login exception: {e}", flush=True)
+                        self.send_response(500)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        response = json.dumps({
+                            'success': False,
+                            'error': f'Failed to connect to qBittorrent: {str(e)}',
+                            'configured': True,
+                            'connection_failed': True
+                        })
+                        self.wfile.write(response.encode('utf-8'))
+                        return
+
+                # Get qBittorrent version/info to verify connection
+                try:
+                    version_url = f"{qbt_url}/api/v2/app/version"
+                    version_req = urllib.request.Request(version_url)
+                    version_resp = opener.open(version_req, timeout=10)
+                    version = version_resp.read().decode('utf-8').strip()
+
+                    print(f"✅ qBittorrent validation successful - version: {version}", flush=True)
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': True,
+                        'version': version,
+                        'configured': True,
+                        'url': qbt_url
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+
+                except Exception as e:
+                    print(f"❌ qBittorrent version check failed: {e}", flush=True)
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False,
+                        'error': f'Failed to connect to qBittorrent: {str(e)}',
+                        'configured': True,
+                        'connection_failed': True
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+
+            except Exception as e:
+                import traceback
+                print(f"❌ qBittorrent validate error: {e}", flush=True)
+                print(f"❌ Traceback: {traceback.format_exc()}", flush=True)
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': str(e)})
+                self.wfile.write(response.encode('utf-8'))
+            return
+
         # API: Bulk delete books from Calibre library
         if self.path == '/api/books/bulk-delete':
             content_length = int(self.headers['Content-Length'])

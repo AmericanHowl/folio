@@ -21,6 +21,7 @@ A modern, mobile-first ebook management interface for Calibre libraries with Har
 - **Book requests** - Build a wish list of books you want
 - **Rich metadata** - View ratings, descriptions, genres, and more
 - **Prowlarr integration** - Search for books via Prowlarr (optional)
+- **qBittorrent integration** - Send magnet links directly to qBittorrent from search results (optional)
 
 ### Design
 - **Warm library theme** - Burnt orange, deep purple, and burgundy color palette
@@ -74,6 +75,25 @@ That's it!
 3. Copy the API key
 4. Enter your Prowlarr URL and API key in Folio Settings > Prowlarr
 
+**qBittorrent Setup (Optional):**
+1. Make sure qBittorrent Web UI is enabled:
+   - Open qBittorrent → Tools → Options → Web UI
+   - Check "Enable Web User Interface"
+   - Set port (default: 8080)
+   - Set username and password
+2. Set these as environment variables:
+   ```bash
+   export QBITTORRENT_URL="http://localhost:8080"
+   export QBITTORRENT_USERNAME="admin"
+   export QBITTORRENT_PASSWORD="adminadmin"
+   ```
+3. Once configured, you can send magnet links from Prowlarr search results directly to qBittorrent
+
+   **Testing the connection:**
+   ```bash
+   curl -X POST http://localhost:9099/api/qbittorrent/validate
+   ```
+
 ## Project Structure
 
 ```
@@ -125,6 +145,9 @@ Pure HTML/JS with:
 | `/api/hardcover/lists` | GET | Get popular lists |
 | `/api/hardcover/list?id=` | GET | Get books from a list |
 | `/api/prowlarr/search?q=` | GET | Search Prowlarr for books |
+| `/api/prowlarr/validate` | POST | Validate Prowlarr connection |
+| `/api/qbittorrent/add` | POST | Send magnet/torrent to qBittorrent |
+| `/api/qbittorrent/validate` | POST | Validate qBittorrent connection |
 | `/api/requests` | GET/POST | Manage book requests |
 | `/api/requests/{id}` | DELETE | Cancel a book request |
 | `/api/reading-list` | GET/POST/DELETE | Manage reading list |
@@ -148,6 +171,11 @@ export HARDCOVER_TOKEN="your-api-token"
 # Set Prowlarr configuration (optional)
 export PROWLARR_URL="http://localhost:9696"
 export PROWLARR_API_KEY="your-prowlarr-api-key"
+
+# Set qBittorrent configuration (optional)
+export QBITTORRENT_URL="http://localhost:8080"
+export QBITTORRENT_USERNAME="admin"
+export QBITTORRENT_PASSWORD="adminadmin"
 
 # Run the server
 python3 serve.py
@@ -238,6 +266,11 @@ PROWLARR_URL=http://prowlarr:9696
 
 # Prowlarr API key (get from Prowlarr Settings → General → API Key)
 PROWLARR_API_KEY=your-prowlarr-api-key
+
+# qBittorrent configuration (optional - for sending torrents from Prowlarr)
+QBITTORRENT_URL=http://qbittorrent:8080
+QBITTORRENT_USERNAME=admin
+QBITTORRENT_PASSWORD=adminadmin
 ```
 
 Then run:
@@ -265,6 +298,9 @@ docker run -d \
   -e HARDCOVER_TOKEN=your-api-token \
   -e PROWLARR_URL=http://prowlarr:9696 \
   -e PROWLARR_API_KEY=your-prowlarr-api-key \
+  -e QBITTORRENT_URL=http://qbittorrent:8080 \
+  -e QBITTORRENT_USERNAME=admin \
+  -e QBITTORRENT_PASSWORD=adminadmin \
   folio
 ```
 
@@ -361,10 +397,12 @@ MIT License
 
 ---
 
-**Status**: Fully functional with Hardcover.app and Prowlarr integration
+**Status**: Fully functional with Hardcover.app, Prowlarr, and qBittorrent integration
 
 ## Recent Updates
 
+- **qBittorrent integration** - Send magnet links directly to qBittorrent from Prowlarr search results
+- **Connection validation endpoints** - Test Prowlarr and qBittorrent connectivity before use
 - **Cross-platform calibredb support** - Automatically detects calibredb on macOS, Linux, and Windows using PATH first, then platform-specific locations
 - **Prowlarr integration** - Search for books via Prowlarr with configurable URL and API key
 - **Enhanced Settings UI** - Manage Hardcover API key and Prowlarr configuration directly from Settings menu
