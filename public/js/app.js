@@ -239,9 +239,21 @@ function folioApp() {
                 this.hardcoverToken = data.hardcover_token || false;
                 this.prowlarrUrl = data.prowlarr_url || '';
                 this.prowlarrApiKey = data.prowlarr_api_key || false;
+                
+                // Populate input fields from loaded config (so env vars show in UI)
+                if (data.hardcover_token && typeof data.hardcover_token === 'string') {
+                    this.hardcoverApiKeyInput = data.hardcover_token;
+                }
+                if (data.prowlarr_url) {
+                    this.prowlarrUrlInput = data.prowlarr_url;
+                }
+                // Note: prowlarr_api_key is sent as boolean for security, so we can't pre-populate it
+                // But if prowlarrApiKey is true, we know it's configured
+                
                 console.log('📖 Loaded config:', { 
                     library: this.calibreLibraryPath ? 'Set' : 'Not set',
-                    token: this.hardcoverToken ? 'Set' : 'Not set'
+                    token: this.hardcoverToken ? 'Set' : 'Not set',
+                    prowlarr: this.prowlarrUrl ? 'Set' : 'Not set'
                 });
             } catch (error) {
                 console.error('Failed to load config:', error);
@@ -387,28 +399,19 @@ function folioApp() {
                     return;
                 }
 
-                // Test connection by checking Prowlarr system status
-                // Use the config endpoint which should work with valid API key
-                const prowlarrUrl = this.prowlarrUrlInput.trim().replace(/\/+$/, '');
-                const testUrl = prowlarrUrl + '/api/v1/system/status';
-                const testReq = new Request(testUrl, {
-                    headers: {
-                        'X-Api-Key': this.prowlarrApiKeyInput.trim()
-                    }
+                // Test connection using server-side validation endpoint (avoids CORS issues and provides logging)
+                const validateResponse = await fetch('/api/prowlarr/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prowlarr_url: this.prowlarrUrlInput.trim(),
+                        prowlarr_api_key: this.prowlarrApiKeyInput.trim()
+                    })
                 });
                 
-                try {
-                    const testResponse = await fetch(testReq);
-                    if (!testResponse.ok) {
-                        if (testResponse.status === 401) {
-                            this.prowlarrError = 'Invalid API key. Please check your Prowlarr API key.';
-                        } else {
-                            this.prowlarrError = `Failed to connect to Prowlarr (HTTP ${testResponse.status}). Please check your URL.`;
-                        }
-                        return;
-                }
-            } catch (error) {
-                    this.prowlarrError = 'Failed to connect to Prowlarr. Please check your URL and API key.';
+                const validateResult = await validateResponse.json();
+                if (!validateResult.success) {
+                    this.prowlarrError = validateResult.error || 'Failed to connect to Prowlarr. Please check your URL and API key.';
                     return;
                 }
                 

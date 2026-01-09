@@ -1054,12 +1054,14 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             # Don't expose the full tokens, just whether they're set
+            # BUT: For Hardcover token, expose the actual value if it exists (user needs to see it)
+            # For Prowlarr API key, only expose boolean for security
             safe_config = {
                 **config,
                 'calibredb_path': config.get('calibredb_path', ''),
-                'hardcover_token': bool(config.get('hardcover_token')),
+                'hardcover_token': config.get('hardcover_token', '') or bool(config.get('hardcover_token')),  # Return actual value if set
                 'prowlarr_url': config.get('prowlarr_url', ''),
-                'prowlarr_api_key': bool(config.get('prowlarr_api_key'))
+                'prowlarr_api_key': bool(config.get('prowlarr_api_key'))  # Only boolean for security
             }
             response = json.dumps(safe_config)
             self.wfile.write(response.encode('utf-8'))
@@ -1181,6 +1183,14 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
                 return
 
+            # Re-check env vars on each request to ensure they're fresh (fixes Docker env var persistence)
+            env_prowlarr_url = os.getenv('PROWLARR_URL', '')
+            env_prowlarr_key = os.getenv('PROWLARR_API_KEY', '')
+            if env_prowlarr_url:
+                config['prowlarr_url'] = env_prowlarr_url
+            if env_prowlarr_key:
+                config['prowlarr_api_key'] = env_prowlarr_key
+
             prowlarr_url = config.get('prowlarr_url', '').rstrip('/')
             prowlarr_api_key = config.get('prowlarr_api_key', '')
             
@@ -1228,17 +1238,89 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     response = json.dumps({'success': True, 'results': formatted_results})
                     self.wfile.write(response.encode('utf-8'))
             except urllib.error.HTTPError as e:
+                error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+                print(f"❌ Prowlarr HTTP error {e.code}: {error_body}")
                 self.send_response(e.code)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
                 response = json.dumps({'error': f'Prowlarr API error: {error_body}'})
                 self.wfile.write(response.encode('utf-8'))
             except Exception as e:
+                print(f"❌ Prowlarr search error: {e}")
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 response = json.dumps({'error': f'Failed to search Prowlarr: {str(e)}'})
+                self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Validate Prowlarr connection
+        if path == '/api/prowlarr/validate':
+            # Re-check env vars on each request to ensure they're fresh
+            env_prowlarr_url = os.getenv('PROWLARR_URL', '')
+            env_prowlarr_key = os.getenv('PROWLARR_API_KEY', '')
+            if env_prowlarr_url:
+                config['prowlarr_url'] = env_prowlarr_url
+            if env_prowlarr_key:
+                config['prowlarr_api_key'] = env_prowlarr_key
+            
+            # Get Prowlarr config from request body or use config
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    post_data = self.rfile.read(content_length)
+                    request_data = json.loads(post_data.decode('utf-8'))
+                    prowlarr_url = request_data.get('prowlarr_url', '').rstrip('/') or config.get('prowlarr_url', '').rstrip('/')
+                    prowlarr_api_key = request_data.get('prowlarr_api_key', '') or config.get('prowlarr_api_key', '')
+                else:
+                    prowlarr_url = config.get('prowlarr_url', '').rstrip('/')
+                    prowlarr_api_key = config.get('prowlarr_api_key', '')
+            except:
+                prowlarr_url = config.get('prowlarr_url', '').rstrip('/')
+                prowlarr_api_key = config.get('prowlarr_api_key', '')
+            
+            if not prowlarr_url or not prowlarr_api_key:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Prowlarr URL and API key are required'})
+                self.wfile.write(response.encode('utf-8'))
+                return
+            
+            try:
+                # Test connection by checking Prowlarr system status
+                test_url = f"{prowlarr_url}/api/v1/system/status"
+                req = urllib.request.Request(test_url)
+                req.add_header('X-Api-Key', prowlarr_api_key)
+                
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    status_data = json.loads(response.read().decode('utf-8'))
+                    
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': True, 'version': status_data.get('version', '')})
+                    self.wfile.write(response.encode('utf-8'))
+                    
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+                print(f"❌ Prowlarr validation HTTP error {e.code}: {error_body}")
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                if e.code == 401:
+                    error_msg = 'Invalid API key. Please check your Prowlarr API key.'
+                else:
+                    error_msg = f'Failed to connect to Prowlarr (HTTP {e.code}). Please check your URL.'
+                response = json.dumps({'success': False, 'error': error_msg})
+                self.wfile.write(response.encode('utf-8'))
+                
+            except Exception as e:
+                print(f"❌ Prowlarr validation error: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': f'Failed to connect to Prowlarr: {str(e)}'})
                 self.wfile.write(response.encode('utf-8'))
             return
 
@@ -1409,7 +1491,11 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(cover_data)
             else:
-                self.send_error(404, "Cover not found")
+                self.send_response(404)
+                self.send_header('Content-Type', 'text/plain')
+                self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')  # Prevent 404 caching
+                self.end_headers()
+                self.wfile.write(b"Cover not found")
             return
 
         # API: Download book file
@@ -1567,6 +1653,13 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
         # API: Download from Prowlarr (send to bittorrent client)
         if self.path == '/api/prowlarr/download':
+            # Re-check env vars on each request to ensure they're fresh
+            env_prowlarr_url = os.getenv('PROWLARR_URL', '')
+            env_prowlarr_key = os.getenv('PROWLARR_API_KEY', '')
+            if env_prowlarr_url:
+                config['prowlarr_url'] = env_prowlarr_url
+            if env_prowlarr_key:
+                config['prowlarr_api_key'] = env_prowlarr_key
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
 
