@@ -559,11 +559,12 @@ def get_reading_list_books(sort='added'):
     Returns:
         List of book dicts with id, title, authors, timestamp, formats, has_cover, etc.
     """
+    reading_list_ids = get_reading_list_ids()
+    if not reading_list_ids:
+        return []
+    
+    conn = None
     try:
-        reading_list_ids = get_reading_list_ids()
-        if not reading_list_ids:
-            return []
-        
         conn = get_db_connection(readonly=True)
         cursor = conn.cursor()
         
@@ -653,11 +654,13 @@ def get_reading_list_books(sort='added'):
             }
             books.append(book)
         
-        conn.close()
         return books
     except Exception as e:
         print(f"❌ Error loading reading list books: {e}")
         return []
+    finally:
+        if conn:
+            conn.close()
 
 
 def render_kobo_page(books, page=1, sort='added', books_per_page=5):
