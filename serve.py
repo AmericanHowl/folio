@@ -4,6 +4,7 @@ Folio Server - Serves static files and manages Calibre library via direct DB acc
 No Calibre Content Server needed - reads directly from metadata.db
 """
 import http.server
+import http.cookiejar
 import socketserver
 from socketserver import ThreadingMixIn
 import urllib.request
@@ -1771,6 +1772,11 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         if idx < 3:
                             print(f"🔍 Search result {idx}: title={item.get('title', 'Unknown')[:50]}, indexerId={indexer_id}, indexer={item.get('indexer', 'Unknown')}, guid={item.get('guid', '')[:50]}")
                         
+                        # Get download URL - prefer magnetUrl, then downloadUrl, then infoUrl
+                        download_url = item.get('downloadUrl', '')
+                        magnet_url = item.get('magnetUrl', '')
+                        info_url = item.get('infoUrl', '')
+                        
                         formatted_results.append({
                             'title': item.get('title', 'Unknown'),
                             'author': item.get('author', 'Unknown'),
@@ -1779,7 +1785,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             'size': item.get('size', 0),
                             'seeders': item.get('seeders', 0),
                             'leechers': item.get('leechers', 0),
-                            'downloadUrl': item.get('downloadUrl', ''),
+                            'downloadUrl': download_url,
+                            'magnetUrl': magnet_url,
+                            'infoUrl': info_url,
                             'guid': item.get('guid', ''),
                             'publishDate': item.get('publishDate', ''),
                             'categories': item.get('categories', [])
@@ -2481,6 +2489,136 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 response = json.dumps({'success': False, 'error': f'Server error: {str(e)}'})
+                self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Send torrent/magnet to qBittorrent
+        if self.path == '/api/qbittorrent/add':
+            print(f"📥 qBittorrent add endpoint hit", flush=True)
+            
+            try:
+                content_length = int(self.headers['Content-Length'])
+                body = self.rfile.read(content_length)
+                data = json.loads(body.decode('utf-8'))
+                
+                # Get the URL to add (magnet or torrent URL)
+                url = data.get('url', '')
+                title = data.get('title', 'Unknown')
+                
+                print(f"📥 qBittorrent add request: title={title}, url={url[:100]}...", flush=True)
+                
+                if not url:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': 'URL is required'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+                
+                # Get qBittorrent config from environment
+                qbt_url = os.getenv('QBITTORRENT_URL', '').strip().rstrip('/')
+                qbt_username = os.getenv('QBITTORRENT_USERNAME', '').strip()
+                qbt_password = os.getenv('QBITTORRENT_PASSWORD', '').strip()
+                
+                if not qbt_url:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False, 
+                        'error': 'qBittorrent not configured. Set QBITTORRENT_URL environment variable.'
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+                
+                print(f"🔗 Connecting to qBittorrent at {qbt_url}", flush=True)
+                
+                # Cookie jar for session management
+                cookie_jar = http.cookiejar.CookieJar()
+                opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
+                
+                # Login to qBittorrent if credentials provided
+                if qbt_username and qbt_password:
+                    login_url = f"{qbt_url}/api/v2/auth/login"
+                    login_data = urllib.parse.urlencode({
+                        'username': qbt_username,
+                        'password': qbt_password
+                    }).encode('utf-8')
+                    
+                    try:
+                        login_req = urllib.request.Request(login_url, data=login_data, method='POST')
+                        login_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+                        login_resp = opener.open(login_req, timeout=10)
+                        login_result = login_resp.read().decode('utf-8')
+                        
+                        if login_result.strip().lower() != 'ok.':
+                            print(f"⚠️ qBittorrent login response: {login_result}", flush=True)
+                        else:
+                            print(f"✅ qBittorrent login successful", flush=True)
+                    except Exception as e:
+                        print(f"⚠️ qBittorrent login failed: {e}", flush=True)
+                        # Continue anyway - maybe auth is disabled
+                
+                # Add torrent to qBittorrent
+                add_url = f"{qbt_url}/api/v2/torrents/add"
+                
+                # Build multipart form data
+                boundary = '----WebKitFormBoundary' + ''.join(chr(ord('a') + (i % 26)) for i in range(16))
+                
+                body_parts = []
+                body_parts.append(f'--{boundary}')
+                body_parts.append('Content-Disposition: form-data; name="urls"')
+                body_parts.append('')
+                body_parts.append(url)
+                body_parts.append(f'--{boundary}--')
+                
+                multipart_body = '\r\n'.join(body_parts).encode('utf-8')
+                
+                add_req = urllib.request.Request(add_url, data=multipart_body, method='POST')
+                add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
+                
+                try:
+                    add_resp = opener.open(add_req, timeout=30)
+                    add_result = add_resp.read().decode('utf-8')
+                    
+                    print(f"✅ qBittorrent add response: {add_result}", flush=True)
+                    
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': True,
+                        'message': f'Torrent added to qBittorrent: {title}'
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                    
+                except urllib.error.HTTPError as e:
+                    error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+                    print(f"❌ qBittorrent add error {e.code}: {error_body}", flush=True)
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False,
+                        'error': f'qBittorrent error: {error_body}'
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                    
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON decode error: {e}", flush=True)
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Invalid JSON'})
+                self.wfile.write(response.encode('utf-8'))
+            except Exception as e:
+                import traceback
+                print(f"❌ qBittorrent add error: {e}", flush=True)
+                print(f"❌ Traceback: {traceback.format_exc()}", flush=True)
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': str(e)})
                 self.wfile.write(response.encode('utf-8'))
             return
 

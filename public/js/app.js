@@ -509,18 +509,14 @@ function folioApp() {
         },
 
         /**
-         * Download from Prowlarr and send to bittorrent client
+         * Download from Prowlarr - send torrent/magnet to qBittorrent
          */
         async downloadFromProwlarr(result, book) {
-            if (!result || !result.guid) {
-                alert('Invalid download link. Please try a different result.');
-                return;
-            }
+            // Get the best available URL (prefer magnet, then download URL)
+            const downloadUrl = result.magnetUrl || result.downloadUrl;
             
-            // Check for indexerId (must exist and not be null/undefined)
-            if (result.indexerId === null || result.indexerId === undefined) {
-                console.error('Missing indexerId for result:', result);
-                alert('This result is missing indexer information and cannot be downloaded automatically. Try a different result.');
+            if (!downloadUrl) {
+                alert('No download URL available for this result. Try a different one.');
                 return;
             }
 
@@ -533,13 +529,11 @@ function folioApp() {
             this.downloadingProwlarr = resultIndex;
             
             try {
-                const response = await fetch('/api/prowlarr/download', {
+                const response = await fetch('/api/qbittorrent/add', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        guid: result.guid,
-                        indexerId: result.indexerId,
-                        indexer: result.indexer,
+                        url: downloadUrl,
                         title: result.title
                     }),
                 });
@@ -547,7 +541,7 @@ function folioApp() {
                 const data = await response.json();
 
                 if (data.success) {
-                    console.log('✅ Download sent to Prowlarr:', result.title);
+                    console.log('✅ Torrent sent to qBittorrent:', result.title);
                     this.downloadProwlarrSuccess = resultIndex;
                     
                     // Clear success message after 3 seconds
@@ -557,7 +551,7 @@ function folioApp() {
                         }
                     }, 3000);
                 } else {
-                    this.downloadProwlarrError = data.error || 'Failed to send download to Prowlarr';
+                    this.downloadProwlarrError = data.error || 'Failed to send to qBittorrent';
                     console.error('Download error:', this.downloadProwlarrError);
                     
                     // Clear error after 5 seconds
@@ -566,8 +560,8 @@ function folioApp() {
                     }, 5000);
                 }
             } catch (error) {
-                console.error('Failed to download from Prowlarr:', error);
-                this.downloadProwlarrError = 'Failed to send download. Please check your Prowlarr configuration.';
+                console.error('Failed to send to qBittorrent:', error);
+                this.downloadProwlarrError = 'Failed to send download. Please check qBittorrent configuration.';
                 
                 // Clear error after 5 seconds
                 setTimeout(() => {
