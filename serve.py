@@ -279,6 +279,7 @@ def get_book_cover(book_id):
         cover_path = os.path.join(library_path, row['path'], 'cover.jpg')
 
         if os.path.exists(cover_path):
+            # Close DB connection before reading file to avoid holding it during I/O
             with open(cover_path, 'rb') as f:
                 return f.read()
 
@@ -369,14 +370,64 @@ def run_calibredb(args):
         return {'success': False, 'error': error_msg}
 
 
+def ensure_reading_list_column():
+    """
+    Ensure the reading_list custom column exists in Calibre.
+    Creates it if it doesn't exist.
+    Returns True if column exists or was created successfully, False otherwise.
+    """
+    # First, try to list custom columns to check if reading_list exists
+    result = run_calibredb(['custom_columns'])
+    if result['success']:
+        # Check if reading_list is in the output
+        output = result['output'].lower()
+        # Look for reading_list in various formats: reading_list, #reading_list, reading list
+        if 'reading_list' in output or '#reading_list' in output or 'reading list' in output:
+            # Column exists
+            return True
+    
+    # Column doesn't exist, create it
+    # Try with option flags first (more explicit)
+    result = run_calibredb(['add_custom_column', '--label=reading_list', '--name=Reading List', '--datatype=bool'])
+    if result['success']:
+        print('✅ Created reading_list custom column')
+        return True
+    
+    # If that failed, try positional arguments
+    result = run_calibredb(['add_custom_column', 'reading_list', 'Reading List', 'bool'])
+    if result['success']:
+        print('✅ Created reading_list custom column')
+        return True
+    else:
+        error_msg = result.get('error', 'Unknown error')
+        # If error says column already exists, that's fine
+        if 'already exists' in error_msg.lower() or 'duplicate' in error_msg.lower():
+            print('✅ reading_list custom column already exists')
+            return True
+        print(f'⚠️  Failed to create reading_list custom column: {error_msg}')
+        # Try to continue anyway - maybe the column exists but wasn't detected
+        return False
+
+
 def get_reading_list_ids():
     """
     Get IDs of books on the reading list using Calibre custom column #reading_list.
-    Expects a Yes/No custom column with lookup name 'reading_list' configured in Calibre.
+    Automatically creates the column if it doesn't exist.
     """
+    # Ensure the column exists before trying to use it
+    ensure_reading_list_column()
+    
     result = run_calibredb(['list', '--fields', 'id', '--search', '#reading_list:true'])
     if not result['success']:
-        return []
+        # If search fails, column might not exist yet - try creating it again
+        if 'reading_list' in result.get('error', '').lower() or 'column' in result.get('error', '').lower():
+            ensure_reading_list_column()
+            # Try once more
+            result = run_calibredb(['list', '--fields', 'id', '--search', '#reading_list:true'])
+            if not result['success']:
+                return []
+        else:
+            return []
 
     ids = []
     for line in result['output'].splitlines():
@@ -984,6 +1035,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         parsed_url = urlparse(self.path)
         path = parsed_url.path
         query_params = parse_qs(parsed_url.query)
+        # Store parsed_url for use in handlers
+        self.parsed_url = parsed_url
         # API: Get config
         if path == '/api/config':
             # Re-check env vars on each request to ensure they're fresh (fixes Docker env var persistence)
@@ -1212,6 +1265,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # API: Get reading list (IDs of library books)
         if path == '/api/reading-list':
             try:
+                # Ensure the column exists before trying to get reading list
+                ensure_reading_list_column()
                 ids = get_reading_list_ids()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
@@ -1702,6 +1757,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 added_count = 0
                 errors = []
 
+                # Ensure the reading_list column exists before using it
+                ensure_reading_list_column()
+
                 # Add each book to reading list using calibredb set_metadata
                 for book_id in book_ids:
                     try:
@@ -1784,6 +1842,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(response.encode('utf-8'))
                     return
 
+                # Ensure the reading_list column exists before using it
+                ensure_reading_list_column()
+
                 # Set custom column #reading_list:true via calibredb
                 result = run_calibredb(['set_metadata', str(book_id_int), '--field', '#reading_list:true'])
                 if result['success']:
@@ -1827,6 +1888,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         match = re.match(r'/api/reading-list/(\d+)', self.path)
         if match:
             book_id = int(match.group(1))
+
+            # Ensure the reading_list column exists before using it
+            ensure_reading_list_column()
 
             result = run_calibredb(['set_metadata', str(book_id), '--field', '#reading_list:false'])
             if result['success']:
