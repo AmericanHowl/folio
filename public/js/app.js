@@ -620,14 +620,20 @@ function folioApp() {
                     sorted.sort((a, b) => {
                         const authorA = this.formatAuthors(a.authors);
                         const authorB = this.formatAuthors(b.authors);
-                        return authorA.localeCompare(authorB);
+                        // Sort by last name (last word in the name)
+                        const lastNameA = this.getLastNameForSort(authorA);
+                        const lastNameB = this.getLastNameForSort(authorB);
+                        return lastNameA.localeCompare(lastNameB);
                     });
                     break;
                 case 'author-desc':
                     sorted.sort((a, b) => {
                         const authorA = this.formatAuthors(a.authors);
                         const authorB = this.formatAuthors(b.authors);
-                        return authorB.localeCompare(authorA);
+                        // Sort by last name (last word in the name)
+                        const lastNameA = this.getLastNameForSort(authorA);
+                        const lastNameB = this.getLastNameForSort(authorB);
+                        return lastNameB.localeCompare(lastNameA);
                     });
                     break;
             }
@@ -788,9 +794,12 @@ function folioApp() {
             
             try {
                 const title = book.title;
-                const author = Array.isArray(book.authors) ? book.authors[0] : book.authors;
+                // Use formatted author (already normalized to "FirstName LastName")
+                const author = this.formatAuthors(book.authors);
+                // Extract first author if multiple
+                const firstAuthor = author.split(',')[0].trim();
                 
-                const response = await fetch(`/api/itunes/search?q=${encodeURIComponent(title + ' ' + author)}&limit=5`);
+                const response = await fetch(`/api/itunes/search?q=${encodeURIComponent(title + ' ' + firstAuthor)}&limit=5`);
                 const data = await response.json();
 
                 if (data.books && data.books.length > 0) {
@@ -800,8 +809,9 @@ function folioApp() {
                             this.normalizeForMatching(book.title),
                             this.normalizeForMatching(itunesBook.title)
                         );
+                        // Compare formatted author with iTunes author
                         const authorMatch = this.calculateSimilarity(
-                            this.normalizeForMatching(author),
+                            this.normalizeForMatching(firstAuthor),
                             this.normalizeForMatching(itunesBook.author)
                         );
                         
@@ -1805,6 +1815,7 @@ function folioApp() {
 
         /**
          * Format authors array, handling duplicates and various formats
+         * Assumes authors are already normalized to "FirstName LastName" from server
          */
         formatAuthors(authors) {
             if (!authors) return 'Unknown Author';
@@ -1825,7 +1836,8 @@ function folioApp() {
                 author = author.trim();
                 if (!author) continue;
                 
-                // Normalize: handle "LastName, FirstName" or "LastName| FirstName" format
+                // Server should already normalize, but handle edge cases
+                // Normalize: handle "LastName, FirstName" or "LastName| FirstName" format if still present
                 let normalized = author;
                 if (author.includes(', ')) {
                     const parts = author.split(', ', 2);
@@ -1849,6 +1861,19 @@ function folioApp() {
             }
             
             return cleaned.length > 0 ? cleaned.join(', ') : 'Unknown Author';
+        },
+
+        /**
+         * Get last name from author string for sorting purposes
+         */
+        getLastNameForSort(authorStr) {
+            if (!authorStr || authorStr === 'Unknown Author') return '';
+            // Get last word (last name) from "FirstName LastName" format
+            const parts = authorStr.trim().split(/\s+/);
+            if (parts.length >= 2) {
+                return parts[parts.length - 1]; // Last word is last name
+            }
+            return authorStr; // Fallback to full name if single word
         },
 
         /**

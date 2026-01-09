@@ -175,46 +175,68 @@ def get_books(limit=50, offset=0, search=None):
             formats = [f['format'].upper() for f in cursor.fetchall()]
 
             # Parse authors - handle various separators and formats, and deduplicate
-            # Calibre stores authors as "LastName, FirstName" - convert to "FirstName LastName"
+            # Calibre stores authors as "LastName, FirstName" or "LastName| FirstName" - convert to "FirstName LastName"
             authors_list = []
             seen_authors = set()  # Use set for O(1) lookup
+            
+            def normalize_author_name(author_str):
+                """Convert 'LastName, FirstName' or 'LastName| FirstName' to 'FirstName LastName'"""
+                author_str = author_str.strip()
+                if not author_str:
+                    return None
+                
+                # Handle pipe format: "LastName| FirstName" or "LastName|FirstName"
+                if '|' in author_str:
+                    parts = author_str.split('|', 1)
+                    if len(parts) == 2:
+                        last_name = parts[0].strip()
+                        first_name = parts[1].strip()
+                        if first_name and last_name:
+                            return f"{first_name} {last_name}"
+                
+                # Handle comma format: "LastName, FirstName" or "LastName,FirstName"
+                if ', ' in author_str:
+                    parts = author_str.split(', ', 1)
+                    if len(parts) == 2:
+                        last_name = parts[0].strip()
+                        first_name = parts[1].strip()
+                        if first_name and last_name:
+                            return f"{first_name} {last_name}"
+                elif author_str.count(',') == 1 and not author_str.startswith(','):
+                    # Handle "LastName,FirstName" (no space)
+                    parts = author_str.split(',', 1)
+                    if len(parts) == 2:
+                        last_name = parts[0].strip()
+                        first_name = parts[1].strip()
+                        if first_name and last_name:
+                            return f"{first_name} {last_name}"
+                
+                # If no conversion needed, return as-is
+                return author_str
             
             if row['authors']:
                 authors_str = str(row['authors']).strip()
                 if authors_str:
-                    # Split by common separators: ' & ', '|', ', and ', ' and '
-                    # First normalize separators
-                    authors_str = authors_str.replace('|', ' & ').replace(', and ', ' & ').replace(' and ', ' & ')
+                    # First, handle pipe separators between authors (rare, but possible)
+                    # Replace '|' used as author separator with ' & ', but preserve '|' within names
+                    # We'll split by ' & ' first, then normalize each author
+                    authors_str = authors_str.replace(', and ', ' & ').replace(' and ', ' & ')
                     
-                    # Split by ' & ' (multiple authors)
+                    # Split by ' & ' for multiple authors
+                    # Note: '|' within an author name (like "Smith| John") will be handled by normalize_author_name
                     for author in authors_str.split(' & '):
                         author = author.strip()
                         if not author:
                             continue
-                            
-                        # Convert "LastName, FirstName" to "FirstName LastName"
-                        # Handle both ", " and "," separators
-                        if ', ' in author:
-                            parts = author.split(', ', 1)
-                            if len(parts) == 2:
-                                last_name = parts[0].strip()
-                                first_name = parts[1].strip()
-                                if first_name and last_name:
-                                    author = f"{first_name} {last_name}"
-                        elif author.count(',') == 1 and not author.startswith(','):
-                            # Handle "LastName,FirstName" (no space)
-                            parts = author.split(',', 1)
-                            if len(parts) == 2:
-                                last_name = parts[0].strip()
-                                first_name = parts[1].strip()
-                                if first_name and last_name:
-                                    author = f"{first_name} {last_name}"
                         
-                        # Normalize and deduplicate
-                        author_normalized = author.strip()
-                        if author_normalized and author_normalized.lower() not in seen_authors:
-                            seen_authors.add(author_normalized.lower())
-                            authors_list.append(author_normalized)
+                        # Normalize the author name format
+                        normalized_author = normalize_author_name(author)
+                        if normalized_author:
+                            # Deduplicate
+                            key = normalized_author.lower()
+                            if key not in seen_authors:
+                                seen_authors.add(key)
+                                authors_list.append(normalized_author)
             
             book = {
                 'id': row['id'],
@@ -1206,13 +1228,69 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("SELECT DISTINCT name FROM authors ORDER BY name")
-                authors = [row['name'] for row in cursor.fetchall()]
+                raw_authors = [row['name'] for row in cursor.fetchall()]
                 conn.close()
+                
+                # Normalize author names: convert "LastName, FirstName" or "LastName| FirstName" to "FirstName LastName"
+                def normalize_author_name(author_str):
+                    """Convert 'LastName, FirstName' or 'LastName| FirstName' to 'FirstName LastName'"""
+                    author_str = author_str.strip()
+                    if not author_str:
+                        return None
+                    
+                    # Handle pipe format: "LastName| FirstName" or "LastName|FirstName"
+                    if '|' in author_str:
+                        parts = author_str.split('|', 1)
+                        if len(parts) == 2:
+                            last_name = parts[0].strip()
+                            first_name = parts[1].strip()
+                            if first_name and last_name:
+                                return f"{first_name} {last_name}"
+                    
+                    # Handle comma format: "LastName, FirstName" or "LastName,FirstName"
+                    if ', ' in author_str:
+                        parts = author_str.split(', ', 1)
+                        if len(parts) == 2:
+                            last_name = parts[0].strip()
+                            first_name = parts[1].strip()
+                            if first_name and last_name:
+                                return f"{first_name} {last_name}"
+                    elif author_str.count(',') == 1 and not author_str.startswith(','):
+                        parts = author_str.split(',', 1)
+                        if len(parts) == 2:
+                            last_name = parts[0].strip()
+                            first_name = parts[1].strip()
+                            if first_name and last_name:
+                                return f"{first_name} {last_name}"
+                    
+                    # If no conversion needed, return as-is
+                    return author_str
+                
+                # Normalize all authors and deduplicate
+                normalized_authors = []
+                seen = set()
+                for author in raw_authors:
+                    normalized = normalize_author_name(author)
+                    if normalized:
+                        key = normalized.lower()
+                        if key not in seen:
+                            seen.add(key)
+                            normalized_authors.append(normalized)
+                
+                # Sort by last name for autocomplete
+                def get_last_name_for_sort(author):
+                    """Extract last name for sorting"""
+                    parts = author.split()
+                    if len(parts) >= 2:
+                        return parts[-1]  # Last word is last name
+                    return author
+                
+                normalized_authors.sort(key=get_last_name_for_sort)
                 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                response = json.dumps(authors)
+                response = json.dumps(normalized_authors)
                 self.wfile.write(response.encode('utf-8'))
             except Exception as e:
                 self.send_error(500, f"Database error: {e}")
