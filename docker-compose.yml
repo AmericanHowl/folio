@@ -11,6 +11,9 @@ services:
       # Mount your Calibre library - REQUIRED: Update this path!
       # Use :rw (read-write) to allow metadata editing via calibredb
       - ${CALIBRE_LIBRARY:-/data/calibre-library}:/data/calibre-library:rw
+      # OPTIONAL: Mount an import folder for automatic book imports
+      # Books placed here will be automatically added to Calibre
+      # - ${IMPORT_FOLDER:-/data/import}:/data/import:ro
     environment:
       # Calibre Library location inside container (must match volume mount)
       - CALIBRE_LIBRARY=/data/calibre-library
@@ -22,6 +25,11 @@ services:
       - PROWLARR_URL=${PROWLARR_URL:-}
       # Prowlarr API key (get from Prowlarr Settings → General → API Key)
       - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
+      # OPTIONAL: Import folder settings (uncomment volume mount above to use)
+      # - IMPORT_FOLDER=/data/import          # Path inside container
+      # - IMPORT_INTERVAL=60                  # Scan interval in seconds (default: 60)
+      # - IMPORT_RECURSIVE=true               # Scan subdirectories (default: true)
+      # - IMPORT_DELETE=false                 # Delete originals after import (default: false, copies instead)
     # DNS servers for reliable hostname resolution (fixes "Temporary failure in name resolution")
     dns:
       - 8.8.8.8
