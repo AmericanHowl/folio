@@ -1919,11 +1919,6 @@ function folioApp() {
                 
                 if (data.success) {
                     this.prowlarrSearchResults = data.results || [];
-                    // Debug: log indexerIds for troubleshooting
-                    if (this.prowlarrSearchResults.length > 0) {
-                        const first = this.prowlarrSearchResults[0];
-                        console.log(`🔍 Prowlarr results: ${this.prowlarrSearchResults.length}, first indexerId: ${first.indexerId}, indexer: ${first.indexer}`);
-                    }
                     this.sortProwlarrResults();
                 } else {
                     this.prowlarrError = data.error || 'Failed to search Prowlarr';

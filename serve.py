@@ -2301,28 +2301,6 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     }
                     grab_payload = json.dumps(grab_payload_dict).encode('utf-8')
                     
-                    # #region agent log
-                    import json as json_module
-                    with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
-                        f.write(json_module.dumps({
-                            'sessionId': 'debug-session',
-                            'runId': 'run1',
-                            'hypothesisId': 'A',
-                            'location': 'serve.py:2333',
-                            'message': 'Prowlarr release grab request payload',
-                            'data': {
-                                'grab_url': grab_url,
-                                'payload': grab_payload_dict,
-                                'indexerId_type': type(indexer_id).__name__,
-                                'indexerId_value': indexer_id,
-                                'indexerId_int': indexer_id_int,
-                                'guid': guid,
-                                'title': title
-                            },
-                            'timestamp': int(time.time() * 1000)
-                        }) + '\n')
-                    # #endregion
-                    
                     req = urllib.request.Request(grab_url, data=grab_payload, method='POST')
                     req.add_header('Content-Type', 'application/json')
                     req.add_header('X-Api-Key', prowlarr_api_key)
@@ -2357,35 +2335,6 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         error_msg = error_data.get('message') or error_data.get('error') or error_body or str(e)
                     except Exception as parse_err:
                         error_msg = error_body or str(e)
-                    
-                    # #region agent log
-                    import json as json_module
-                    try:
-                        payload_for_log = grab_payload_dict
-                        url_for_log = grab_url
-                    except NameError:
-                        payload_for_log = {'guid': guid, 'indexerId': indexer_id}
-                        url_for_log = f"{prowlarr_url}/api/v1/release/grab"
-                    with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
-                        f.write(json_module.dumps({
-                            'sessionId': 'debug-session',
-                            'runId': 'run1',
-                            'hypothesisId': 'B',
-                            'location': 'serve.py:2396',
-                            'message': 'Prowlarr HTTP error response',
-                            'data': {
-                                'http_code': e.code,
-                                'http_reason': e.reason,
-                                'error_body_raw': error_body,
-                                'error_msg': error_msg,
-                                'request_payload': payload_for_log,
-                                'grab_url': url_for_log,
-                                'guid': guid,
-                                'indexerId': indexer_id
-                            },
-                            'timestamp': int(time.time() * 1000)
-                        }) + '\n')
-                    # #endregion
                     
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
