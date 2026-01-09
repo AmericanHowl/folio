@@ -22,6 +22,11 @@ services:
       - PROWLARR_URL=${PROWLARR_URL:-}
       # Prowlarr API key (get from Prowlarr Settings → General → API Key)
       - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
+    # DNS servers for reliable hostname resolution (fixes "Temporary failure in name resolution")
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9099/api/config"]
       interval: 30s
