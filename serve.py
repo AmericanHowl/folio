@@ -2411,7 +2411,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 if is_magnet:
                     # For magnet links, just send the URL with ebook category
                     print(f"🔗 Sending magnet to qBittorrent: {url[:80]}...", flush=True)
-                    add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebook'}).encode('utf-8')
+                    add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebooks'}).encode('utf-8')
                     add_req = urllib.request.Request(add_url, data=add_data, method='POST')
                     add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
                 else:
@@ -2430,7 +2430,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         if not torrent_data or (torrent_data[0:1] != b'd' and torrent_data[0:1] != b'8'):
                             print(f"⚠️ Downloaded data doesn't look like a torrent file, trying as URL", flush=True)
                             # Fall back to sending URL with ebook category
-                            add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebook'}).encode('utf-8')
+                            add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebooks'}).encode('utf-8')
                             add_req = urllib.request.Request(add_url, data=add_data, method='POST')
                             add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
                         else:
@@ -2455,14 +2455,14 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             body_parts.append(b'ebook')
                             body_parts.append(f'--{boundary}--'.encode())
                             
-                            add_data = b'\r\n'.join(body_parts)
+                            add_data = b'\r\n\r\n'.join(body_parts)
                             add_req = urllib.request.Request(add_url, data=add_data, method='POST')
                             add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
                             
                     except Exception as e:
                         print(f"⚠️ Failed to download torrent file: {e}, trying URL directly", flush=True)
-                        # Fall back to sending URL with ebook category (might work if qBittorrent can reach it)
-                        add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebook'}).encode('utf-8')
+                        # Fall back to sending URL with ebooks category (might work if qBittorrent can reach it)
+                        add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebooks'}).encode('utf-8')
                         add_req = urllib.request.Request(add_url, data=add_data, method='POST')
                         add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
 
