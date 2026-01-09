@@ -1125,12 +1125,8 @@
                                         class="w-16 h-24 object-cover rounded-lg"
                                         @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'"
                                     >
-                                    <!-- Badge for library books -->
-                                    <span x-show="!selectionMode" class="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                                        <i class="bi bi-check-lg text-white text-[10px]"></i>
-                                    </span>
                                 </div>
-                                
+
                                 <!-- Details -->
                                 <div @click="selectionMode ? toggleBookSelection(book.id) : openBookModal(book)" 
                                      :class="selectionMode ? 'cursor-pointer' : 'cursor-pointer'"
@@ -1176,10 +1172,6 @@
                                                  :alt="book.title" 
                                                  loading="lazy"
                                                  @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                                            <!-- Badge for library books (hide when in selection mode) -->
-                                            <span x-show="!selectionMode" class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                                                <i class="bi bi-check-lg text-white text-xs"></i>
-                                            </span>
                                         </div>
                                         <h3 class="mt-1.5 text-xs font-semibold text-ink-900 line-clamp-2 leading-tight" x-text="book.title"></h3>
                                         <p class="text-xs text-ink-500 line-clamp-1" x-text="formatAuthors(book.authors)"></p>

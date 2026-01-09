@@ -1455,6 +1455,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                             'title': item.get('title', 'Unknown'),
                             'author': item.get('author', 'Unknown'),
                             'indexer': item.get('indexer', 'Unknown'),
+                            'indexerId': item.get('indexerId'),
                             'size': item.get('size', 0),
                             'seeders': item.get('seeders', 0),
                             'leechers': item.get('leechers', 0),
@@ -1916,12 +1917,21 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body.decode('utf-8'))
                 guid = data.get('guid')
-                
+                indexer_id = data.get('indexerId')
+
                 if not guid:
                     self.send_response(400)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
                     response = json.dumps({'success': False, 'error': 'GUID is required'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                if not indexer_id:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': 'Indexer ID is required'})
                     self.wfile.write(response.encode('utf-8'))
                     return
 
@@ -1938,11 +1948,12 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
                 try:
                     # Prowlarr command endpoint to send download to bittorrent client
-                    # The DownloadRelease command requires guid parameter
+                    # The DownloadRelease command requires guid and indexerId parameters
                     command_url = f"{prowlarr_url}/api/v1/command"
                     command_payload = json.dumps({
                         'name': 'DownloadRelease',
-                        'guid': guid
+                        'guid': guid,
+                        'indexerId': indexer_id
                     }).encode('utf-8')
                     
                     req = urllib.request.Request(command_url, data=command_payload, method='POST')

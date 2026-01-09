@@ -102,8 +102,8 @@ function folioApp() {
         // Settings
         showSettings: false,
         
-        // Cache-buster for covers
-        coverVersion: Date.now(),
+        // Cache-buster for covers (persisted to localStorage to enable browser caching)
+        coverVersion: parseInt(localStorage.getItem('coverVersion')) || 1,
         
         // Bookshelf view (for viewing full sections)
         showBookshelf: false,
@@ -463,6 +463,7 @@ function folioApp() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         guid: result.guid,
+                        indexerId: result.indexerId,
                         indexer: result.indexer,
                         title: result.title
                     }),
@@ -904,6 +905,7 @@ function folioApp() {
                     
                     // Bust cover cache so the new cover shows immediately
                     this.coverVersion = Date.now();
+                    localStorage.setItem('coverVersion', this.coverVersion);
                 } else {
                     console.error('Failed to update metadata:', result.errors);
                     alert('Failed to update metadata: ' + (result.errors?.join(', ') || 'Unknown error'));
@@ -1029,7 +1031,8 @@ function folioApp() {
 
                     // Bust cover cache so the new cover shows immediately
                     this.coverVersion = Date.now();
-                    
+                    localStorage.setItem('coverVersion', this.coverVersion);
+
                     this.exitEditMode();
                 } else {
                     alert('Failed to save metadata: ' + (result.errors?.join(', ') || 'Unknown error'));
