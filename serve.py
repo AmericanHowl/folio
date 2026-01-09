@@ -1087,9 +1087,250 @@ def find_calibredb():
     return None
 
 
+def find_kepubify():
+    """Find kepubify executable across platforms"""
+    # Try finding in PATH first
+    kepubify_in_path = shutil.which('kepubify')
+    if kepubify_in_path:
+        return kepubify_in_path
+
+    # Try common locations by platform
+    import platform
+    system = platform.system()
+
+    common_paths = []
+
+    if system == 'Darwin':  # macOS
+        common_paths = [
+            '/usr/local/bin/kepubify',
+            os.path.expanduser('~/bin/kepubify'),
+            os.path.expanduser('~/.local/bin/kepubify'),
+        ]
+    elif system == 'Linux':
+        common_paths = [
+            '/usr/bin/kepubify',
+            '/usr/local/bin/kepubify',
+            os.path.expanduser('~/.local/bin/kepubify'),
+            os.path.expanduser('~/bin/kepubify'),
+        ]
+    elif system == 'Windows':
+        common_paths = [
+            os.path.expanduser('~\\kepubify.exe'),
+            'C:\\Program Files\\kepubify\\kepubify.exe',
+        ]
+
+    for path in common_paths:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+
+    return None
+
+
+def convert_book_to_kepub(book_id):
+    """
+    Convert an EPUB book to KEPUB format using kepubify and add it to the library.
+    Returns True on success, False on failure.
+    """
+    kepubify_path = find_kepubify()
+    if not kepubify_path:
+        print("⚠️ kepubify not found - skipping KEPUB conversion")
+        return False
+
+    try:
+        # Get book info from database
+        conn = get_db_connection(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute("SELECT path FROM books WHERE id = ?", (book_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            print(f"❌ Book {book_id} not found for KEPUB conversion")
+            return False
+
+        book_path = row['path']
+        library_path = get_calibre_library()
+        book_dir = os.path.join(library_path, book_path)
+
+        # Find the EPUB file in the book directory
+        epub_file = None
+        for filename in os.listdir(book_dir):
+            if filename.lower().endswith('.epub') and not filename.lower().endswith('.kepub.epub'):
+                epub_file = os.path.join(book_dir, filename)
+                break
+
+        if not epub_file:
+            print(f"⚠️ No EPUB found for book {book_id} - skipping KEPUB conversion")
+            return False
+
+        # Create output filename
+        kepub_file = epub_file.replace('.epub', '.kepub.epub')
+
+        # Run kepubify
+        result = subprocess.run(
+            [kepubify_path, '-o', kepub_file, epub_file],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+
+        if result.returncode == 0 and os.path.exists(kepub_file):
+            # Add the KEPUB format to the book in Calibre
+            add_result = run_calibredb(['add_format', str(book_id), kepub_file], suppress_errors=True)
+            if add_result['success']:
+                print(f"✅ Converted and added KEPUB for book {book_id}")
+                # Remove the temporary kepub file since it's now in the library
+                try:
+                    os.remove(kepub_file)
+                except:
+                    pass
+                return True
+            else:
+                print(f"❌ Failed to add KEPUB format: {add_result.get('error', 'Unknown error')}")
+                return False
+        else:
+            print(f"❌ kepubify failed: {result.stderr}")
+            return False
+
+    except Exception as e:
+        print(f"❌ KEPUB conversion error: {e}")
+        return False
+
+
+def fetch_and_apply_itunes_metadata(book_id):
+    """
+    Fetch metadata from iTunes based on the book's title/author and apply it.
+    Returns True on success, False on failure.
+    """
+    try:
+        # Get book info from database
+        conn = get_db_connection(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT b.title, GROUP_CONCAT(a.name, ' & ') as authors
+            FROM books b
+            LEFT JOIN books_authors_link bal ON b.id = bal.book
+            LEFT JOIN authors a ON bal.author = a.id
+            WHERE b.id = ?
+            GROUP BY b.id
+        """, (book_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            print(f"❌ Book {book_id} not found for metadata fetch")
+            return False
+
+        title = row['title'] or ''
+        authors = row['authors'] or ''
+
+        # Build search query
+        search_query = title
+        if authors:
+            # Take just the first author for more accurate results
+            first_author = authors.split(' & ')[0].strip()
+            search_query = f"{title} {first_author}"
+
+        print(f"🔍 Searching iTunes for: {search_query}")
+
+        # Search iTunes
+        result = search_itunes(search_query, limit=5)
+        if 'error' in result or not result.get('books'):
+            print(f"⚠️ No iTunes results for book {book_id}")
+            return False
+
+        # Find best match (simple title matching)
+        best_match = None
+        title_lower = title.lower()
+        for book in result['books']:
+            if book.get('title', '').lower() == title_lower:
+                best_match = book
+                break
+
+        # If no exact match, use first result
+        if not best_match:
+            best_match = result['books'][0]
+
+        # Build metadata update args
+        metadata_args = ['set_metadata', str(book_id)]
+
+        # Apply description/comments if available
+        if best_match.get('description'):
+            # Strip HTML tags for Calibre comments
+            description = re.sub(r'<[^>]+>', '', best_match['description'])
+            metadata_args.extend(['--field', f'comments:{description}'])
+
+        # Apply cover if available
+        if best_match.get('image'):
+            try:
+                # Download cover image
+                cover_url = best_match['image']
+                req = urllib.request.Request(cover_url)
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    cover_data = response.read()
+
+                # Save to temp file
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                    tmp.write(cover_data)
+                    cover_path = tmp.name
+
+                # Apply cover using calibredb
+                cover_result = run_calibredb(['set_metadata', str(book_id), '--field', f'cover:{cover_path}'], suppress_errors=True)
+
+                # Clean up temp file
+                try:
+                    os.remove(cover_path)
+                except:
+                    pass
+
+                if cover_result['success']:
+                    print(f"✅ Applied cover from iTunes for book {book_id}")
+            except Exception as e:
+                print(f"⚠️ Failed to apply cover: {e}")
+
+        # Apply other metadata if we have any fields
+        if len(metadata_args) > 2:
+            result = run_calibredb(metadata_args, suppress_errors=True)
+            if result['success']:
+                print(f"✅ Applied iTunes metadata for book {book_id}")
+                return True
+            else:
+                print(f"⚠️ Failed to apply metadata: {result.get('error', 'Unknown')}")
+                return False
+
+        return True
+
+    except Exception as e:
+        print(f"❌ iTunes metadata error: {e}")
+        return False
+
+
+def get_book_id_from_calibredb_output(output):
+    """
+    Extract the book ID from calibredb add output.
+    Output format typically: "Added book ids: 123" or similar
+    """
+    if not output:
+        return None
+
+    # Look for patterns like "Added book ids: 123" or "id: 123"
+    match = re.search(r'(?:Added book ids?:|id:)\s*(\d+)', output, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+
+    # Also try to find just a number on a line by itself
+    for line in output.strip().split('\n'):
+        line = line.strip()
+        if line.isdigit():
+            return int(line)
+
+    return None
+
+
 def run_calibredb(args, suppress_errors=False):
     """Execute calibredb command with the library path
-    
+
     Args:
         args: Command arguments for calibredb
         suppress_errors: If True, don't print error messages (for non-critical operations)
@@ -1208,6 +1449,23 @@ def import_books_from_folder():
                 import_state['imported_files'].append(filepath)
                 print(f"✅ Imported: {os.path.basename(filepath)}")
 
+                # Get the book ID from the calibredb output for post-processing
+                book_id = get_book_id_from_calibredb_output(result.get('output', ''))
+
+                if book_id:
+                    # Convert EPUB to KEPUB if it's an EPUB file
+                    if filepath.lower().endswith('.epub'):
+                        try:
+                            convert_book_to_kepub(book_id)
+                        except Exception as e:
+                            print(f"⚠️ KEPUB conversion failed: {e}")
+
+                    # Fetch and apply iTunes metadata
+                    try:
+                        fetch_and_apply_itunes_metadata(book_id)
+                    except Exception as e:
+                        print(f"⚠️ iTunes metadata fetch failed: {e}")
+
                 # Delete original if configured
                 if delete_after:
                     try:
@@ -1293,44 +1551,50 @@ def stop_import_watcher():
     import_state['running'] = False
 
 
+def get_reading_list_column_id():
+    """
+    Get the ID of the reading_list custom column from the database.
+    Returns the column ID if it exists, None otherwise.
+    """
+    try:
+        library_path = get_calibre_library()
+        db_path = os.path.join(library_path, 'metadata.db')
+
+        if not os.path.exists(db_path):
+            return None
+
+        conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=10.0)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM custom_columns WHERE label = 'reading_list'")
+        row = cursor.fetchone()
+        conn.close()
+
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
 def ensure_reading_list_column():
     """
     Ensure the reading_list custom column exists in Calibre.
     Creates it if it doesn't exist.
-    Returns True if column exists or was created successfully, False otherwise.
-    
+    Returns the column ID if column exists or was created successfully, None otherwise.
+
     This is a non-critical feature - failures are handled gracefully.
     """
-    # First, check directly in the database if the column exists
-    # This avoids calling calibredb which can print apsw errors to stderr
-    try:
-        library_path = get_calibre_library()
-        db_path = os.path.join(library_path, 'metadata.db')
-        
-        if os.path.exists(db_path):
-            conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=10.0)
-            cursor = conn.cursor()
-            # Check if custom_columns table has reading_list
-            cursor.execute("SELECT id FROM custom_columns WHERE label = 'reading_list'")
-            row = cursor.fetchone()
-            conn.close()
-            
-            if row:
-                # Column already exists in database
-                return True
-    except Exception:
-        # If we can't check the database, try to create the column anyway
-        pass
-    
-    # Column doesn't exist or we couldn't check, try to create it
-    # Suppress stderr output by using subprocess directly with stderr capture
+    # First, check if column already exists
+    column_id = get_reading_list_column_id()
+    if column_id is not None:
+        return column_id
+
+    # Column doesn't exist, try to create it using calibredb
     library_path = get_calibre_library()
     calibredb_path = find_calibredb()
-    
+
     if not calibredb_path:
         # No calibredb available - reading list feature won't work
-        return False
-    
+        return None
+
     # Try positional arguments (most compatible with different calibre versions)
     cmd = [calibredb_path, 'add_custom_column', 'reading_list', 'Reading List', 'bool', '--library-path', library_path]
     try:
@@ -1342,61 +1606,238 @@ def ensure_reading_list_column():
         )
         # Check if successful or if column already exists
         if result.returncode == 0:
-            return True
-        
+            # Get the new column ID
+            return get_reading_list_column_id()
+
         # Check stderr for "already exists" type errors - these are fine
         error_output = (result.stderr + result.stdout).lower()
         if ('already exists' in error_output or
             'duplicate' in error_output or
             'unique constraint' in error_output or
             'constrainterror' in error_output):
-            return True
-        
+            return get_reading_list_column_id()
+
         # Some other error - reading list won't work but app continues
-        return False
-        
+        return None
+
     except Exception as e:
         error_str = str(e).lower()
         # If error indicates column already exists, that's fine
         if 'unique constraint' in error_str or 'already exists' in error_str:
-            return True
-        return False
+            return get_reading_list_column_id()
+        return None
 
 
 def get_reading_list_ids():
     """
-    Get IDs of books on the reading list using Calibre custom column #reading_list.
-    Automatically creates the column if it doesn't exist.
-    
+    Get IDs of books on the reading list using direct database query.
+
     This is a non-critical feature - returns empty list on any error.
     """
     try:
-        # Ensure the column exists before trying to use it
-        if not ensure_reading_list_column():
-            # Column doesn't exist and couldn't be created - return empty list
-            return []
-        
-        # Use suppress_errors=True since reading list is optional
-        result = run_calibredb(['list', '--fields', 'id', '--search', '#reading_list:true'], suppress_errors=True)
-        if not result['success']:
+        column_id = ensure_reading_list_column()
+        if column_id is None:
             return []
 
-        ids = []
-        for line in result['output'].splitlines():
-            line = line.strip()
-            if not line or line.lower().startswith('id'):
-                continue
-            try:
-                # calibredb list with --fields id prints just the id per line
-                book_id = int(line.split()[0])
-                ids.append(book_id)
-            except ValueError:
-                continue
-        return ids
+        library_path = get_calibre_library()
+        db_path = os.path.join(library_path, 'metadata.db')
+
+        if not os.path.exists(db_path):
+            return []
+
+        conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=10.0)
+        cursor = conn.cursor()
+
+        # Query the custom column table for books with value = 1 (true)
+        table_name = f'custom_column_{column_id}'
+        cursor.execute(f"SELECT book FROM {table_name} WHERE value = 1")
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [row[0] for row in rows]
     except Exception as e:
-        # Reading list is optional - don't let errors break the app
         print(f"⚠️ Reading list unavailable: {e}", flush=True)
         return []
+
+
+def add_to_reading_list(book_id):
+    """
+    Add a book to the reading list using direct database access.
+    Returns True on success, False on failure.
+    """
+    try:
+        column_id = ensure_reading_list_column()
+        if column_id is None:
+            print("❌ Could not create reading list column")
+            return False
+
+        library_path = get_calibre_library()
+        db_path = os.path.join(library_path, 'metadata.db')
+
+        if not os.path.exists(db_path):
+            return False
+
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+
+        table_name = f'custom_column_{column_id}'
+
+        # Check if entry already exists
+        cursor.execute(f"SELECT id FROM {table_name} WHERE book = ?", (book_id,))
+        existing = cursor.fetchone()
+
+        if existing:
+            # Update existing entry
+            cursor.execute(f"UPDATE {table_name} SET value = 1 WHERE book = ?", (book_id,))
+        else:
+            # Insert new entry
+            cursor.execute(f"INSERT INTO {table_name} (book, value) VALUES (?, 1)", (book_id,))
+
+        conn.commit()
+        conn.close()
+
+        print(f"✅ Added book {book_id} to reading list")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to add book {book_id} to reading list: {e}")
+        return False
+
+
+def remove_from_reading_list(book_id):
+    """
+    Remove a book from the reading list using direct database access.
+    Returns True on success, False on failure.
+    """
+    try:
+        column_id = get_reading_list_column_id()
+        if column_id is None:
+            # Column doesn't exist, nothing to remove
+            return True
+
+        library_path = get_calibre_library()
+        db_path = os.path.join(library_path, 'metadata.db')
+
+        if not os.path.exists(db_path):
+            return False
+
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+
+        table_name = f'custom_column_{column_id}'
+
+        # Delete the entry (or set value to 0)
+        cursor.execute(f"DELETE FROM {table_name} WHERE book = ?", (book_id,))
+
+        conn.commit()
+        conn.close()
+
+        print(f"✅ Removed book {book_id} from reading list")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to remove book {book_id} from reading list: {e}")
+        return False
+
+
+def mark_request_actioned(book_title):
+    """
+    Mark a book request as actioned (sent to qBittorrent).
+    Sets the actioned_at timestamp for the matching request.
+    Returns True if a request was marked, False otherwise.
+    """
+    try:
+        requested_books = config.get('requested_books', [])
+        title_lower = book_title.lower().strip()
+
+        for book in requested_books:
+            book_title_lower = book.get('title', '').lower().strip()
+            if book_title_lower == title_lower or title_lower in book_title_lower or book_title_lower in title_lower:
+                book['actioned_at'] = int(time.time())
+                config['requested_books'] = requested_books
+                save_config()
+                print(f"✅ Marked request as actioned: {book.get('title', 'Unknown')}")
+                return True
+
+        return False
+    except Exception as e:
+        print(f"⚠️ Failed to mark request as actioned: {e}")
+        return False
+
+
+def check_book_in_library(title, author=None):
+    """
+    Check if a book with the given title (and optionally author) exists in the Calibre library.
+    Returns the book ID if found, None otherwise.
+    """
+    try:
+        conn = get_db_connection(readonly=True)
+        cursor = conn.cursor()
+
+        # Search by title (case-insensitive)
+        title_pattern = f'%{title}%'
+
+        if author:
+            # Search with both title and author
+            author_pattern = f'%{author}%'
+            cursor.execute("""
+                SELECT DISTINCT b.id, b.title
+                FROM books b
+                LEFT JOIN books_authors_link bal ON b.id = bal.book
+                LEFT JOIN authors a ON bal.author = a.id
+                WHERE b.title LIKE ? AND a.name LIKE ?
+                LIMIT 1
+            """, (title_pattern, author_pattern))
+        else:
+            # Search by title only
+            cursor.execute("""
+                SELECT id, title FROM books
+                WHERE title LIKE ?
+                LIMIT 1
+            """, (title_pattern,))
+
+        row = cursor.fetchone()
+        conn.close()
+
+        return row['id'] if row else None
+    except Exception as e:
+        print(f"⚠️ Error checking library for book: {e}")
+        return None
+
+
+def cleanup_fulfilled_requests():
+    """
+    Remove requests for books that are now in the Calibre library.
+    Returns list of removed book titles.
+    """
+    try:
+        requested_books = config.get('requested_books', [])
+        if not requested_books:
+            return []
+
+        removed = []
+        remaining = []
+
+        for book in requested_books:
+            title = book.get('title', '')
+            author = book.get('author', '')
+
+            # Check if book is now in library
+            book_id = check_book_in_library(title, author)
+            if book_id:
+                removed.append(title)
+                print(f"📚 Request fulfilled - found in library: {title}")
+            else:
+                remaining.append(book)
+
+        if removed:
+            config['requested_books'] = remaining
+            save_config()
+            print(f"🧹 Cleaned up {len(removed)} fulfilled request(s)")
+
+        return removed
+    except Exception as e:
+        print(f"⚠️ Error cleaning up requests: {e}")
+        return []
+
 
 def transform_hardcover_books(results):
     """Transform Hardcover API book results to our format (for discovery features)"""
@@ -2391,21 +2832,30 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
         # API: Get requested books
         if path == '/api/requests':
+            # First, clean up any requests for books now in the library
+            fulfilled = cleanup_fulfilled_requests()
+
             requested_books = config.get('requested_books', [])
             # Ensure all books have a requested_at timestamp (set to today if missing)
             current_timestamp = int(time.time())
+            needs_save = False
             for book in requested_books:
                 if 'requested_at' not in book or not book.get('requested_at'):
                     book['requested_at'] = current_timestamp
-            # Save updated books back to config
-            if any('requested_at' not in book or not book.get('requested_at') for book in requested_books):
+                    needs_save = True
+
+            # Save updated books back to config if needed
+            if needs_save:
                 config['requested_books'] = requested_books
                 save_config()
-            
+
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
-            response = json.dumps({'books': requested_books})
+            response = json.dumps({
+                'books': requested_books,
+                'fulfilled': fulfilled if fulfilled else None
+            })
             self.wfile.write(response.encode('utf-8'))
             return
 
@@ -2991,6 +3441,10 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     # qBittorrent returns "Ok." on success, "Fails." on failure
                     if add_result.lower() == 'ok.':
                         print(f"✅ Successfully added to qBittorrent: {title}", flush=True)
+
+                        # Mark the corresponding book request as actioned
+                        mark_request_actioned(title)
+
                         self.send_response(200)
                         self.send_header('Content-Type', 'application/json')
                         self.end_headers()
@@ -3278,20 +3732,14 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 added_count = 0
                 errors = []
 
-                # Ensure the reading_list column exists before using it
-                ensure_reading_list_column()
-
-                # Add each book to reading list using calibredb set_metadata
+                # Add each book to reading list using direct database access
                 for book_id in book_ids:
                     try:
                         book_id_int = int(book_id)
-                        # Set custom column #reading_list:true via calibredb
-                        result = run_calibredb(['set_metadata', str(book_id_int), '--field', '#reading_list:true'], suppress_errors=True)
-                        if result['success']:
+                        if add_to_reading_list(book_id_int):
                             added_count += 1
-                            print(f"✅ Added book {book_id_int} to reading list")
                         else:
-                            errors.append(f"Book {book_id_int}: {result.get('error', 'Unknown error')}")
+                            errors.append(f"Book {book_id_int}: Failed to add")
                     except ValueError:
                         errors.append(f"Invalid book ID: {book_id}")
                     except Exception as e:
@@ -3363,12 +3811,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(response.encode('utf-8'))
                     return
 
-                # Ensure the reading_list column exists before using it
-                ensure_reading_list_column()
-
-                # Set custom column #reading_list:true via calibredb
-                result = run_calibredb(['set_metadata', str(book_id_int), '--field', '#reading_list:true'], suppress_errors=True)
-                if result['success']:
+                # Add to reading list using direct database access
+                if add_to_reading_list(book_id_int):
                     ids = get_reading_list_ids()
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
@@ -3379,7 +3823,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
-                    response = json.dumps({'success': False, 'error': result.get('error', 'Unknown error')})
+                    response = json.dumps({'success': False, 'error': 'Failed to add book to reading list'})
                     self.wfile.write(response.encode('utf-8'))
             except Exception as e:
                 self.send_error(400, f"Bad Request: {e}")
@@ -3405,16 +3849,13 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Remove book from reading list (set #reading_list:false)
+        # API: Remove book from reading list
         match = re.match(r'/api/reading-list/(\d+)', self.path)
         if match:
             book_id = int(match.group(1))
 
-            # Ensure the reading_list column exists before using it
-            ensure_reading_list_column()
-
-            result = run_calibredb(['set_metadata', str(book_id), '--field', '#reading_list:false'], suppress_errors=True)
-            if result['success']:
+            # Remove from reading list using direct database access
+            if remove_from_reading_list(book_id):
                 ids = get_reading_list_ids()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
@@ -3425,7 +3866,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                response = json.dumps({'success': False, 'error': result.get('error', 'Unknown error')})
+                response = json.dumps({'success': False, 'error': 'Failed to remove book from reading list'})
                 self.wfile.write(response.encode('utf-8'))
             return
 
