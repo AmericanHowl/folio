@@ -591,33 +591,53 @@ def find_calibredb():
     return None
 
 
-def run_calibredb(args):
-    """Execute calibredb command with the library path"""
+def run_calibredb(args, suppress_errors=False):
+    """Execute calibredb command with the library path
+    
+    Args:
+        args: Command arguments for calibredb
+        suppress_errors: If True, don't print error messages (for non-critical operations)
+    """
     library_path = get_calibre_library()
     calibredb_path = find_calibredb()
     
     if not calibredb_path:
         error_msg = 'calibredb not found. Please install Calibre or set CALIBREDB_PATH environment variable.'
-        print(f"❌ {error_msg}")
+        if not suppress_errors:
+            print(f"❌ {error_msg}")
         return {'success': False, 'error': error_msg}
     
     cmd = [calibredb_path] + args + ['--library-path', library_path]
-    print(f"🔧 Running: {' '.join(cmd)}")
+    if not suppress_errors:
+        print(f"🔧 Running: {' '.join(cmd)}")
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
+            timeout=30  # Add timeout to prevent hanging
         )
         return {'success': True, 'output': result.stdout}
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() if e.stderr else str(e)
-        print(f"❌ calibredb error: {error_msg}")
+        if not suppress_errors:
+            print(f"❌ calibredb error: {error_msg}")
+        return {'success': False, 'error': error_msg}
+    except subprocess.TimeoutExpired:
+        error_msg = 'calibredb command timed out'
+        if not suppress_errors:
+            print(f"❌ {error_msg}")
         return {'success': False, 'error': error_msg}
     except FileNotFoundError:
         error_msg = f'calibredb not found at {calibredb_path}. Please install Calibre.'
-        print(f"❌ {error_msg}")
+        if not suppress_errors:
+            print(f"❌ {error_msg}")
+        return {'success': False, 'error': error_msg}
+    except Exception as e:
+        error_msg = str(e)
+        if not suppress_errors:
+            print(f"❌ calibredb unexpected error: {error_msg}")
         return {'success': False, 'error': error_msg}
 
 
@@ -782,6 +802,8 @@ def ensure_reading_list_column():
     Ensure the reading_list custom column exists in Calibre.
     Creates it if it doesn't exist.
     Returns True if column exists or was created successfully, False otherwise.
+    
+    This is a non-critical feature - failures are handled gracefully.
     """
     # First, check directly in the database if the column exists
     # This avoids calling calibredb which can print apsw errors to stderr
@@ -800,9 +822,9 @@ def ensure_reading_list_column():
             if row:
                 # Column already exists in database
                 return True
-    except Exception as e:
-        # If we can't check the database, fall back to calibredb
-        print(f"⚠️  Could not check database for custom column: {e}")
+    except Exception:
+        # If we can't check the database, try to create the column anyway
+        pass
     
     # Column doesn't exist or we couldn't check, try to create it
     # Suppress stderr output by using subprocess directly with stderr capture
@@ -810,7 +832,7 @@ def ensure_reading_list_column():
     calibredb_path = find_calibredb()
     
     if not calibredb_path:
-        print('⚠️  calibredb not found, cannot create reading_list column')
+        # No calibredb available - reading list feature won't work
         return False
     
     # Try positional arguments (most compatible with different calibre versions)
@@ -824,31 +846,24 @@ def ensure_reading_list_column():
         )
         # Check if successful or if column already exists
         if result.returncode == 0:
-            print('✅ Created reading_list custom column')
             return True
         
-        # Check stderr for "already exists" type errors
+        # Check stderr for "already exists" type errors - these are fine
         error_output = (result.stderr + result.stdout).lower()
         if ('already exists' in error_output or
             'duplicate' in error_output or
             'unique constraint' in error_output or
             'constrainterror' in error_output):
-            # Column already exists - this is fine, don't print the error
             return True
         
-        # Some other error
-        print(f'⚠️  Failed to create reading_list column: {result.stderr.strip()}')
+        # Some other error - reading list won't work but app continues
         return False
         
-    except subprocess.TimeoutExpired:
-        print('⚠️  Timeout creating reading_list column')
-        return False
     except Exception as e:
         error_str = str(e).lower()
         # If error indicates column already exists, that's fine
         if 'unique constraint' in error_str or 'already exists' in error_str:
             return True
-        print(f'⚠️  Error creating reading_list column: {e}')
         return False
 
 
@@ -856,34 +871,36 @@ def get_reading_list_ids():
     """
     Get IDs of books on the reading list using Calibre custom column #reading_list.
     Automatically creates the column if it doesn't exist.
-    """
-    # Ensure the column exists before trying to use it
-    ensure_reading_list_column()
     
-    result = run_calibredb(['list', '--fields', 'id', '--search', '#reading_list:true'])
-    if not result['success']:
-        # If search fails, column might not exist yet - try creating it again
-        if 'reading_list' in result.get('error', '').lower() or 'column' in result.get('error', '').lower():
-            ensure_reading_list_column()
-            # Try once more
-            result = run_calibredb(['list', '--fields', 'id', '--search', '#reading_list:true'])
-            if not result['success']:
-                return []
-        else:
+    This is a non-critical feature - returns empty list on any error.
+    """
+    try:
+        # Ensure the column exists before trying to use it
+        if not ensure_reading_list_column():
+            # Column doesn't exist and couldn't be created - return empty list
+            return []
+        
+        # Use suppress_errors=True since reading list is optional
+        result = run_calibredb(['list', '--fields', 'id', '--search', '#reading_list:true'], suppress_errors=True)
+        if not result['success']:
             return []
 
-    ids = []
-    for line in result['output'].splitlines():
-        line = line.strip()
-        if not line or line.lower().startswith('id'):
-            continue
-        try:
-            # calibredb list with --fields id prints just the id per line
-            book_id = int(line.split()[0])
-            ids.append(book_id)
-        except ValueError:
-            continue
-    return ids
+        ids = []
+        for line in result['output'].splitlines():
+            line = line.strip()
+            if not line or line.lower().startswith('id'):
+                continue
+            try:
+                # calibredb list with --fields id prints just the id per line
+                book_id = int(line.split()[0])
+                ids.append(book_id)
+            except ValueError:
+                continue
+        return ids
+    except Exception as e:
+        # Reading list is optional - don't let errors break the app
+        print(f"⚠️ Reading list unavailable: {e}", flush=True)
+        return []
 
 def transform_hardcover_books(results):
     """Transform Hardcover API book results to our format (for discovery features)"""
@@ -2378,14 +2395,66 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 # Add torrent to qBittorrent
                 add_url = f"{qbt_url}/api/v2/torrents/add"
 
-                # Use proper URL-encoded form data (qBittorrent expects application/x-www-form-urlencoded)
-                # Despite the parameter being called "urls", it's sent as form data, not multipart
-                add_data = urllib.parse.urlencode({'urls': url}).encode('utf-8')
-
-                print(f"🔗 Sending to qBittorrent: url={url[:100]}...", flush=True)
-
-                add_req = urllib.request.Request(add_url, data=add_data, method='POST')
-                add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+                # Check if this is a magnet link or a torrent URL
+                is_magnet = url.startswith('magnet:')
+                
+                if is_magnet:
+                    # For magnet links, just send the URL with ebook category
+                    print(f"🔗 Sending magnet to qBittorrent: {url[:80]}...", flush=True)
+                    add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebook'}).encode('utf-8')
+                    add_req = urllib.request.Request(add_url, data=add_data, method='POST')
+                    add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+                else:
+                    # For torrent URLs (like Prowlarr download links), download the .torrent file first
+                    # then send it to qBittorrent as file content. This ensures qBittorrent gets the file
+                    # even if it can't reach the original URL (common in Docker networking scenarios)
+                    print(f"🔗 Downloading torrent file from: {url[:80]}...", flush=True)
+                    
+                    try:
+                        torrent_req = urllib.request.Request(url)
+                        torrent_req.add_header('User-Agent', 'Folio/1.0')
+                        torrent_resp = urllib.request.urlopen(torrent_req, timeout=30)
+                        torrent_data = torrent_resp.read()
+                        
+                        # Verify it looks like a torrent file (starts with 'd' for bencoded dict)
+                        if not torrent_data or (torrent_data[0:1] != b'd' and torrent_data[0:1] != b'8'):
+                            print(f"⚠️ Downloaded data doesn't look like a torrent file, trying as URL", flush=True)
+                            # Fall back to sending URL with ebook category
+                            add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebook'}).encode('utf-8')
+                            add_req = urllib.request.Request(add_url, data=add_data, method='POST')
+                            add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+                        else:
+                            print(f"✅ Downloaded torrent file: {len(torrent_data)} bytes", flush=True)
+                            
+                            # Send as multipart form data with the torrent file
+                            import uuid
+                            boundary = str(uuid.uuid4())
+                            
+                            # Build multipart body
+                            body_parts = []
+                            # Add the torrent file
+                            body_parts.append(f'--{boundary}'.encode())
+                            body_parts.append(b'Content-Disposition: form-data; name="torrents"; filename="download.torrent"')
+                            body_parts.append(b'Content-Type: application/x-bittorrent')
+                            body_parts.append(b'')
+                            body_parts.append(torrent_data)
+                            # Add ebook category
+                            body_parts.append(f'--{boundary}'.encode())
+                            body_parts.append(b'Content-Disposition: form-data; name="category"')
+                            body_parts.append(b'')
+                            body_parts.append(b'ebook')
+                            body_parts.append(f'--{boundary}--'.encode())
+                            
+                            add_data = b'\r\n'.join(body_parts)
+                            add_req = urllib.request.Request(add_url, data=add_data, method='POST')
+                            add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
+                            
+                    except Exception as e:
+                        print(f"⚠️ Failed to download torrent file: {e}, trying URL directly", flush=True)
+                        # Fall back to sending URL with ebook category (might work if qBittorrent can reach it)
+                        add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebook'}).encode('utf-8')
+                        add_req = urllib.request.Request(add_url, data=add_data, method='POST')
+                        add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
 
                 try:
                     add_resp = opener.open(add_req, timeout=30)
@@ -2691,7 +2760,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     try:
                         book_id_int = int(book_id)
                         # Set custom column #reading_list:true via calibredb
-                        result = run_calibredb(['set_metadata', str(book_id_int), '--field', '#reading_list:true'])
+                        result = run_calibredb(['set_metadata', str(book_id_int), '--field', '#reading_list:true'], suppress_errors=True)
                         if result['success']:
                             added_count += 1
                             print(f"✅ Added book {book_id_int} to reading list")
@@ -2772,7 +2841,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 ensure_reading_list_column()
 
                 # Set custom column #reading_list:true via calibredb
-                result = run_calibredb(['set_metadata', str(book_id_int), '--field', '#reading_list:true'])
+                result = run_calibredb(['set_metadata', str(book_id_int), '--field', '#reading_list:true'], suppress_errors=True)
                 if result['success']:
                     ids = get_reading_list_ids()
                     self.send_response(200)
@@ -2818,7 +2887,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             # Ensure the reading_list column exists before using it
             ensure_reading_list_column()
 
-            result = run_calibredb(['set_metadata', str(book_id), '--field', '#reading_list:false'])
+            result = run_calibredb(['set_metadata', str(book_id), '--field', '#reading_list:false'], suppress_errors=True)
             if result['success']:
                 ids = get_reading_list_ids()
                 self.send_response(200)
