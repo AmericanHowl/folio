@@ -20,8 +20,73 @@ import random
 import shutil
 import threading
 import glob as glob_module
+from functools import wraps
 
 PORT = 9099
+
+# ============================================
+# API Response Cache
+# ============================================
+
+class APICache:
+    """Simple in-memory cache with TTL for API responses"""
+    
+    def __init__(self):
+        self._cache = {}
+        self._lock = threading.Lock()
+    
+    def get(self, key):
+        """Get cached value if not expired"""
+        with self._lock:
+            if key in self._cache:
+                value, expiry = self._cache[key]
+                if time.time() < expiry:
+                    return value
+                else:
+                    # Expired, remove it
+                    del self._cache[key]
+            return None
+    
+    def set(self, key, value, ttl_seconds):
+        """Cache a value with TTL"""
+        with self._lock:
+            expiry = time.time() + ttl_seconds
+            self._cache[key] = (value, expiry)
+    
+    def clear(self, pattern=None):
+        """Clear cache entries, optionally matching a pattern"""
+        with self._lock:
+            if pattern is None:
+                self._cache.clear()
+            else:
+                keys_to_delete = [k for k in self._cache if pattern in k]
+                for key in keys_to_delete:
+                    del self._cache[key]
+    
+    def stats(self):
+        """Get cache statistics"""
+        with self._lock:
+            now = time.time()
+            valid_count = sum(1 for _, (_, expiry) in self._cache.items() if now < expiry)
+            return {
+                'total_entries': len(self._cache),
+                'valid_entries': valid_count,
+                'keys': list(self._cache.keys())
+            }
+
+# Global cache instance
+# TTL values (in seconds):
+# - Hardcover trending/recent: 5 minutes (data changes infrequently)
+# - Hardcover lists: 10 minutes (lists are fairly static)
+# - iTunes search: 30 minutes (metadata is stable)
+api_cache = APICache()
+
+CACHE_TTL_HARDCOVER_TRENDING = 300  # 5 minutes
+CACHE_TTL_HARDCOVER_RECENT = 300    # 5 minutes  
+CACHE_TTL_HARDCOVER_LISTS = 600     # 10 minutes
+CACHE_TTL_HARDCOVER_LIST = 600      # 10 minutes
+CACHE_TTL_HARDCOVER_AUTHOR = 600    # 10 minutes
+CACHE_TTL_ITUNES_SEARCH = 1800      # 30 minutes
 CONFIG_FILE = "config.json"
 HARDCOVER_API_URL = "https://api.hardcover.app/v1/graphql"
 
@@ -750,7 +815,16 @@ def transform_itunes_books(results):
 
 
 def search_itunes(query, limit=20, offset=0):
-    """Search iTunes API for books"""
+    """Search iTunes API for books (with caching)"""
+    # Create cache key from query parameters
+    cache_key = f"itunes_search:{query}:{limit}:{offset}"
+    
+    # Check cache first
+    cached = api_cache.get(cache_key)
+    if cached is not None:
+        print(f"📦 Cache hit: iTunes search '{query}'")
+        return cached
+    
     # iTunes Search API endpoint
     # media=ebook for books, limit results
     # Note: iTunes API doesn't support offset directly, but we can request more and slice
@@ -773,7 +847,14 @@ def search_itunes(query, limit=20, offset=0):
             # Limit results to requested limit
             if isinstance(transformed, list) and len(transformed) > limit:
                 transformed = transformed[:limit]
-            return {'books': transformed}
+            
+            result = {'books': transformed}
+            
+            # Cache successful results
+            api_cache.set(cache_key, result, CACHE_TTL_ITUNES_SEARCH)
+            print(f"📦 Cached: iTunes search '{query}'")
+            
+            return result
 
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8') if e.fp else ''
@@ -788,9 +869,16 @@ def search_itunes(query, limit=20, offset=0):
 
 
 def get_trending_hardcover(token, limit=20):
-    """Get most popular books from 2025 on Hardcover"""
+    """Get most popular books from 2025 on Hardcover (with caching)"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
+
+    # Check cache first
+    cache_key = f"hardcover_trending:{limit}"
+    cached = api_cache.get(cache_key)
+    if cached is not None:
+        print(f"📦 Cache hit: Hardcover trending")
+        return cached
 
     # GraphQL query for trending books from 2025
     # Books filtered by release_year 2025, sorted by users_read_count (most popular)
@@ -846,7 +934,13 @@ def get_trending_hardcover(token, limit=20):
 
             # Transform results
             books = transform_hardcover_books(results)
-            return {'books': books}
+            result = {'books': books}
+            
+            # Cache successful results
+            api_cache.set(cache_key, result, CACHE_TTL_HARDCOVER_TRENDING)
+            print(f"📦 Cached: Hardcover trending")
+            
+            return result
 
     except Exception as e:
         print(f"❌ Hardcover trending error: {e}")
@@ -854,9 +948,16 @@ def get_trending_hardcover(token, limit=20):
 
 
 def get_recent_releases_hardcover(token, limit=20):
-    """Get recent book releases from Hardcover - matches /upcoming/recent page"""
+    """Get recent book releases from Hardcover - matches /upcoming/recent page (with caching)"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
+
+    # Check cache first
+    cache_key = f"hardcover_recent:{limit}"
+    cached = api_cache.get(cache_key)
+    if cached is not None:
+        print(f"📦 Cache hit: Hardcover recent releases")
+        return cached
 
     # Calculate recent timeframe - last 14 days (matches Hardcover's recent page)
     from datetime import datetime, timedelta
@@ -920,7 +1021,13 @@ def get_recent_releases_hardcover(token, limit=20):
 
             results = data.get('data', {}).get('books', [])
             books = transform_hardcover_books(results)
-            return {'books': books}
+            result = {'books': books}
+            
+            # Cache successful results
+            api_cache.set(cache_key, result, CACHE_TTL_HARDCOVER_RECENT)
+            print(f"📦 Cached: Hardcover recent releases")
+            
+            return result
 
     except Exception as e:
         print(f"❌ Hardcover recent releases error: {e}")
@@ -928,9 +1035,25 @@ def get_recent_releases_hardcover(token, limit=20):
 
 
 def get_hardcover_popular_lists(token):
-    """Get popular lists from Hardcover - first 30, then pick 3 random"""
+    """Get popular lists from Hardcover - first 30, then pick 3 random (with caching)"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
+
+    # Check cache first
+    # Note: We cache the full list of 25 lists, not the random selection
+    # This allows the random selection to change on each page load
+    cache_key = "hardcover_popular_lists_all"
+    cached = api_cache.get(cache_key)
+    
+    if cached is not None:
+        print(f"📦 Cache hit: Hardcover popular lists")
+        # Pick 3 random lists from cached results
+        lists = cached.get('all_lists', [])
+        if len(lists) > 3:
+            selected_lists = random.sample(lists, 3)
+        else:
+            selected_lists = lists
+        return {'lists': selected_lists}
 
     # GraphQL query to get popular lists - matches /lists/popular
     # Get top 25 lists ordered by popularity
@@ -973,6 +1096,10 @@ def get_hardcover_popular_lists(token):
 
             lists = data.get('data', {}).get('lists', [])
             
+            # Cache all lists for future random selections
+            api_cache.set(cache_key, {'all_lists': lists}, CACHE_TTL_HARDCOVER_LISTS)
+            print(f"📦 Cached: Hardcover popular lists")
+            
             # Pick 3 random lists from the top 25
             if len(lists) > 3:
                 selected_lists = random.sample(lists, 3)
@@ -986,9 +1113,16 @@ def get_hardcover_popular_lists(token):
 
 
 def get_list_hardcover(token, list_id, limit=20):
-    """Get books from a specific Hardcover list by ID"""
+    """Get books from a specific Hardcover list by ID (with caching)"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
+
+    # Check cache first
+    cache_key = f"hardcover_list:{list_id}:{limit}"
+    cached = api_cache.get(cache_key)
+    if cached is not None:
+        print(f"📦 Cache hit: Hardcover list {list_id}")
+        return cached
 
     # GraphQL query for list books
     graphql_query = """
@@ -1051,11 +1185,17 @@ def get_list_hardcover(token, list_id, limit=20):
             # Extract books from list_books structure
             raw_books = [item.get('book') for item in list_books if item.get('book')]
             books = transform_hardcover_books(raw_books)
-            return {
+            result = {
                 'books': books,
                 'list_name': list_data.get('name', ''),
                 'list_description': list_data.get('description', '')
             }
+            
+            # Cache successful results
+            api_cache.set(cache_key, result, CACHE_TTL_HARDCOVER_LIST)
+            print(f"📦 Cached: Hardcover list {list_id}")
+            
+            return result
 
     except Exception as e:
         print(f"❌ Hardcover list error: {e}")
@@ -1063,9 +1203,16 @@ def get_list_hardcover(token, list_id, limit=20):
 
 
 def get_books_by_author_hardcover(token, author_name, limit=20):
-    """Get books by a specific author from Hardcover"""
+    """Get books by a specific author from Hardcover (with caching)"""
     if not token:
         return {'error': 'No Hardcover API token configured'}
+
+    # Check cache first
+    cache_key = f"hardcover_author:{author_name.lower()}:{limit}"
+    cached = api_cache.get(cache_key)
+    if cached is not None:
+        print(f"📦 Cache hit: Hardcover author '{author_name}'")
+        return cached
 
     # GraphQL query to search for books by author (API returns results as JSON blob)
     graphql_query = """
@@ -1139,10 +1286,16 @@ def get_books_by_author_hardcover(token, author_name, limit=20):
                 if len(books) >= limit:
                     break
 
-            return {
+            result = {
                 'books': books,
                 'author_name': author_name
             }
+            
+            # Cache successful results
+            api_cache.set(cache_key, result, CACHE_TTL_HARDCOVER_AUTHOR)
+            print(f"📦 Cached: Hardcover author '{author_name}'")
+            
+            return result
 
     except Exception as e:
         print(f"❌ Hardcover author books error: {e}")

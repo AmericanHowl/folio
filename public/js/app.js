@@ -3,6 +3,74 @@
  * Modern book library interface with Hardcover.app integration
  */
 
+// ============================================
+// Client-side API Response Cache
+// ============================================
+
+const FolioCache = {
+    // Cache TTLs in milliseconds
+    TTL: {
+        HARDCOVER_TRENDING: 5 * 60 * 1000,   // 5 minutes
+        HARDCOVER_RECENT: 5 * 60 * 1000,     // 5 minutes
+        HARDCOVER_LISTS: 10 * 60 * 1000,     // 10 minutes
+        HARDCOVER_LIST: 10 * 60 * 1000,      // 10 minutes
+        ITUNES_SEARCH: 30 * 60 * 1000,       // 30 minutes
+    },
+
+    /**
+     * Get cached data if not expired
+     */
+    get(key) {
+        try {
+            const item = sessionStorage.getItem(`folio_cache_${key}`);
+            if (!item) return null;
+
+            const { data, expiry } = JSON.parse(item);
+            if (Date.now() > expiry) {
+                sessionStorage.removeItem(`folio_cache_${key}`);
+                return null;
+            }
+            return data;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    /**
+     * Cache data with TTL
+     */
+    set(key, data, ttl) {
+        try {
+            const item = {
+                data,
+                expiry: Date.now() + ttl
+            };
+            sessionStorage.setItem(`folio_cache_${key}`, JSON.stringify(item));
+        } catch (e) {
+            // Ignore storage errors (quota exceeded, etc.)
+            console.warn('Cache storage failed:', e);
+        }
+    },
+
+    /**
+     * Clear all cache entries
+     */
+    clear() {
+        try {
+            const keysToRemove = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('folio_cache_')) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => sessionStorage.removeItem(key));
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+};
+
 function folioApp() {
     return {
         // Setup state
@@ -791,7 +859,7 @@ function folioApp() {
         },
 
         /**
-         * Check if local book has an iTunes match
+         * Check if local book has an iTunes match (with client-side caching)
          */
         async checkiTunesMatch(book) {
             this.selectedBookiTunesMatch = null;
@@ -802,9 +870,20 @@ function folioApp() {
                 const author = this.formatAuthors(book.authors);
                 // Extract first author if multiple
                 const firstAuthor = author.split(',')[0].trim();
+                const searchQuery = title + ' ' + firstAuthor;
                 
-                const response = await fetch(`/api/itunes/search?q=${encodeURIComponent(title + ' ' + firstAuthor)}&limit=5`);
-                const data = await response.json();
+                // Check client-side cache first
+                const cacheKey = `itunes_match_${searchQuery}`;
+                let data = FolioCache.get(cacheKey);
+                
+                if (!data) {
+                    const response = await fetch(`/api/itunes/search?q=${encodeURIComponent(searchQuery)}&limit=5`);
+                    data = await response.json();
+                    // Cache even empty results to avoid repeated lookups
+                    FolioCache.set(cacheKey, data, FolioCache.TTL.ITUNES_SEARCH);
+                } else {
+                    console.log(`📦 Cache hit: iTunes match for "${book.title}"`);
+                }
 
                 if (data.books && data.books.length > 0) {
                     // Find best match
@@ -1254,8 +1333,7 @@ function folioApp() {
         // ============================================
 
         /**
-         * Load all Hardcover data
-         * Prioritizes recent releases for mobile performance
+         * Load all Hardcover data in parallel for maximum performance
          */
         async loadHardcoverData() {
             if (!this.hardcoverToken) return;
@@ -1263,17 +1341,15 @@ function folioApp() {
             this.hardcoverLoading = true;
             
             try {
-                // Load recent releases first (priority for mobile)
-                await this.loadHardcoverRecent();
-                
-                // Then load other data in parallel
+                // Load ALL Hardcover data in parallel for faster loading
                 await Promise.all([
+                    this.loadHardcoverRecent(),
                     this.loadHardcoverTrending(),
                     this.loadHardcoverTrendingMonth(),
                     this.loadHardcoverLists()
                 ]);
                 
-                console.log('✅ Hardcover data loaded');
+                console.log('✅ Hardcover data loaded (parallel)');
             } catch (error) {
                 console.error('❌ Failed to load Hardcover data:', error);
             } finally {
@@ -1282,9 +1358,19 @@ function folioApp() {
         },
 
         /**
-         * Load trending books
+         * Load trending books (with client-side caching)
          */
         async loadHardcoverTrending() {
+            const cacheKey = 'hardcover_trending_20';
+            
+            // Check client-side cache first
+            const cached = FolioCache.get(cacheKey);
+            if (cached) {
+                this.hardcoverTrending = this.matchWithLibrary(cached.books || []);
+                console.log(`📦 Cache hit: ${this.hardcoverTrending.length} trending books`);
+                return;
+            }
+
             try {
                 const response = await fetch('/api/hardcover/trending?limit=20');
                 const data = await response.json();
@@ -1294,6 +1380,8 @@ function folioApp() {
                     this.hardcoverTrending = [];
                 } else {
                     this.hardcoverTrending = this.matchWithLibrary(data.books || []);
+                    // Cache the raw API response
+                    FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_TRENDING);
                     console.log(`📈 Loaded ${this.hardcoverTrending.length} trending books`);
                 }
             } catch (error) {
@@ -1303,9 +1391,19 @@ function folioApp() {
         },
 
         /**
-         * Load most popular releases from 2025
+         * Load most popular releases from 2025 (with client-side caching)
          */
         async loadHardcoverTrendingMonth() {
+            const cacheKey = 'hardcover_trending_month_20';
+            
+            // Check client-side cache first
+            const cached = FolioCache.get(cacheKey);
+            if (cached) {
+                this.hardcoverTrendingMonth = this.matchWithLibrary(cached.books || []);
+                console.log(`📦 Cache hit: ${this.hardcoverTrendingMonth.length} popular 2025 books`);
+                return;
+            }
+
             try {
                 const response = await fetch('/api/hardcover/trending?limit=20');
                 const data = await response.json();
@@ -1315,6 +1413,8 @@ function folioApp() {
                     this.hardcoverTrendingMonth = [];
                 } else {
                     this.hardcoverTrendingMonth = this.matchWithLibrary(data.books || []);
+                    // Cache the raw API response
+                    FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_TRENDING);
                     console.log(`📈 Loaded ${this.hardcoverTrendingMonth.length} popular 2025 books`);
                 }
             } catch (error) {
@@ -1324,9 +1424,19 @@ function folioApp() {
         },
 
         /**
-         * Load recent releases
+         * Load recent releases (with client-side caching)
          */
         async loadHardcoverRecent() {
+            const cacheKey = 'hardcover_recent_20';
+            
+            // Check client-side cache first
+            const cached = FolioCache.get(cacheKey);
+            if (cached) {
+                this.hardcoverRecentReleases = this.matchWithLibrary(cached.books || []);
+                console.log(`📦 Cache hit: ${this.hardcoverRecentReleases.length} recent releases`);
+                return;
+            }
+
             try {
                 const response = await fetch('/api/hardcover/recent?limit=20');
                 const data = await response.json();
@@ -1336,6 +1446,8 @@ function folioApp() {
                     this.hardcoverRecentReleases = [];
                 } else {
                     this.hardcoverRecentReleases = this.matchWithLibrary(data.books || []);
+                    // Cache the raw API response
+                    FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_RECENT);
                     console.log(`🆕 Loaded ${this.hardcoverRecentReleases.length} recent releases`);
                 }
             } catch (error) {
@@ -1345,7 +1457,7 @@ function folioApp() {
         },
 
         /**
-         * Load curated lists from @hardcover
+         * Load curated lists from @hardcover (with client-side caching)
          */
         async loadHardcoverLists() {
             // Prevent multiple simultaneous loads
@@ -1371,7 +1483,7 @@ function folioApp() {
                 // Use all lists returned (already randomly selected from top 25)
                 const selectedLists = data.lists.slice(0, 3);
                 
-                // Load books from selected lists
+                // Load books from selected lists in parallel
                 const listPromises = selectedLists.map(list => this.loadHardcoverList(list.id));
                 const results = await Promise.all(listPromises);
                 
@@ -1379,7 +1491,7 @@ function folioApp() {
                 const validSections = results.filter(result => result.books && result.books.length > 0);
                 // Set all at once to prevent incremental updates
                 this.hardcoverSections = [...validSections];
-                console.log(`📚 Loaded ${this.hardcoverSections.length} curated lists`);
+                console.log(`📚 Loaded ${this.hardcoverSections.length} curated lists (parallel)`);
             } catch (error) {
                 console.error('Failed to load lists:', error);
                 this.hardcoverSections = [];
@@ -1389,9 +1501,23 @@ function folioApp() {
         },
 
         /**
-         * Load books from a specific list
+         * Load books from a specific list (with client-side caching)
          */
         async loadHardcoverList(listId) {
+            const cacheKey = `hardcover_list_${listId}_20`;
+            
+            // Check client-side cache first
+            const cached = FolioCache.get(cacheKey);
+            if (cached) {
+                console.log(`📦 Cache hit: list ${listId}`);
+                return {
+                    id: listId,
+                    books: this.matchWithLibrary(cached.books || []),
+                    name: cached.list_name || '',
+                    description: cached.list_description || ''
+                };
+            }
+
             try {
                 const response = await fetch(`/api/hardcover/list?id=${listId}&limit=20`);
                 const data = await response.json();
@@ -1399,6 +1525,9 @@ function folioApp() {
                 if (data.error) {
                     return { id: listId, books: [], name: '', description: '' };
                 }
+                
+                // Cache the raw API response
+                FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_LIST);
                 
                 return {
                     id: listId,
@@ -1430,7 +1559,7 @@ function folioApp() {
         },
 
         /**
-         * Load more iTunes search results (incremental)
+         * Load more iTunes search results (incremental, with client-side caching)
          */
         async loadMoreiTunesSearch() {
             if (!this.searchQuery.trim()) {
@@ -1445,9 +1574,24 @@ function folioApp() {
             const nextPage = this.searchiTunesPage + 1;
             const offset = (nextPage - 1) * pageSize;
 
+            // Check client-side cache first
+            const cacheKey = `itunes_search_${this.searchQuery}_${pageSize}_${offset}`;
+            const cached = FolioCache.get(cacheKey);
+            
             try {
-                const response = await fetch(`/api/itunes/search?q=${encodeURIComponent(this.searchQuery)}&limit=${pageSize}&offset=${offset}`);
-                const data = await response.json();
+                let data;
+                if (cached) {
+                    data = cached;
+                    console.log(`📦 Cache hit: iTunes search '${this.searchQuery}' page ${nextPage}`);
+                } else {
+                    const response = await fetch(`/api/itunes/search?q=${encodeURIComponent(this.searchQuery)}&limit=${pageSize}&offset=${offset}`);
+                    data = await response.json();
+                    // Cache the response
+                    if (data.books) {
+                        FolioCache.set(cacheKey, data, FolioCache.TTL.ITUNES_SEARCH);
+                    }
+                }
+
                 if (data.books && data.books.length > 0) {
                     const books = this.matchWithLibrary(data.books);
                     // Filter out duplicates and append new results
@@ -1612,7 +1756,7 @@ function folioApp() {
         // ============================================
 
         /**
-         * Open bookshelf view with a section's books
+         * Open bookshelf view with a section's books (with client-side caching)
          */
         async openBookshelf(type, title) {
             this.bookshelfTitle = title;
@@ -1623,7 +1767,9 @@ function folioApp() {
             
             // Load 30 books for the bookshelf
             try {
-                let response;
+                let cacheKey;
+                let data;
+                
                 switch (type) {
                     case 'library':
                         this.bookshelfBooks = this.sortedBooks.slice(0, 30);
@@ -1632,29 +1778,69 @@ function folioApp() {
                         this.bookshelfBooks = this.sortedBooks;
                         return;
                     case 'trending':
-                        response = await fetch('/api/hardcover/trending?limit=30');
+                        cacheKey = 'bookshelf_trending_30';
+                        data = FolioCache.get(cacheKey);
+                        if (!data) {
+                            const response = await fetch('/api/hardcover/trending?limit=30');
+                            data = await response.json();
+                            if (data.books) {
+                                FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_TRENDING);
+                            }
+                        }
                         break;
                     case 'trending-month':
-                        response = await fetch('/api/hardcover/trending?limit=30');
+                        cacheKey = 'bookshelf_trending_month_30';
+                        data = FolioCache.get(cacheKey);
+                        if (!data) {
+                            const response = await fetch('/api/hardcover/trending?limit=30');
+                            data = await response.json();
+                            if (data.books) {
+                                FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_TRENDING);
+                            }
+                        }
                         break;
                     case 'recent':
-                        response = await fetch('/api/hardcover/recent?limit=30');
+                        cacheKey = 'bookshelf_recent_30';
+                        data = FolioCache.get(cacheKey);
+                        if (!data) {
+                            const response = await fetch('/api/hardcover/recent?limit=30');
+                            data = await response.json();
+                            if (data.books) {
+                                FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_RECENT);
+                            }
+                        }
                         break;
                     case 'author':
-                        response = await fetch(`/api/hardcover/author?author=${encodeURIComponent(this.hardcoverAuthor)}&limit=30`);
+                        cacheKey = `bookshelf_author_${this.hardcoverAuthor}_30`;
+                        data = FolioCache.get(cacheKey);
+                        if (!data) {
+                            const response = await fetch(`/api/hardcover/author?author=${encodeURIComponent(this.hardcoverAuthor)}&limit=30`);
+                            data = await response.json();
+                            if (data.books) {
+                                FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_LIST);
+                            }
+                        }
                         break;
                     default:
                         // For list IDs
                         if (type.startsWith('list-')) {
                             const listId = type.replace('list-', '');
-                            response = await fetch(`/api/hardcover/list?id=${listId}&limit=30`);
+                            cacheKey = `bookshelf_list_${listId}_30`;
+                            data = FolioCache.get(cacheKey);
+                            if (!data) {
+                                const response = await fetch(`/api/hardcover/list?id=${listId}&limit=30`);
+                                data = await response.json();
+                                if (data.books) {
+                                    FolioCache.set(cacheKey, data, FolioCache.TTL.HARDCOVER_LIST);
+                                }
+                            }
                         }
                 }
                 
-                if (response) {
-                    const data = await response.json();
-                    if (data.books) {
-                        this.bookshelfBooks = this.matchWithLibrary(data.books);
+                if (data && data.books) {
+                    this.bookshelfBooks = this.matchWithLibrary(data.books);
+                    if (cacheKey && FolioCache.get(cacheKey)) {
+                        console.log(`📦 Cache hit: bookshelf ${type}`);
                     }
                 }
             } catch (error) {
