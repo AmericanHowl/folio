@@ -34,6 +34,18 @@ config = {
 }
 
 
+def sanitize_token(token):
+    """Sanitize API token by removing whitespace, newlines, and 'Bearer ' prefix."""
+    if not token:
+        return ''
+    # Strip whitespace and newlines
+    token = token.strip()
+    # Remove 'Bearer ' prefix if present (users sometimes paste the full header)
+    if token.startswith('Bearer '):
+        token = token[7:]
+    return token.strip()
+
+
 def load_config():
     """Load configuration from file, merging with environment variables.
 
@@ -42,13 +54,13 @@ def load_config():
     """
     global config
 
-    # Start with environment variable defaults
+    # Start with environment variable defaults (sanitize tokens)
     env_config = {
         'calibre_library': os.getenv('CALIBRE_LIBRARY', ''),
         'calibredb_path': os.getenv('CALIBREDB_PATH', ''),
-        'hardcover_token': os.getenv('HARDCOVER_TOKEN', ''),
-        'prowlarr_url': os.getenv('PROWLARR_URL', ''),
-        'prowlarr_api_key': os.getenv('PROWLARR_API_KEY', ''),
+        'hardcover_token': sanitize_token(os.getenv('HARDCOVER_TOKEN', '')),
+        'prowlarr_url': os.getenv('PROWLARR_URL', '').strip(),
+        'prowlarr_api_key': sanitize_token(os.getenv('PROWLARR_API_KEY', '')),
     }
 
     # Load file config if it exists
@@ -1040,9 +1052,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # API: Get config
         if path == '/api/config':
             # Re-check env vars on each request to ensure they're fresh (fixes Docker env var persistence)
-            env_hardcover = os.getenv('HARDCOVER_TOKEN', '')
-            env_prowlarr_url = os.getenv('PROWLARR_URL', '')
-            env_prowlarr_key = os.getenv('PROWLARR_API_KEY', '')
+            env_hardcover = sanitize_token(os.getenv('HARDCOVER_TOKEN', ''))
+            env_prowlarr_url = os.getenv('PROWLARR_URL', '').strip().strip()
+            env_prowlarr_key = sanitize_token(os.getenv('PROWLARR_API_KEY', ''))
             if env_hardcover:
                 config['hardcover_token'] = env_hardcover
             if env_prowlarr_url:
@@ -1091,7 +1103,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # API: Get trending from Hardcover
         if path == '/api/hardcover/trending':
             # Re-check env var on each request to ensure it's fresh (fixes Docker env var persistence)
-            env_hardcover_token = os.getenv('HARDCOVER_TOKEN', '')
+            env_hardcover_token = sanitize_token(os.getenv('HARDCOVER_TOKEN', ''))
             if env_hardcover_token:
                 config['hardcover_token'] = env_hardcover_token
 
@@ -1109,7 +1121,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # API: Get recent releases from Hardcover
         if path == '/api/hardcover/recent':
             # Re-check env var on each request to ensure it's fresh (fixes Docker env var persistence)
-            env_hardcover_token = os.getenv('HARDCOVER_TOKEN', '')
+            env_hardcover_token = sanitize_token(os.getenv('HARDCOVER_TOKEN', ''))
             if env_hardcover_token:
                 config['hardcover_token'] = env_hardcover_token
 
@@ -1127,7 +1139,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # API: Get popular lists
         if path == '/api/hardcover/lists':
             # Re-check env var on each request to ensure it's fresh (fixes Docker env var persistence)
-            env_hardcover_token = os.getenv('HARDCOVER_TOKEN', '')
+            env_hardcover_token = sanitize_token(os.getenv('HARDCOVER_TOKEN', ''))
             if env_hardcover_token:
                 config['hardcover_token'] = env_hardcover_token
 
@@ -1153,7 +1165,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             # Re-check env var on each request to ensure it's fresh (fixes Docker env var persistence)
-            env_hardcover_token = os.getenv('HARDCOVER_TOKEN', '')
+            env_hardcover_token = sanitize_token(os.getenv('HARDCOVER_TOKEN', ''))
             if env_hardcover_token:
                 config['hardcover_token'] = env_hardcover_token
 
@@ -1180,7 +1192,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             # Re-check env var on each request to ensure it's fresh (fixes Docker env var persistence)
-            env_hardcover_token = os.getenv('HARDCOVER_TOKEN', '')
+            env_hardcover_token = sanitize_token(os.getenv('HARDCOVER_TOKEN', ''))
             if env_hardcover_token:
                 config['hardcover_token'] = env_hardcover_token
 
@@ -1209,8 +1221,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             # Re-check env vars on each request to ensure they're fresh (fixes Docker env var persistence)
-            env_prowlarr_url = os.getenv('PROWLARR_URL', '')
-            env_prowlarr_key = os.getenv('PROWLARR_API_KEY', '')
+            env_prowlarr_url = os.getenv('PROWLARR_URL', '').strip()
+            env_prowlarr_key = sanitize_token(os.getenv('PROWLARR_API_KEY', ''))
             if env_prowlarr_url:
                 config['prowlarr_url'] = env_prowlarr_url
             if env_prowlarr_key:
@@ -1522,17 +1534,17 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body.decode('utf-8'))
 
-                # Update config
+                # Update config (sanitize tokens to remove whitespace, newlines, Bearer prefix)
                 if 'calibre_library' in data:
                     config['calibre_library'] = os.path.expanduser(data['calibre_library'])
                 if 'calibredb_path' in data:
                     config['calibredb_path'] = data['calibredb_path'].strip()
                 if 'hardcover_token' in data:
-                    config['hardcover_token'] = data['hardcover_token']
+                    config['hardcover_token'] = sanitize_token(data['hardcover_token'])
                 if 'prowlarr_url' in data:
-                    config['prowlarr_url'] = data['prowlarr_url']
+                    config['prowlarr_url'] = data['prowlarr_url'].strip() if data['prowlarr_url'] else ''
                 if 'prowlarr_api_key' in data:
-                    config['prowlarr_api_key'] = data['prowlarr_api_key']
+                    config['prowlarr_api_key'] = sanitize_token(data['prowlarr_api_key'])
 
                 # Save to file
                 if save_config():
@@ -1562,8 +1574,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # API: Validate Prowlarr connection
         if self.path == '/api/prowlarr/validate':
             # Re-check env vars on each request to ensure they're fresh
-            env_prowlarr_url = os.getenv('PROWLARR_URL', '')
-            env_prowlarr_key = os.getenv('PROWLARR_API_KEY', '')
+            env_prowlarr_url = os.getenv('PROWLARR_URL', '').strip()
+            env_prowlarr_key = sanitize_token(os.getenv('PROWLARR_API_KEY', ''))
             if env_prowlarr_url:
                 config['prowlarr_url'] = env_prowlarr_url
             if env_prowlarr_key:
@@ -1679,8 +1691,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # API: Download from Prowlarr (send to bittorrent client)
         if self.path == '/api/prowlarr/download':
             # Re-check env vars on each request to ensure they're fresh
-            env_prowlarr_url = os.getenv('PROWLARR_URL', '')
-            env_prowlarr_key = os.getenv('PROWLARR_API_KEY', '')
+            env_prowlarr_url = os.getenv('PROWLARR_URL', '').strip()
+            env_prowlarr_key = sanitize_token(os.getenv('PROWLARR_API_KEY', ''))
             if env_prowlarr_url:
                 config['prowlarr_url'] = env_prowlarr_url
             if env_prowlarr_key:
