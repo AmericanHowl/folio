@@ -2,7 +2,7 @@
 
 A modern, mobile-first ebook management interface for Calibre libraries with Hardcover.app integration for book discovery.
 
-**Folio** is "Overseerr for books" - a clean, beautiful web app to browse your Calibre library, discover new books via Hardcover.app, and manage a wish list. Built with pure HTML/JS and a single Python script - no complex backend, no Docker required.
+**Folio** is a clean web app to browse your Calibre library, discover new books via Hardcover.app, and manage a wish list. Built with pure HTML/JS and a single Python script - no complex backend, no Docker required.
 
 ## Features
 
