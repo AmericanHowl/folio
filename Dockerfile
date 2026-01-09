@@ -19,8 +19,8 @@ WORKDIR /app
 COPY serve.py .
 COPY public/ ./public/
 
-# Create directory for config.json (will be mounted as volume)
-RUN mkdir -p /app && touch /app/config.json
+# Create empty config.json with valid JSON (avoids parse errors on first run)
+RUN mkdir -p /app && echo '{}' > /app/config.json
 
 # Set default environment variables for container
 ENV CALIBREDB_PATH=/usr/bin/calibredb
