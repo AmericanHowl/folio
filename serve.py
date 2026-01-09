@@ -1990,6 +1990,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         # Write cover file directly to book directory
                         with open(cover_path, 'wb') as f:
                             f.write(image_data)
+                            f.flush()  # Force flush to disk
+                            os.fsync(f.fileno())  # Ensure written to disk
 
                         # Update has_cover flag in database
                         cursor.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (book_id,))
