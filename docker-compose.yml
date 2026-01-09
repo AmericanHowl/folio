@@ -3,7 +3,7 @@ version: '3.8'
 services:
   folio:
     # Use the pre-built image from GitHub Container Registry
-    image: ghcr.io/mykierowan/folio:latest
+    image: ghcr.io/americanhowl/folio:latest
     container_name: folio
     ports:
       - "9099:9099"
