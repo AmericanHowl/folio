@@ -783,39 +783,72 @@ def ensure_reading_list_column():
     Creates it if it doesn't exist.
     Returns True if column exists or was created successfully, False otherwise.
     """
-    # First, try to list custom columns to check if reading_list exists
-    result = run_calibredb(['custom_columns'])
-    if result['success']:
-        # Check if reading_list is in the output
-        output = result['output'].lower()
-        # Look for reading_list in various formats: reading_list, #reading_list, reading list
-        if 'reading_list' in output or '#reading_list' in output or 'reading list' in output:
-            # Column exists
-            return True
+    # First, check directly in the database if the column exists
+    # This avoids calling calibredb which can print apsw errors to stderr
+    try:
+        library_path = get_calibre_library()
+        db_path = os.path.join(library_path, 'metadata.db')
+        
+        if os.path.exists(db_path):
+            conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=10.0)
+            cursor = conn.cursor()
+            # Check if custom_columns table has reading_list
+            cursor.execute("SELECT id FROM custom_columns WHERE label = 'reading_list'")
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                # Column already exists in database
+                return True
+    except Exception as e:
+        # If we can't check the database, fall back to calibredb
+        print(f"⚠️  Could not check database for custom column: {e}")
     
-    # Column doesn't exist, create it
-    # Try with option flags first (more explicit)
-    result = run_calibredb(['add_custom_column', '--label=reading_list', '--name=Reading List', '--datatype=bool'])
-    if result['success']:
-        print('✅ Created reading_list custom column')
-        return True
+    # Column doesn't exist or we couldn't check, try to create it
+    # Suppress stderr output by using subprocess directly with stderr capture
+    library_path = get_calibre_library()
+    calibredb_path = find_calibredb()
     
-    # If that failed, try positional arguments
-    result = run_calibredb(['add_custom_column', 'reading_list', 'Reading List', 'bool'])
-    if result['success']:
-        print('✅ Created reading_list custom column')
-        return True
-    else:
-        error_msg = result.get('error', 'Unknown error')
-        # If error says column already exists, that's fine
-        if ('already exists' in error_msg.lower() or
-            'duplicate' in error_msg.lower() or
-            'unique constraint' in error_msg.lower() or
-            'constrainterror' in error_msg.lower()):
-            print('✅ reading_list custom column already exists')
+    if not calibredb_path:
+        print('⚠️  calibredb not found, cannot create reading_list column')
+        return False
+    
+    # Try positional arguments (most compatible with different calibre versions)
+    cmd = [calibredb_path, 'add_custom_column', 'reading_list', 'Reading List', 'bool', '--library-path', library_path]
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        # Check if successful or if column already exists
+        if result.returncode == 0:
+            print('✅ Created reading_list custom column')
             return True
-        print(f'⚠️  Failed to create reading_list custom column: {error_msg}')
-        # Try to continue anyway - maybe the column exists but wasn't detected
+        
+        # Check stderr for "already exists" type errors
+        error_output = (result.stderr + result.stdout).lower()
+        if ('already exists' in error_output or
+            'duplicate' in error_output or
+            'unique constraint' in error_output or
+            'constrainterror' in error_output):
+            # Column already exists - this is fine, don't print the error
+            return True
+        
+        # Some other error
+        print(f'⚠️  Failed to create reading_list column: {result.stderr.strip()}')
+        return False
+        
+    except subprocess.TimeoutExpired:
+        print('⚠️  Timeout creating reading_list column')
+        return False
+    except Exception as e:
+        error_str = str(e).lower()
+        # If error indicates column already exists, that's fine
+        if 'unique constraint' in error_str or 'already exists' in error_str:
+            return True
+        print(f'⚠️  Error creating reading_list column: {e}')
         return False
 
 
