@@ -808,7 +808,10 @@ def ensure_reading_list_column():
     else:
         error_msg = result.get('error', 'Unknown error')
         # If error says column already exists, that's fine
-        if 'already exists' in error_msg.lower() or 'duplicate' in error_msg.lower():
+        if ('already exists' in error_msg.lower() or
+            'duplicate' in error_msg.lower() or
+            'unique constraint' in error_msg.lower() or
+            'constrainterror' in error_msg.lower()):
             print('✅ reading_list custom column already exists')
             return True
         print(f'⚠️  Failed to create reading_list custom column: {error_msg}')
