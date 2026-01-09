@@ -2176,6 +2176,7 @@ if __name__ == "__main__":
         print(f"🚀 Folio server running at http://localhost:{PORT}")
         print(f"📖 Calibre Library: {get_calibre_library()}")
         print(f"🔑 Hardcover API: {'Configured' if config.get('hardcover_token') else 'Not configured'}")
+        print(f"🔍 Prowlarr: {'Configured (' + config.get('prowlarr_url', '') + ')' if config.get('prowlarr_url') and config.get('prowlarr_api_key') else 'Not configured'}")
         print(f"\n   Library APIs:")
         print(f"   /api/books → Book list from metadata.db")
         print(f"   /api/cover/* → Book covers")
