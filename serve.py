@@ -1751,29 +1751,19 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     search_query = f"{author} {query}"
                 
                 # Prowlarr uses /api/v1/search endpoint
-                search_url = f"{prowlarr_url}/api/v1/search?query={urllib.parse.quote(search_query)}"
+                # Restrict to a single indexer (MyAnonamouse = ID 3)
+                search_url = f"{prowlarr_url}/api/v1/search?query={urllib.parse.quote(search_query)}&indexerIds=3"
                 req = urllib.request.Request(search_url)
                 req.add_header('X-Api-Key', prowlarr_api_key)
                 
                 with urllib.request.urlopen(req) as response:
                     results = json.loads(response.read().decode('utf-8'))
                     
-                    # Log raw response structure for debugging
-                    if results:
-                        first = results[0]
-                        print(f"🔍 Prowlarr raw result keys: {sorted(first.keys())}")
-                        # Log all fields that might contain indexer info
-                        for key in ['indexerId', 'indexer', 'indexerFlags', 'indexer_id']:
-                            if key in first:
-                                print(f"🔍   {key} = {first.get(key)}")
-                    
                     # Transform results to a simpler format
                     formatted_results = []
                     missing_indexer_count = 0
-                    for idx, item in enumerate(results):
-                        # Get indexerId - Prowlarr returns it directly as 'indexerId'
+                    for item in results:
                         indexer_id = item.get('indexerId')
-                        
                         if indexer_id is None:
                             missing_indexer_count += 1
                         
