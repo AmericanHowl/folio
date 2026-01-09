@@ -1777,29 +1777,6 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         if indexer_id is None:
                             missing_indexer_count += 1
                         
-                        # #region agent log
-                        if idx < 3:  # Log first 3 results for debugging
-                            import json as json_module
-                            with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
-                                f.write(json_module.dumps({
-                                    'sessionId': 'debug-session',
-                                    'runId': 'run1',
-                                    'hypothesisId': 'C',
-                                    'location': 'serve.py:1760',
-                                    'message': 'Prowlarr search result indexerId',
-                                    'data': {
-                                        'result_index': idx,
-                                        'title': item.get('title', 'Unknown')[:50],
-                                        'indexerId': indexer_id,
-                                        'indexerId_type': type(indexer_id).__name__ if indexer_id is not None else None,
-                                        'indexer': item.get('indexer', 'Unknown'),
-                                        'guid': item.get('guid', ''),
-                                        'all_keys': list(item.keys())
-                                    },
-                                    'timestamp': int(time.time() * 1000)
-                                }) + '\n')
-                        # #endregion
-                        
                         formatted_results.append({
                             'title': item.get('title', 'Unknown'),
                             'author': item.get('author', 'Unknown'),
@@ -2273,26 +2250,6 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 guid = data.get('guid')
                 indexer_id = data.get('indexerId')
                 title = data.get('title', 'Unknown')
-
-                # #region agent log
-                import json as json_module
-                with open('/Users/mykie/Sites/untitled folder/folio-1/.cursor/debug.log', 'a') as f:
-                    f.write(json_module.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'D',
-                        'location': 'serve.py:2249',
-                        'message': 'Download request received from client',
-                        'data': {
-                            'full_request': data,
-                            'guid': guid,
-                            'indexerId': indexer_id,
-                            'indexerId_type': type(indexer_id).__name__ if indexer_id is not None else None,
-                            'title': title
-                        },
-                        'timestamp': int(time.time() * 1000)
-                    }) + '\n')
-                # #endregion
 
                 print(f"📥 Download request: guid={guid}, indexerId={indexer_id}, title={title}")
 
