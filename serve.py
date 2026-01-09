@@ -2307,36 +2307,45 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 
                 # Add torrent to qBittorrent
                 add_url = f"{qbt_url}/api/v2/torrents/add"
-                
-                # Build multipart form data
-                boundary = '----WebKitFormBoundary' + ''.join(chr(ord('a') + (i % 26)) for i in range(16))
-                
-                body_parts = []
-                body_parts.append(f'--{boundary}')
-                body_parts.append('Content-Disposition: form-data; name="urls"')
-                body_parts.append('')
-                body_parts.append(url)
-                body_parts.append(f'--{boundary}--')
-                
-                multipart_body = '\r\n'.join(body_parts).encode('utf-8')
-                
-                add_req = urllib.request.Request(add_url, data=multipart_body, method='POST')
-                add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
-                
+
+                # Use proper URL-encoded form data (qBittorrent expects application/x-www-form-urlencoded)
+                # Despite the parameter being called "urls", it's sent as form data, not multipart
+                add_data = urllib.parse.urlencode({'urls': url}).encode('utf-8')
+
+                print(f"🔗 Sending to qBittorrent: url={url[:100]}...", flush=True)
+
+                add_req = urllib.request.Request(add_url, data=add_data, method='POST')
+                add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+
                 try:
                     add_resp = opener.open(add_req, timeout=30)
-                    add_result = add_resp.read().decode('utf-8')
-                    
-                    print(f"✅ qBittorrent add response: {add_result}", flush=True)
-                    
-                    self.send_response(200)
-                    self.send_header('Content-Type', 'application/json')
-                    self.end_headers()
-                    response = json.dumps({
-                        'success': True,
-                        'message': f'Torrent added to qBittorrent: {title}'
-                    })
-                    self.wfile.write(response.encode('utf-8'))
+                    add_result = add_resp.read().decode('utf-8').strip()
+
+                    print(f"📥 qBittorrent API response: '{add_result}'", flush=True)
+
+                    # qBittorrent returns "Ok." on success, "Fails." on failure
+                    if add_result.lower() == 'ok.':
+                        print(f"✅ Successfully added to qBittorrent: {title}", flush=True)
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        response = json.dumps({
+                            'success': True,
+                            'message': f'Torrent added to qBittorrent: {title}'
+                        })
+                        self.wfile.write(response.encode('utf-8'))
+                    else:
+                        # qBittorrent returned an error
+                        error_msg = add_result if add_result else 'Unknown error from qBittorrent'
+                        print(f"❌ qBittorrent rejected the torrent: {error_msg}", flush=True)
+                        self.send_response(500)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        response = json.dumps({
+                            'success': False,
+                            'error': f'qBittorrent rejected the torrent: {error_msg}'
+                        })
+                        self.wfile.write(response.encode('utf-8'))
                     
                 except urllib.error.HTTPError as e:
                     error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
