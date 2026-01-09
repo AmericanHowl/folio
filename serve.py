@@ -964,6 +964,17 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         query_params = parse_qs(parsed_url.query)
         # API: Get config
         if path == '/api/config':
+            # Re-check env vars on each request to ensure they're fresh (fixes Docker env var persistence)
+            env_hardcover = os.getenv('HARDCOVER_TOKEN', '')
+            env_prowlarr_url = os.getenv('PROWLARR_URL', '')
+            env_prowlarr_key = os.getenv('PROWLARR_API_KEY', '')
+            if env_hardcover:
+                config['hardcover_token'] = env_hardcover
+            if env_prowlarr_url:
+                config['prowlarr_url'] = env_prowlarr_url
+            if env_prowlarr_key:
+                config['prowlarr_api_key'] = env_prowlarr_key
+            
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
