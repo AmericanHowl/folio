@@ -463,6 +463,7 @@ function folioApp() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         guid: result.guid,
+                        indexerId: result.indexerId,
                         indexer: result.indexer,
                         title: result.title
                     }),
