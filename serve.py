@@ -198,7 +198,7 @@ config = {
     'import_folder': os.getenv('IMPORT_FOLDER', ''),  # Empty = disabled
     'import_interval': int(os.getenv('IMPORT_INTERVAL', '60')),  # Seconds between scans
     'import_recursive': os.getenv('IMPORT_RECURSIVE', 'true').lower() == 'true',  # Scan subdirs
-    'import_delete': os.getenv('IMPORT_DELETE', 'false').lower() == 'true',  # Delete after import
+    'import_delete': os.getenv('IMPORT_DELETE', 'true').lower() == 'true',  # Delete from import folder after successful import (default: true)
 }
 
 # Import watcher state
@@ -1197,6 +1197,112 @@ def convert_book_to_kepub(book_id):
         return False
 
 
+def convert_file_to_kepub(filepath):
+    """
+    Convert an EPUB file from the import folder to KEPUB format using kepubify.
+    Returns the path to the KEPUB file on success, None on failure.
+    The KEPUB file is created in a temp directory to avoid polluting the import folder.
+    """
+    kepubify_path = find_kepubify()
+    if not kepubify_path:
+        print("⚠️ kepubify not found - cannot convert to KEPUB")
+        return None
+
+    if not filepath.lower().endswith('.epub'):
+        print(f"⚠️ File is not an EPUB, cannot convert to KEPUB: {os.path.basename(filepath)}")
+        return None
+
+    if filepath.lower().endswith('.kepub.epub'):
+        # Already a KEPUB
+        return filepath
+
+    try:
+        # Create output filename in a temp directory
+        temp_dir = tempfile.mkdtemp(prefix='kepub_')
+        base_name = os.path.basename(filepath)
+        kepub_name = base_name.replace('.epub', '.kepub.epub').replace('.EPUB', '.kepub.epub')
+        kepub_file = os.path.join(temp_dir, kepub_name)
+
+        # Run kepubify
+        result = subprocess.run(
+            [kepubify_path, '-o', kepub_file, filepath],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+
+        if result.returncode == 0 and os.path.exists(kepub_file):
+            print(f"✅ Converted to KEPUB: {os.path.basename(filepath)}")
+            return kepub_file
+        else:
+            print(f"❌ kepubify failed for {os.path.basename(filepath)}: {result.stderr}")
+            # Clean up temp dir on failure
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
+            return None
+
+    except Exception as e:
+        print(f"❌ KEPUB conversion error for {os.path.basename(filepath)}: {e}")
+        return None
+
+
+def group_import_files_by_book(files):
+    """
+    Group import files by their base name (without extension) to detect duplicates.
+    This handles cases where both .mobi and .epub exist for the same book.
+    Returns a dict: {base_name: [list of filepaths]}
+    """
+    groups = {}
+    for filepath in files:
+        filename = os.path.basename(filepath)
+        # Get base name without extension
+        base_name, ext = os.path.splitext(filename)
+        # Handle double extensions like .kepub.epub
+        if base_name.lower().endswith('.kepub'):
+            base_name = base_name[:-6]
+
+        # Normalize the base name for grouping (lowercase, strip whitespace)
+        group_key = base_name.lower().strip()
+
+        if group_key not in groups:
+            groups[group_key] = []
+        groups[group_key].append(filepath)
+
+    return groups
+
+
+def select_best_format_for_import(filepaths):
+    """
+    Given a list of file paths for the same book (different formats),
+    select the best one for import. Prefers EPUB (can be converted to KEPUB),
+    then other formats in order of preference.
+    Returns (best_file, other_files) tuple.
+    """
+    # Priority order: EPUB (for KEPUB conversion) > MOBI > AZW3 > others
+    priority = {
+        '.epub': 1,
+        '.kepub.epub': 0,  # Already KEPUB is best
+        '.mobi': 2,
+        '.azw3': 3,
+        '.azw': 4,
+        '.pdf': 5,
+    }
+
+    def get_priority(filepath):
+        lower = filepath.lower()
+        if lower.endswith('.kepub.epub'):
+            return priority.get('.kepub.epub', 99)
+        for ext, prio in priority.items():
+            if lower.endswith(ext):
+                return prio
+        return 99
+
+    sorted_files = sorted(filepaths, key=get_priority)
+    return sorted_files[0], sorted_files[1:] if len(sorted_files) > 1 else []
+
+
 def fetch_and_apply_itunes_metadata(book_id):
     """
     Fetch metadata from iTunes based on the book's title/author and apply it.
@@ -1411,7 +1517,17 @@ def scan_import_folder():
 
 
 def import_books_from_folder():
-    """Import books from the import folder into Calibre."""
+    """
+    Import books from the import folder into Calibre.
+
+    Flow:
+    1. Scan import folder for ebook files
+    2. Group files by base name to detect duplicates (e.g., same book as .mobi and .epub)
+    3. For each book group, select the best format (prefer EPUB for KEPUB conversion)
+    4. Convert EPUB to KEPUB using kepubify
+    5. Import the KEPUB (or original format if not EPUB) to Calibre
+    6. Delete the original file(s) from the import folder
+    """
     global import_state
 
     import_folder = config.get('import_folder', '')
@@ -1432,54 +1548,93 @@ def import_books_from_folder():
         import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
         return {'success': True, 'imported': 0, 'message': 'No new files to import'}
 
+    # Group files by book name to detect duplicates
+    book_groups = group_import_files_by_book(new_files)
+
     imported_count = 0
     errors = []
-    delete_after = config.get('import_delete', False)
+    skipped_duplicates = 0
 
-    for filepath in new_files:
+    for base_name, filepaths in book_groups.items():
+        # Select the best format for import (prefer EPUB for KEPUB conversion)
+        best_file, other_files = select_best_format_for_import(filepaths)
+
+        if other_files:
+            skipped_duplicates += len(other_files)
+            print(f"📚 Found {len(filepaths)} formats for '{base_name}', using: {os.path.basename(best_file)}")
+            for other in other_files:
+                print(f"   ⏭️  Skipping duplicate format: {os.path.basename(other)}")
+
+        kepub_file = None
+        temp_dir_to_cleanup = None
+
         try:
+            # Convert EPUB to KEPUB before importing
+            if best_file.lower().endswith('.epub') and not best_file.lower().endswith('.kepub.epub'):
+                kepub_file = convert_file_to_kepub(best_file)
+                if kepub_file:
+                    # Remember the temp dir for cleanup
+                    temp_dir_to_cleanup = os.path.dirname(kepub_file)
+                    file_to_import = kepub_file
+                else:
+                    # Conversion failed, fall back to importing original EPUB
+                    print(f"⚠️ KEPUB conversion failed, importing original EPUB: {os.path.basename(best_file)}")
+                    file_to_import = best_file
+            else:
+                file_to_import = best_file
+
             # Build calibredb add command
             # --duplicates flag allows adding even if similar book exists
-            args = ['add', filepath, '--duplicates']
+            args = ['add', file_to_import, '--duplicates']
 
             result = run_calibredb(args)
 
             if result['success']:
                 imported_count += 1
-                import_state['imported_files'].append(filepath)
-                print(f"✅ Imported: {os.path.basename(filepath)}")
+                # Mark all files in this group as imported
+                for filepath in filepaths:
+                    import_state['imported_files'].append(filepath)
+
+                print(f"✅ Imported: {os.path.basename(file_to_import)}")
 
                 # Get the book ID from the calibredb output for post-processing
                 book_id = get_book_id_from_calibredb_output(result.get('output', ''))
 
                 if book_id:
-                    # Convert EPUB to KEPUB if it's an EPUB file
-                    if filepath.lower().endswith('.epub'):
-                        try:
-                            convert_book_to_kepub(book_id)
-                        except Exception as e:
-                            print(f"⚠️ KEPUB conversion failed: {e}")
-
                     # Fetch and apply iTunes metadata
                     try:
                         fetch_and_apply_itunes_metadata(book_id)
                     except Exception as e:
                         print(f"⚠️ iTunes metadata fetch failed: {e}")
 
-                # Delete original if configured
+                # Delete original files from import folder (all formats for this book)
+                delete_after = config.get('import_delete', True)
                 if delete_after:
-                    try:
-                        os.remove(filepath)
-                        print(f"🗑️  Deleted original: {os.path.basename(filepath)}")
-                    except Exception as e:
-                        errors.append(f"Failed to delete {filepath}: {e}")
+                    for filepath in filepaths:
+                        try:
+                            if os.path.exists(filepath):
+                                os.remove(filepath)
+                                print(f"🗑️  Deleted from import folder: {os.path.basename(filepath)}")
+                        except Exception as e:
+                            errors.append(f"Failed to delete {filepath}: {e}")
+                            print(f"⚠️ Failed to delete {os.path.basename(filepath)}: {e}")
+
             else:
                 error_msg = result.get('error', 'Unknown error')
-                errors.append(f"{os.path.basename(filepath)}: {error_msg}")
-                print(f"❌ Failed to import {os.path.basename(filepath)}: {error_msg}")
+                errors.append(f"{os.path.basename(best_file)}: {error_msg}")
+                print(f"❌ Failed to import {os.path.basename(best_file)}: {error_msg}")
+
         except Exception as e:
-            errors.append(f"{os.path.basename(filepath)}: {str(e)}")
-            print(f"❌ Error importing {os.path.basename(filepath)}: {e}")
+            errors.append(f"{os.path.basename(best_file)}: {str(e)}")
+            print(f"❌ Error importing {os.path.basename(best_file)}: {e}")
+
+        finally:
+            # Clean up temp KEPUB file and directory
+            if temp_dir_to_cleanup and os.path.exists(temp_dir_to_cleanup):
+                try:
+                    shutil.rmtree(temp_dir_to_cleanup)
+                except Exception as e:
+                    print(f"⚠️ Failed to cleanup temp dir: {e}")
 
     # Update state
     import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
@@ -1492,11 +1647,16 @@ def import_books_from_folder():
     if errors:
         import_state['errors'] = errors[-10:]  # Keep last 10 errors
 
+    message = f'Imported {imported_count} book(s)'
+    if skipped_duplicates > 0:
+        message += f' (skipped {skipped_duplicates} duplicate format(s))'
+
     return {
         'success': True,
         'imported': imported_count,
+        'skipped_duplicates': skipped_duplicates,
         'errors': errors if errors else None,
-        'message': f'Imported {imported_count} book(s)'
+        'message': message
     }
 
 
