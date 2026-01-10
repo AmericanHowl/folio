@@ -2137,6 +2137,104 @@ def search_itunes(query, limit=20, offset=0):
         return {'error': str(e)}
 
 
+def identify_book_from_image(base64_image):
+    """Use Claude API with vision to identify a book from a cover image.
+
+    Args:
+        base64_image: Base64-encoded JPEG image data (without data URI prefix)
+
+    Returns:
+        dict with 'title' and 'author' if identified, or 'error' if failed
+    """
+    anthropic_api_key = os.getenv('ANTHROPIC_API_KEY', '').strip()
+
+    if not anthropic_api_key:
+        return {'error': 'ANTHROPIC_API_KEY environment variable not configured'}
+
+    try:
+        # Claude API endpoint for messages
+        api_url = "https://api.anthropic.com/v1/messages"
+
+        # Prepare the request payload with vision
+        payload = {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 256,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": base64_image
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": "What book is this? Reply with just the title and author in format: Title: <title>\nAuthor: <author>"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        # Make the API request
+        req_data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(api_url, data=req_data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('x-api-key', anthropic_api_key)
+        req.add_header('anthropic-version', '2023-06-01')
+
+        print(f"📷 Sending image to Claude API for book identification...")
+
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode('utf-8'))
+
+            # Extract the text response
+            if 'content' in result and len(result['content']) > 0:
+                text_response = result['content'][0].get('text', '')
+                print(f"📷 Claude response: {text_response}")
+
+                # Parse title and author from response
+                title = None
+                author = None
+
+                for line in text_response.strip().split('\n'):
+                    line = line.strip()
+                    if line.lower().startswith('title:'):
+                        title = line[6:].strip()
+                    elif line.lower().startswith('author:'):
+                        author = line[7:].strip()
+
+                if title:
+                    return {
+                        'title': title,
+                        'author': author or '',
+                        'raw_response': text_response
+                    }
+                else:
+                    # Couldn't parse, return the raw response for debugging
+                    return {
+                        'error': "Couldn't identify book from image",
+                        'raw_response': text_response
+                    }
+            else:
+                return {'error': 'Empty response from Claude API'}
+
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8') if e.fp else ''
+        print(f"❌ Claude API HTTP error: {e.code} - {error_body}")
+        return {'error': f'Claude API error: {e.code}'}
+    except urllib.error.URLError as e:
+        print(f"❌ Claude API connection error: {e.reason}")
+        return {'error': f'Connection error: {e.reason}'}
+    except Exception as e:
+        print(f"❌ Claude API error: {e}")
+        return {'error': str(e)}
+
+
 def get_trending_hardcover(token, limit=20):
     """Get most popular books from 2025 on Hardcover (with caching)"""
     if not token:
@@ -3232,6 +3330,90 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             response = json.dumps(result)
             self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Identify book from camera image
+        if self.path == '/api/camera/identify':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length == 0:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'error': 'No image data provided'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                body = self.rfile.read(content_length)
+                data = json.loads(body.decode('utf-8'))
+
+                # Get base64 image data (strip data URI prefix if present)
+                image_data = data.get('image', '')
+                if image_data.startswith('data:'):
+                    # Remove data URI prefix (e.g., "data:image/jpeg;base64,")
+                    image_data = image_data.split(',', 1)[1] if ',' in image_data else ''
+
+                if not image_data:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'error': 'No image data provided'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                print(f"📷 Received camera image for identification ({len(image_data)} bytes base64)")
+
+                # Identify book using Claude API
+                identify_result = identify_book_from_image(image_data)
+
+                if 'error' in identify_result:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False,
+                        'error': identify_result['error'],
+                        'raw_response': identify_result.get('raw_response', '')
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                # Search iTunes with the identified title and author
+                title = identify_result.get('title', '')
+                author = identify_result.get('author', '')
+                search_query = f"{title} {author}".strip()
+
+                print(f"📷 Searching iTunes for: {search_query}")
+
+                search_result = search_itunes(search_query, limit=20, offset=0)
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({
+                    'success': True,
+                    'identified': {
+                        'title': title,
+                        'author': author
+                    },
+                    'search_query': search_query,
+                    'books': search_result.get('books', [])
+                })
+                self.wfile.write(response.encode('utf-8'))
+
+            except json.JSONDecodeError as e:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'error': f'Invalid JSON: {e}'})
+                self.wfile.write(response.encode('utf-8'))
+            except Exception as e:
+                print(f"❌ Camera identify error: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'error': str(e)})
+                self.wfile.write(response.encode('utf-8'))
             return
 
         # API: Update config
