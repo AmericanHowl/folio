@@ -812,7 +812,7 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
     }}
     
     .header h1 {{
-      font-size: 20px;
+      font-size: 26px;
       font-weight: 700;
       margin: 0;
       letter-spacing: -0.5px;
@@ -831,16 +831,16 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
     .sort-select {{
       background: #fff;
       border: 2px solid #000;
-      padding: 10px 14px;
-      font-size: 16px;
+      padding: 12px 16px;
+      font-size: 18px;
       font-weight: 500;
-      min-width: 120px;
+      min-width: 140px;
     }}
     
     .content {{
       position: absolute;
-      top: 62px;
-      bottom: 70px;
+      top: 70px;
+      bottom: 80px;
       left: 0;
       right: 0;
       overflow: hidden;
@@ -855,56 +855,56 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
     .book-item {{
       display: table;
       width: 100%;
-      padding: 10px 12px;
+      padding: 14px 16px;
       border-bottom: 1px solid #ccc;
     }}
-    
+
     .book-cover {{
       display: table-cell;
       vertical-align: top;
-      width: 55px;
-      height: 80px;
+      width: 70px;
+      height: 100px;
       background: #ddd;
       border: 1px solid #999;
     }}
-    
+
     .book-cover img {{
-      width: 55px;
-      height: 80px;
+      width: 70px;
+      height: 100px;
       object-fit: cover;
     }}
-    
+
     .book-info {{
       display: table-cell;
       vertical-align: top;
-      padding: 0 12px;
+      padding: 0 16px;
     }}
-    
+
     .book-title {{
-      font-size: 16px;
+      font-size: 22px;
       font-weight: 600;
-      margin: 0 0 4px 0;
-      line-height: 1.2;
+      margin: 0 0 6px 0;
+      line-height: 1.25;
     }}
-    
+
     .book-author {{
-      font-size: 14px;
-      color: #444;
+      font-size: 18px;
+      color: #333;
       margin: 0;
     }}
-    
+
     .book-meta {{
       display: table-cell;
       vertical-align: middle;
       text-align: right;
       white-space: nowrap;
-      width: 100px;
+      width: 130px;
     }}
-    
+
     .file-info {{
-      font-size: 11px;
-      color: #666;
-      margin-bottom: 8px;
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 10px;
     }}
     
     .download-btn {{
@@ -912,22 +912,22 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
       background: #000;
       color: #fff;
       border: none;
-      padding: 12px 16px;
-      font-size: 14px;
+      padding: 14px 20px;
+      font-size: 18px;
       font-weight: 600;
       text-decoration: none;
       text-align: center;
     }}
     
     .empty-state {{
-      padding: 40px 20px;
+      padding: 50px 24px;
       text-align: center;
-      color: #666;
+      color: #555;
     }}
-    
+
     .empty-state p {{
-      margin: 10px 0;
-      font-size: 16px;
+      margin: 12px 0;
+      font-size: 20px;
     }}
     
     .pagination {{
@@ -952,8 +952,8 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
       display: table-cell;
       text-align: center;
       width: 34%;
-      font-size: 14px;
-      color: #444;
+      font-size: 18px;
+      color: #333;
       vertical-align: middle;
     }}
     
@@ -968,12 +968,12 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
       background: #000;
       color: #fff;
       border: 2px solid #000;
-      padding: 14px 24px;
-      font-size: 16px;
+      padding: 16px 28px;
+      font-size: 20px;
       font-weight: 600;
       text-decoration: none;
       text-align: center;
-      min-width: 110px;
+      min-width: 120px;
     }}
     
     .nav-btn[disabled],
@@ -3041,6 +3041,10 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 library_path = get_calibre_library()
                 book_file_path = os.path.join(library_path, row['path'], f"{row['name']}.{format.lower()}")
 
+                # Handle KEPUB files which may have .kepub.epub extension
+                if not os.path.exists(book_file_path) and format == 'KEPUB':
+                    book_file_path = os.path.join(library_path, row['path'], f"{row['name']}.kepub.epub")
+
                 if not os.path.exists(book_file_path):
                     self.send_error(404, f"Book file not found at {book_file_path}")
                     return
@@ -3048,6 +3052,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 # Determine MIME type based on format
                 mime_types = {
                     'EPUB': 'application/epub+zip',
+                    'KEPUB': 'application/epub+zip',  # KEPUB is Kobo's extended EPUB
                     'PDF': 'application/pdf',
                     'MOBI': 'application/x-mobipocket-ebook',
                     'AZW3': 'application/vnd.amazon.ebook',
@@ -3055,13 +3060,18 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 }
                 mime_type = mime_types.get(format, 'application/octet-stream')
 
+                # Clean filename for Content-Disposition header
+                safe_title = row["title"].replace('"', "'").replace('\n', ' ').replace('\r', '')
+                # Use .epub extension for KEPUB files so devices recognize them
+                file_ext = 'epub' if format == 'KEPUB' else format.lower()
+
                 # Send the file
                 with open(book_file_path, 'rb') as f:
                     book_data = f.read()
 
                 self.send_response(200)
                 self.send_header('Content-Type', mime_type)
-                self.send_header('Content-Disposition', f'attachment; filename="{row["title"]}.{format.lower()}"')
+                self.send_header('Content-Disposition', f'attachment; filename="{safe_title}.{file_ext}"')
                 self.send_header('Content-Length', len(book_data))
                 self.end_headers()
                 self.wfile.write(book_data)
