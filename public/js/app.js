@@ -148,6 +148,10 @@ function folioApp() {
         selectedBookiTunesMatch: null,
         updatingMetadata: false,
         savingMetadata: false, // Track if we're saving edited metadata
+        convertingToKepub: false, // Track if KEPUB conversion is in progress
+        // iTunes metadata search in edit mode
+        itunesMetadataResults: [], // Multiple results for user to pick from
+        searchingItunesMetadata: false, // Loading state for metadata search
 
         // Requests
         requestedBooks: [],
@@ -862,9 +866,6 @@ function folioApp() {
                 } else {
                 this.readingListStatus = null;
             }
-            
-            // Check for iTunes match
-            this.checkiTunesMatch(book);
         },
 
         /**
@@ -1060,6 +1061,7 @@ function folioApp() {
             this.tagSuggestions = [];
             this.showAuthorSuggestions = false;
             this.showTagSuggestions = false;
+            this.itunesMetadataResults = [];
         },
 
         /**
@@ -1221,6 +1223,128 @@ function folioApp() {
             this.selectedBook = null;
             this.selectedBookHardcoverMatch = null;
             this.exitEditMode();
+        },
+
+        /**
+         * Check if book can be converted to KEPUB (has EPUB but not KEPUB)
+         */
+        canConvertToKepub(book) {
+            if (!book || !book.formats) return false;
+            const formats = book.formats.map(f => f.toUpperCase());
+            return formats.includes('EPUB') && !formats.includes('KEPUB');
+        },
+
+        /**
+         * Convert book to KEPUB format
+         */
+        async convertToKepub() {
+            if (!this.selectedBook || this.convertingToKepub) return;
+
+            const bookId = this.selectedBook.id;
+            this.convertingToKepub = true;
+
+            try {
+                const response = await fetch(`/api/convert-to-kepub/${bookId}`, {
+                    method: 'POST',
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    console.log(`✅ Converted book ${bookId} to KEPUB`);
+
+                    // Update the book's formats locally
+                    if (this.selectedBook && this.selectedBook.id === bookId) {
+                        if (!this.selectedBook.formats.includes('KEPUB')) {
+                            this.selectedBook.formats = [...this.selectedBook.formats, 'KEPUB'];
+                        }
+                    }
+
+                    // Update in books array too
+                    const bookIndex = this.books.findIndex(b => b.id === bookId);
+                    if (bookIndex !== -1) {
+                        const book = this.books[bookIndex];
+                        if (!book.formats.includes('KEPUB')) {
+                            book.formats = [...book.formats, 'KEPUB'];
+                        }
+                    }
+
+                    alert('Book converted to KEPUB successfully!');
+                } else {
+                    console.error('KEPUB conversion failed:', result.error);
+                    alert('KEPUB conversion failed: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('KEPUB conversion error:', error);
+                alert('Error converting to KEPUB: ' + error.message);
+            } finally {
+                this.convertingToKepub = false;
+            }
+        },
+
+        /**
+         * Search iTunes for metadata options (shows multiple results for user to pick)
+         */
+        async searchItunesForMetadata() {
+            if (!this.editingBook) return;
+
+            this.itunesMetadataResults = [];
+            this.searchingItunesMetadata = true;
+
+            try {
+                const title = this.editingBook.title;
+                const author = this.editingBook.authors || '';
+                const firstAuthor = author.split(',')[0].trim();
+                const searchQuery = title + (firstAuthor ? ' ' + firstAuthor : '');
+
+                // Check client-side cache first
+                const cacheKey = `itunes_metadata_${searchQuery}`;
+                let data = FolioCache.get(cacheKey);
+
+                if (!data) {
+                    const response = await fetch(`/api/itunes/search?q=${encodeURIComponent(searchQuery)}&limit=5`);
+                    data = await response.json();
+                    FolioCache.set(cacheKey, data, FolioCache.TTL.ITUNES_SEARCH);
+                } else {
+                    console.log(`📦 Cache hit: iTunes metadata for "${title}"`);
+                }
+
+                if (data.books && data.books.length > 0) {
+                    // Return top 3 results for user to choose
+                    this.itunesMetadataResults = data.books.slice(0, 3);
+                    console.log(`🔍 Found ${this.itunesMetadataResults.length} iTunes results for "${title}"`);
+                }
+            } catch (error) {
+                console.error('Failed to search iTunes for metadata:', error);
+            } finally {
+                this.searchingItunesMetadata = false;
+            }
+        },
+
+        /**
+         * Apply selected iTunes result to the editing form
+         */
+        applyItunesMetadata(itunesBook) {
+            if (!this.editingBook || !itunesBook) return;
+
+            // Apply metadata to editing form
+            if (itunesBook.title) this.editingBook.title = itunesBook.title;
+            if (itunesBook.author) this.editingBook.authors = itunesBook.author;
+            if (itunesBook.year) this.editingBook.year = itunesBook.year.toString();
+            if (itunesBook.description) this.editingBook.comments = itunesBook.description;
+            if (itunesBook.genres && Array.isArray(itunesBook.genres)) {
+                // Combine with existing tags
+                const existingTags = this.editingBook.tags ? this.editingBook.tags.split(',').map(t => t.trim()).filter(t => t) : [];
+                const newTags = [...new Set([...existingTags, ...itunesBook.genres])];
+                this.editingBook.tags = newTags.join(', ');
+            }
+            if (itunesBook.image) {
+                this.editingBook.coverPreview = itunesBook.image;
+                this.editingBook.coverData = itunesBook.image; // URL will be downloaded by server
+            }
+
+            // Clear results after selection
+            this.itunesMetadataResults = [];
+            console.log(`✅ Applied iTunes metadata from "${itunesBook.title}"`);
         },
 
         // ============================================

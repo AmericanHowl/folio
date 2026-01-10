@@ -184,6 +184,7 @@ CACHE_TTL_HARDCOVER_LIST = 600      # 10 minutes
 CACHE_TTL_HARDCOVER_AUTHOR = 600    # 10 minutes
 CACHE_TTL_ITUNES_SEARCH = 1800      # 30 minutes
 CONFIG_FILE = "config.json"
+IMPORTED_FILES_FILE = "imported_files.json"  # Persists list of already-imported files
 HARDCOVER_API_URL = "https://api.hardcover.app/v1/graphql"
 
 # Global config
@@ -284,6 +285,33 @@ def save_config():
         return True
     except Exception as e:
         print(f"⚠️  Failed to save config: {e}")
+        return False
+
+
+def load_imported_files():
+    """Load list of already-imported files from disk (survives restarts)."""
+    global import_state
+    if os.path.exists(IMPORTED_FILES_FILE):
+        try:
+            with open(IMPORTED_FILES_FILE, 'r') as f:
+                data = json.load(f)
+                import_state['imported_files'] = data.get('files', [])
+                print(f"📂 Loaded {len(import_state['imported_files'])} previously imported files")
+        except Exception as e:
+            print(f"⚠️  Failed to load imported files list: {e}")
+            import_state['imported_files'] = []
+    else:
+        import_state['imported_files'] = []
+
+
+def save_imported_files():
+    """Save list of imported files to disk for persistence across restarts."""
+    try:
+        with open(IMPORTED_FILES_FILE, 'w') as f:
+            json.dump({'files': import_state.get('imported_files', [])}, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"⚠️  Failed to save imported files list: {e}")
         return False
 
 
@@ -1600,6 +1628,7 @@ def import_books_from_folder():
                 # Mark all files in this group as imported
                 for filepath in filepaths:
                     import_state['imported_files'].append(filepath)
+                save_imported_files()  # Persist to disk immediately
 
                 print(f"✅ Imported: {os.path.basename(file_to_import)}")
 
@@ -1613,10 +1642,16 @@ def import_books_from_folder():
                     except Exception as e:
                         print(f"⚠️ iTunes metadata fetch failed: {e}")
 
-                # Delete original files from import folder (all formats for this book)
-                delete_after = config.get('import_delete', True)
-                if delete_after:
-                    for filepath in filepaths:
+                # Handle file cleanup
+                # IMPORTANT: Keep EPUB files for seeding (torrents), only delete non-EPUB formats
+                delete_after = config.get('import_delete', False)
+                for filepath in filepaths:
+                    is_epub = filepath.lower().endswith('.epub')
+                    if is_epub:
+                        # Always keep EPUBs for seeding
+                        print(f"📁 Kept for seeding: {os.path.basename(filepath)}")
+                    elif delete_after:
+                        # Delete non-EPUB formats if configured
                         try:
                             if os.path.exists(filepath):
                                 os.remove(filepath)
@@ -3377,6 +3412,47 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response.encode('utf-8'))
             return
 
+        # API: Convert book to KEPUB
+        if self.path.startswith('/api/convert-to-kepub/'):
+            book_id = self.path.split('/')[-1]
+            try:
+                book_id = int(book_id)
+            except ValueError:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Invalid book ID'})
+                self.wfile.write(response.encode('utf-8'))
+                return
+
+            # Check if kepubify is available
+            kepubify_path = find_kepubify()
+            if not kepubify_path:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'kepubify not installed on server'})
+                self.wfile.write(response.encode('utf-8'))
+                return
+
+            # Attempt conversion
+            success = convert_book_to_kepub(book_id)
+            if success:
+                # Invalidate cover cache to refresh book data
+                cover_cache.invalidate()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': True, 'message': 'Book converted to KEPUB'})
+                self.wfile.write(response.encode('utf-8'))
+            else:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'KEPUB conversion failed - check server logs'})
+                self.wfile.write(response.encode('utf-8'))
+            return
+
         # API: Identify book from camera image
         if self.path == '/api/camera/identify':
             try:
@@ -4389,6 +4465,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     # Load config on startup
     load_config()
+
+    # Load previously imported files (survives restarts)
+    load_imported_files()
 
     # Pre-load cover cache asynchronously (don't block server startup)
     def preload_cover_cache():
