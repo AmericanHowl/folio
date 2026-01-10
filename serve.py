@@ -3390,20 +3390,31 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         
                         print(f"✅ Downloaded torrent file: {len(torrent_data)} bytes", flush=True)
                         
-                        # Build multipart/form-data body - just the torrent file, no category
-                        boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
+                        # Build multipart/form-data body with unique boundary
+                        import uuid
+                        boundary = f'----FormBoundary{uuid.uuid4().hex[:16]}'
                         
                         body = (
+                            # Torrent file part
                             f'--{boundary}\r\n'.encode() +
                             b'Content-Disposition: form-data; name="torrents"; filename="download.torrent"\r\n' +
+                            b'Content-Type: application/x-bittorrent\r\n' +
                             b'\r\n' +
                             torrent_data +
+                            # Category part
+                            f'\r\n--{boundary}\r\n'.encode() +
+                            b'Content-Disposition: form-data; name="category"\r\n' +
+                            b'\r\n' +
+                            b'ebooks' +
+                            # Closing boundary
                             f'\r\n--{boundary}--\r\n'.encode()
                         )
                         
                         add_data = body
                         add_req = urllib.request.Request(add_url, data=add_data, method='POST')
                         add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
+                        add_req.add_header('Referer', qbt_url)
+                        add_req.add_header('Origin', qbt_url)
                         
                     except Exception as e:
                         print(f"❌ Failed to download torrent file: {e}", flush=True)
@@ -3439,15 +3450,24 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         })
                         self.wfile.write(response.encode('utf-8'))
                     else:
-                        # qBittorrent returned an error
-                        error_msg = add_result if add_result else 'Unknown error from qBittorrent'
-                        print(f"❌ qBittorrent rejected the torrent: {error_msg}", flush=True)
-                        self.send_response(500)
+                        # qBittorrent returned an error - "Fails." is generic and could mean:
+                        # - Torrent already exists (duplicate)
+                        # - Invalid torrent file
+                        # - Category doesn't exist
+                        # - Disk full or other issues
+                        print(f"❌ qBittorrent rejected the torrent: {add_result}", flush=True)
+                        self.send_response(400)
                         self.send_header('Content-Type', 'application/json')
                         self.end_headers()
+                        
+                        if add_result.lower() == 'fails.':
+                            error_msg = 'qBittorrent rejected the torrent. This usually means the torrent already exists in qBittorrent, or the torrent file is invalid.'
+                        else:
+                            error_msg = f'qBittorrent error: {add_result}'
+                        
                         response = json.dumps({
                             'success': False,
-                            'error': f'qBittorrent rejected the torrent: {error_msg}'
+                            'error': error_msg
                         })
                         self.wfile.write(response.encode('utf-8'))
                     
