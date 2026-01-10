@@ -193,6 +193,7 @@ function folioApp() {
         cameraError: '',
         cameraStream: null,
         capturedImageSrc: '',
+        cameraRequestId: 0, // Used to track/cancel pending camera requests
 
         /**
          * Initialize the application
@@ -2311,6 +2312,10 @@ function folioApp() {
             this.cameraError = '';
             this.capturedImageSrc = '';
 
+            // Increment request ID to track this specific request
+            // This allows us to detect if the modal was closed while getUserMedia was pending
+            const requestId = ++this.cameraRequestId;
+
             // Request camera access
             try {
                 const constraints = {
@@ -2322,22 +2327,47 @@ function folioApp() {
                 };
 
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                // Check if modal was closed while waiting for camera permission
+                // If so, immediately stop the stream and don't proceed
+                if (requestId !== this.cameraRequestId || !this.showCameraCapture) {
+                    console.log('📷 Modal closed while waiting for camera, stopping stream');
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
                 this.cameraStream = stream;
 
                 // Wait for video element to be available
                 await this.$nextTick();
 
+                // Check again after nextTick in case modal was closed
+                if (requestId !== this.cameraRequestId || !this.showCameraCapture) {
+                    console.log('📷 Modal closed after camera ready, stopping stream');
+                    stream.getTracks().forEach(track => track.stop());
+                    this.cameraStream = null;
+                    return;
+                }
+
                 const video = this.$refs.cameraVideo;
                 if (video) {
                     video.srcObject = stream;
                     video.onloadedmetadata = () => {
-                        this.cameraState = 'ready';
-                        console.log('📷 Camera ready');
+                        // Final check before setting ready state
+                        if (requestId === this.cameraRequestId && this.showCameraCapture) {
+                            this.cameraState = 'ready';
+                            console.log('📷 Camera ready');
+                        }
                     };
                 } else {
                     throw new Error('Video element not found');
                 }
             } catch (error) {
+                // Only show error if this request is still current
+                if (requestId !== this.cameraRequestId || !this.showCameraCapture) {
+                    return;
+                }
+
                 console.error('📷 Camera error:', error);
                 this.cameraState = 'error';
 
@@ -2358,6 +2388,10 @@ function folioApp() {
          */
         closeCameraCapture() {
             console.log('📷 Closing camera capture');
+
+            // Increment request ID to invalidate any pending camera requests
+            this.cameraRequestId++;
+
             this.showCameraCapture = false;
             this.cameraState = 'initializing';
             this.capturedImageSrc = '';
