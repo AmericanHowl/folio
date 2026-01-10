@@ -187,6 +187,13 @@ function folioApp() {
         // Back to top
         showBackToTop: false,
 
+        // Camera capture state
+        showCameraCapture: false,
+        cameraState: 'initializing', // 'initializing' | 'ready' | 'captured' | 'identifying' | 'error'
+        cameraError: '',
+        cameraStream: null,
+        capturedImageSrc: '',
+
         /**
          * Initialize the application
          */
@@ -2287,6 +2294,193 @@ function folioApp() {
                 alert('Error adding books to reading list: ' + error.message);
             } finally {
                 this.bulkActionLoading = false;
+            }
+        },
+
+        // ============================================
+        // Camera Capture Methods
+        // ============================================
+
+        /**
+         * Open camera capture modal
+         */
+        async openCameraCapture() {
+            console.log('📷 Opening camera capture...');
+            this.showCameraCapture = true;
+            this.cameraState = 'initializing';
+            this.cameraError = '';
+            this.capturedImageSrc = '';
+
+            // Request camera access
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment', // Prefer rear camera
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                this.cameraStream = stream;
+
+                // Wait for video element to be available
+                await this.$nextTick();
+
+                const video = this.$refs.cameraVideo;
+                if (video) {
+                    video.srcObject = stream;
+                    video.onloadedmetadata = () => {
+                        this.cameraState = 'ready';
+                        console.log('📷 Camera ready');
+                    };
+                } else {
+                    throw new Error('Video element not found');
+                }
+            } catch (error) {
+                console.error('📷 Camera error:', error);
+                this.cameraState = 'error';
+
+                if (error.name === 'NotAllowedError') {
+                    this.cameraError = 'Camera access denied. Please allow camera access in your browser settings.';
+                } else if (error.name === 'NotFoundError') {
+                    this.cameraError = 'No camera found on this device.';
+                } else if (error.name === 'NotReadableError') {
+                    this.cameraError = 'Camera is in use by another application.';
+                } else {
+                    this.cameraError = error.message || 'Failed to access camera.';
+                }
+            }
+        },
+
+        /**
+         * Close camera capture modal and cleanup
+         */
+        closeCameraCapture() {
+            console.log('📷 Closing camera capture');
+            this.showCameraCapture = false;
+            this.cameraState = 'initializing';
+            this.capturedImageSrc = '';
+
+            // Stop camera stream
+            if (this.cameraStream) {
+                this.cameraStream.getTracks().forEach(track => track.stop());
+                this.cameraStream = null;
+            }
+
+            // Clear video source
+            const video = this.$refs.cameraVideo;
+            if (video) {
+                video.srcObject = null;
+            }
+        },
+
+        /**
+         * Capture photo from camera
+         */
+        capturePhoto() {
+            console.log('📷 Capturing photo...');
+            const video = this.$refs.cameraVideo;
+            const canvas = this.$refs.cameraCanvas;
+
+            if (!video || !canvas) {
+                console.error('📷 Video or canvas element not found');
+                return;
+            }
+
+            // Set canvas dimensions to video dimensions
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Draw video frame to canvas
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            // Export as JPEG at 0.8 quality
+            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            this.capturedImageSrc = imageDataUrl;
+            this.cameraState = 'captured';
+
+            // Stop camera stream to save resources
+            if (this.cameraStream) {
+                this.cameraStream.getTracks().forEach(track => track.stop());
+                this.cameraStream = null;
+            }
+
+            console.log('📷 Photo captured');
+        },
+
+        /**
+         * Retake photo - restart camera
+         */
+        async retakePhoto() {
+            console.log('📷 Retaking photo...');
+            this.capturedImageSrc = '';
+            this.cameraState = 'initializing';
+
+            // Restart camera
+            await this.openCameraCapture();
+        },
+
+        /**
+         * Send captured image to backend for identification
+         */
+        async identifyBook() {
+            if (!this.capturedImageSrc) {
+                console.error('📷 No captured image');
+                return;
+            }
+
+            console.log('📷 Identifying book from image...');
+            this.cameraState = 'identifying';
+
+            try {
+                const response = await fetch('/api/camera/identify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: this.capturedImageSrc })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    console.log('📷 Book identified:', data.identified);
+
+                    // Close camera modal
+                    this.closeCameraCapture();
+
+                    // Set the search query to the identified title/author
+                    this.searchQuery = data.search_query || `${data.identified.title} ${data.identified.author}`.trim();
+
+                    // Display the search results directly (bypass normal search)
+                    this.filteredBooks = [];
+                    this.searchiTunesResults = this.matchWithLibrary(data.books || []);
+                    this.searchiTunesPage = 1;
+                    this.searchiTunesHasMore = false; // Results already complete from backend
+                    this.loadingSearchiTunes = false;
+
+                    // Scroll to top to see results
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                    console.log(`📷 Found ${this.searchiTunesResults.length} books for "${this.searchQuery}"`);
+                } else {
+                    // Identification failed
+                    console.error('📷 Identification failed:', data.error);
+                    this.closeCameraCapture();
+
+                    // Focus the search input and show a message
+                    alert(`Couldn't identify the book. ${data.error || 'Try again or search manually.'}`);
+
+                    // Focus the search input
+                    await this.$nextTick();
+                    if (this.$refs.searchInput) {
+                        this.$refs.searchInput.focus();
+                    }
+                }
+            } catch (error) {
+                console.error('📷 Identification request failed:', error);
+                this.cameraState = 'captured';
+                alert('Failed to identify book. Please try again or search manually.');
             }
         },
     };
