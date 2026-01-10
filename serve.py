@@ -3375,8 +3375,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
                 else:
                     # For torrent URLs (like Prowlarr download links), download the .torrent file first
-                    # then send it to qBittorrent as file content. This ensures qBittorrent gets the file
-                    # even if it can't reach the original URL (common in Docker networking scenarios)
+                    # then send it to qBittorrent. Prowlarr download links expire/timeout so qBittorrent
+                    # can't fetch them directly - we need to proxy the download (like Radarr/Sonarr do)
                     print(f"🔗 Downloading torrent file from: {url[:80]}...", flush=True)
                     
                     try:
@@ -3385,45 +3385,37 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         torrent_resp = urllib.request.urlopen(torrent_req, timeout=30)
                         torrent_data = torrent_resp.read()
                         
-                        # Verify it looks like a torrent file (starts with 'd' for bencoded dict)
-                        if not torrent_data or (torrent_data[0:1] != b'd' and torrent_data[0:1] != b'8'):
-                            print(f"⚠️ Downloaded data doesn't look like a torrent file, trying as URL", flush=True)
-                            # Fall back to sending URL with ebook category
-                            add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebooks'}).encode('utf-8')
-                            add_req = urllib.request.Request(add_url, data=add_data, method='POST')
-                            add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
-                        else:
-                            print(f"✅ Downloaded torrent file: {len(torrent_data)} bytes", flush=True)
-                            
-                            # Send as multipart form data with the torrent file
-                            import uuid
-                            boundary = str(uuid.uuid4())
-                            
-                            # Build multipart body following RFC 2046 format exactly
-                            add_data = (
-                                # Torrent file part
-                                f'--{boundary}\r\n'.encode() +
-                                b'Content-Disposition: form-data; name="torrents"; filename="download.torrent"\r\n' +
-                                b'Content-Type: application/x-bittorrent\r\n' +
-                                b'\r\n' +
-                                torrent_data +
-                                # Category part (must match category name in qBittorrent)
-                                f'\r\n--{boundary}\r\n'.encode() +
-                                b'Content-Disposition: form-data; name="category"\r\n' +
-                                b'\r\n' +
-                                b'ebooks' +
-                                # Closing boundary
-                                f'\r\n--{boundary}--\r\n'.encode()
-                            )
-                            add_req = urllib.request.Request(add_url, data=add_data, method='POST')
-                            add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
-                            
-                    except Exception as e:
-                        print(f"⚠️ Failed to download torrent file: {e}, trying URL directly", flush=True)
-                        # Fall back to sending URL with ebooks category (might work if qBittorrent can reach it)
-                        add_data = urllib.parse.urlencode({'urls': url, 'category': 'ebooks'}).encode('utf-8')
+                        if not torrent_data:
+                            raise Exception("Empty response from Prowlarr")
+                        
+                        print(f"✅ Downloaded torrent file: {len(torrent_data)} bytes", flush=True)
+                        
+                        # Build multipart/form-data body - just the torrent file, no category
+                        boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
+                        
+                        body = (
+                            f'--{boundary}\r\n'.encode() +
+                            b'Content-Disposition: form-data; name="torrents"; filename="download.torrent"\r\n' +
+                            b'\r\n' +
+                            torrent_data +
+                            f'\r\n--{boundary}--\r\n'.encode()
+                        )
+                        
+                        add_data = body
                         add_req = urllib.request.Request(add_url, data=add_data, method='POST')
-                        add_req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+                        add_req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
+                        
+                    except Exception as e:
+                        print(f"❌ Failed to download torrent file: {e}", flush=True)
+                        self.send_response(500)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        response = json.dumps({
+                            'success': False,
+                            'error': f'Failed to download torrent from Prowlarr: {str(e)}'
+                        })
+                        self.wfile.write(response.encode('utf-8'))
+                        return
 
                 try:
                     add_resp = opener.open(add_req, timeout=30)
