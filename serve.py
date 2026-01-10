@@ -209,7 +209,13 @@ import_state = {
     'imported_files': [],  # Track already imported files to avoid duplicates
     'last_imported_count': 0,
     'total_imported': 0,
-    'errors': []
+    'errors': [],
+    # KEPUB conversion tracking
+    'kepub_converting': None,  # Currently converting file (None if idle)
+    'kepub_convert_start': None,  # When current conversion started
+    'kepub_last_file': None,  # Last file that was converted
+    'kepub_last_success': None,  # True/False for last conversion result
+    'kepub_last_log': None,  # Full log output from last kepubify run
 }
 
 
@@ -812,7 +818,7 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
     }}
     
     .header h1 {{
-      font-size: 20px;
+      font-size: 26px;
       font-weight: 700;
       margin: 0;
       letter-spacing: -0.5px;
@@ -831,16 +837,16 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
     .sort-select {{
       background: #fff;
       border: 2px solid #000;
-      padding: 10px 14px;
-      font-size: 16px;
+      padding: 12px 16px;
+      font-size: 18px;
       font-weight: 500;
-      min-width: 120px;
+      min-width: 140px;
     }}
     
     .content {{
       position: absolute;
-      top: 62px;
-      bottom: 70px;
+      top: 70px;
+      bottom: 80px;
       left: 0;
       right: 0;
       overflow: hidden;
@@ -855,56 +861,56 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
     .book-item {{
       display: table;
       width: 100%;
-      padding: 10px 12px;
+      padding: 14px 16px;
       border-bottom: 1px solid #ccc;
     }}
-    
+
     .book-cover {{
       display: table-cell;
       vertical-align: top;
-      width: 55px;
-      height: 80px;
+      width: 70px;
+      height: 100px;
       background: #ddd;
       border: 1px solid #999;
     }}
-    
+
     .book-cover img {{
-      width: 55px;
-      height: 80px;
+      width: 70px;
+      height: 100px;
       object-fit: cover;
     }}
-    
+
     .book-info {{
       display: table-cell;
       vertical-align: top;
-      padding: 0 12px;
+      padding: 0 16px;
     }}
-    
+
     .book-title {{
-      font-size: 16px;
+      font-size: 22px;
       font-weight: 600;
-      margin: 0 0 4px 0;
-      line-height: 1.2;
+      margin: 0 0 6px 0;
+      line-height: 1.25;
     }}
-    
+
     .book-author {{
-      font-size: 14px;
-      color: #444;
+      font-size: 18px;
+      color: #333;
       margin: 0;
     }}
-    
+
     .book-meta {{
       display: table-cell;
       vertical-align: middle;
       text-align: right;
       white-space: nowrap;
-      width: 100px;
+      width: 130px;
     }}
-    
+
     .file-info {{
-      font-size: 11px;
-      color: #666;
-      margin-bottom: 8px;
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 10px;
     }}
     
     .download-btn {{
@@ -912,22 +918,22 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
       background: #000;
       color: #fff;
       border: none;
-      padding: 12px 16px;
-      font-size: 14px;
+      padding: 14px 20px;
+      font-size: 18px;
       font-weight: 600;
       text-decoration: none;
       text-align: center;
     }}
     
     .empty-state {{
-      padding: 40px 20px;
+      padding: 50px 24px;
       text-align: center;
-      color: #666;
+      color: #555;
     }}
-    
+
     .empty-state p {{
-      margin: 10px 0;
-      font-size: 16px;
+      margin: 12px 0;
+      font-size: 20px;
     }}
     
     .pagination {{
@@ -952,8 +958,8 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
       display: table-cell;
       text-align: center;
       width: 34%;
-      font-size: 14px;
-      color: #444;
+      font-size: 18px;
+      color: #333;
       vertical-align: middle;
     }}
     
@@ -968,12 +974,12 @@ def render_kobo_page(books, page=1, sort='added', books_per_page=5):
       background: #000;
       color: #fff;
       border: 2px solid #000;
-      padding: 14px 24px;
-      font-size: 16px;
+      padding: 16px 28px;
+      font-size: 20px;
       font-weight: 600;
       text-decoration: none;
       text-align: center;
-      min-width: 110px;
+      min-width: 120px;
     }}
     
     .nav-btn[disabled],
@@ -2176,6 +2182,104 @@ def search_itunes(query, limit=20, offset=0):
         return {'error': str(e)}
 
 
+def identify_book_from_image(base64_image):
+    """Use Claude API with vision to identify a book from a cover image.
+
+    Args:
+        base64_image: Base64-encoded JPEG image data (without data URI prefix)
+
+    Returns:
+        dict with 'title' and 'author' if identified, or 'error' if failed
+    """
+    anthropic_api_key = os.getenv('ANTHROPIC_API_KEY', '').strip()
+
+    if not anthropic_api_key:
+        return {'error': 'ANTHROPIC_API_KEY environment variable not configured'}
+
+    try:
+        # Claude API endpoint for messages
+        api_url = "https://api.anthropic.com/v1/messages"
+
+        # Prepare the request payload with vision
+        payload = {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 256,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": base64_image
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": "What book is this? Reply with just the title and author in format: Title: <title>\nAuthor: <author>"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        # Make the API request
+        req_data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(api_url, data=req_data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('x-api-key', anthropic_api_key)
+        req.add_header('anthropic-version', '2023-06-01')
+
+        print(f"📷 Sending image to Claude API for book identification...")
+
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode('utf-8'))
+
+            # Extract the text response
+            if 'content' in result and len(result['content']) > 0:
+                text_response = result['content'][0].get('text', '')
+                print(f"📷 Claude response: {text_response}")
+
+                # Parse title and author from response
+                title = None
+                author = None
+
+                for line in text_response.strip().split('\n'):
+                    line = line.strip()
+                    if line.lower().startswith('title:'):
+                        title = line[6:].strip()
+                    elif line.lower().startswith('author:'):
+                        author = line[7:].strip()
+
+                if title:
+                    return {
+                        'title': title,
+                        'author': author or '',
+                        'raw_response': text_response
+                    }
+                else:
+                    # Couldn't parse, return the raw response for debugging
+                    return {
+                        'error': "Couldn't identify book from image",
+                        'raw_response': text_response
+                    }
+            else:
+                return {'error': 'Empty response from Claude API'}
+
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8') if e.fp else ''
+        print(f"❌ Claude API HTTP error: {e.code} - {error_body}")
+        return {'error': f'Claude API error: {e.code}'}
+    except urllib.error.URLError as e:
+        print(f"❌ Claude API connection error: {e.reason}")
+        return {'error': f'Connection error: {e.reason}'}
+    except Exception as e:
+        print(f"❌ Claude API error: {e}")
+        return {'error': str(e)}
+
+
 def get_trending_hardcover(token, limit=20):
     """Get most popular books from 2025 on Hardcover (with caching)"""
     if not token:
@@ -2722,7 +2826,15 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 'last_imported_count': import_state.get('last_imported_count', 0),
                 'total_imported': import_state.get('total_imported', 0),
                 'pending_files': len(scan_import_folder()) - len(import_state.get('imported_files', [])),
-                'errors': import_state.get('errors', [])
+                'errors': import_state.get('errors', []),
+                # KEPUB conversion status (for debugging - can be removed later)
+                'kepub': {
+                    'converting': import_state.get('kepub_converting'),
+                    'convert_start': import_state.get('kepub_convert_start'),
+                    'last_file': import_state.get('kepub_last_file'),
+                    'last_success': import_state.get('kepub_last_success'),
+                    'last_log': import_state.get('kepub_last_log'),
+                }
             }
             response = json.dumps(status)
             self.wfile.write(response.encode('utf-8'))
@@ -3201,6 +3313,10 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 library_path = get_calibre_library()
                 book_file_path = os.path.join(library_path, row['path'], f"{row['name']}.{format.lower()}")
 
+                # Handle KEPUB files which may have .kepub.epub extension
+                if not os.path.exists(book_file_path) and format == 'KEPUB':
+                    book_file_path = os.path.join(library_path, row['path'], f"{row['name']}.kepub.epub")
+
                 if not os.path.exists(book_file_path):
                     self.send_error(404, f"Book file not found at {book_file_path}")
                     return
@@ -3208,6 +3324,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 # Determine MIME type based on format
                 mime_types = {
                     'EPUB': 'application/epub+zip',
+                    'KEPUB': 'application/epub+zip',  # KEPUB is Kobo's extended EPUB
                     'PDF': 'application/pdf',
                     'MOBI': 'application/x-mobipocket-ebook',
                     'AZW3': 'application/vnd.amazon.ebook',
@@ -3215,13 +3332,18 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 }
                 mime_type = mime_types.get(format, 'application/octet-stream')
 
+                # Clean filename for Content-Disposition header
+                safe_title = row["title"].replace('"', "'").replace('\n', ' ').replace('\r', '')
+                # Use .epub extension for KEPUB files so devices recognize them
+                file_ext = 'epub' if format == 'KEPUB' else format.lower()
+
                 # Send the file
                 with open(book_file_path, 'rb') as f:
                     book_data = f.read()
 
                 self.send_response(200)
                 self.send_header('Content-Type', mime_type)
-                self.send_header('Content-Disposition', f'attachment; filename="{row["title"]}.{format.lower()}"')
+                self.send_header('Content-Disposition', f'attachment; filename="{safe_title}.{file_ext}"')
                 self.send_header('Content-Length', len(book_data))
                 self.end_headers()
                 self.wfile.write(book_data)
@@ -3253,6 +3375,90 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             response = json.dumps(result)
             self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Identify book from camera image
+        if self.path == '/api/camera/identify':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length == 0:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'error': 'No image data provided'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                body = self.rfile.read(content_length)
+                data = json.loads(body.decode('utf-8'))
+
+                # Get base64 image data (strip data URI prefix if present)
+                image_data = data.get('image', '')
+                if image_data.startswith('data:'):
+                    # Remove data URI prefix (e.g., "data:image/jpeg;base64,")
+                    image_data = image_data.split(',', 1)[1] if ',' in image_data else ''
+
+                if not image_data:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'error': 'No image data provided'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                print(f"📷 Received camera image for identification ({len(image_data)} bytes base64)")
+
+                # Identify book using Claude API
+                identify_result = identify_book_from_image(image_data)
+
+                if 'error' in identify_result:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False,
+                        'error': identify_result['error'],
+                        'raw_response': identify_result.get('raw_response', '')
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+
+                # Search iTunes with the identified title and author
+                title = identify_result.get('title', '')
+                author = identify_result.get('author', '')
+                search_query = f"{title} {author}".strip()
+
+                print(f"📷 Searching iTunes for: {search_query}")
+
+                search_result = search_itunes(search_query, limit=20, offset=0)
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({
+                    'success': True,
+                    'identified': {
+                        'title': title,
+                        'author': author
+                    },
+                    'search_query': search_query,
+                    'books': search_result.get('books', [])
+                })
+                self.wfile.write(response.encode('utf-8'))
+
+            except json.JSONDecodeError as e:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'error': f'Invalid JSON: {e}'})
+                self.wfile.write(response.encode('utf-8'))
+            except Exception as e:
+                print(f"❌ Camera identify error: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'error': str(e)})
+                self.wfile.write(response.encode('utf-8'))
             return
 
         # API: Update config
