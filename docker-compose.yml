@@ -31,6 +31,8 @@ services:
       - QBITTORRENT_USERNAME=${QBITTORRENT_USERNAME:-}
       # qBittorrent Web UI password (if authentication enabled)
       - QBITTORRENT_PASSWORD=${QBITTORRENT_PASSWORD:-}
+      # Anthropic API key for book cover camera identification (get from https://console.anthropic.com)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       # OPTIONAL: Import folder settings (uncomment volume mount above to use)
       # - IMPORT_FOLDER=/data/import          # Path inside container
       # - IMPORT_INTERVAL=60                  # Scan interval in seconds (default: 60)
