@@ -870,17 +870,28 @@
         
         <!-- Search Bar - Moved up -->
         <div class="px-4 py-3 bg-ink-50 border-b border-ink-200">
-            <div class="relative max-w-7xl mx-auto">
-                <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
-                <input 
-                    type="text" 
-                    x-model="searchQuery"
-                    @input.debounce.300ms="searchBooks()"
-                    placeholder="Search for books"
-                    class="w-full pl-11 pr-4 py-3 bg-ink-100 border-0 rounded-lg text-base text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all min-h-[44px]"
+            <div class="relative max-w-7xl mx-auto flex items-center gap-2">
+                <div class="relative flex-1">
+                    <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
+                    <input
+                        type="text"
+                        x-model="searchQuery"
+                        x-ref="searchInput"
+                        @input.debounce.300ms="searchBooks()"
+                        placeholder="Search for books"
+                        class="w-full pl-11 pr-4 py-3 bg-ink-100 border-0 rounded-lg text-base text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all min-h-[44px]"
+                    >
+                </div>
+                <!-- Camera button for book cover scanning -->
+                <button
+                    @click="openCameraCapture()"
+                    class="flex-shrink-0 w-11 h-11 flex items-center justify-center bg-ocean-500 hover:bg-ocean-600 text-white rounded-lg transition-colors"
+                    title="Scan book cover"
                 >
-                                        </div>
-                                    </div>
+                    <i class="bi bi-camera text-lg"></i>
+                </button>
+            </div>
+        </div>
         
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto safe-area-bottom">
@@ -2052,6 +2063,89 @@
                 </div>
             </div>
         </div>
+
+    <!-- Camera Capture Modal -->
+    <div x-show="showCameraCapture" x-cloak @click.self="closeCameraCapture()"
+         class="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center">
+        <!-- Camera View -->
+        <div class="relative w-full h-full max-w-lg max-h-[80vh] flex flex-col">
+            <!-- Header -->
+            <div class="flex justify-between items-center p-4 text-white">
+                <h2 class="text-lg font-semibold">Scan Book Cover</h2>
+                <button @click="closeCameraCapture()" class="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Video preview / Captured image / Loading state -->
+            <div class="flex-1 flex items-center justify-center overflow-hidden px-4">
+                <!-- Camera initializing -->
+                <div x-show="cameraState === 'initializing'" class="text-center text-white">
+                    <div class="spinner w-8 h-8 mx-auto mb-3"></div>
+                    <p class="text-sm">Starting camera...</p>
+                </div>
+
+                <!-- Camera error -->
+                <div x-show="cameraState === 'error'" class="text-center text-white px-4">
+                    <i class="bi bi-exclamation-triangle text-4xl text-amber-400 mb-3"></i>
+                    <p class="text-base mb-2">Camera unavailable</p>
+                    <p class="text-sm text-white/70" x-text="cameraError"></p>
+                    <button @click="closeCameraCapture()" class="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors">
+                        Close
+                    </button>
+                </div>
+
+                <!-- Live camera feed -->
+                <div x-show="cameraState === 'ready'" class="relative w-full">
+                    <video x-ref="cameraVideo" autoplay playsinline muted class="w-full rounded-lg"></video>
+                    <!-- Viewfinder overlay -->
+                    <div class="absolute inset-0 pointer-events-none">
+                        <div class="absolute inset-4 border-2 border-white/50 rounded-lg"></div>
+                    </div>
+                </div>
+
+                <!-- Captured image preview -->
+                <div x-show="cameraState === 'captured' || cameraState === 'identifying'" class="relative w-full">
+                    <img x-ref="capturedImage" class="w-full rounded-lg" :src="capturedImageSrc">
+                    <!-- Loading overlay when identifying -->
+                    <div x-show="cameraState === 'identifying'" class="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                        <div class="text-center text-white">
+                            <div class="spinner w-8 h-8 mx-auto mb-3"></div>
+                            <p class="text-sm">Identifying book...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="p-4 flex justify-center gap-4">
+                <!-- Capture button (when camera is ready) -->
+                <button x-show="cameraState === 'ready'" @click="capturePhoto()"
+                        class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 transition-colors">
+                    <div class="w-12 h-12 bg-white rounded-full border-4 border-ink-900"></div>
+                </button>
+
+                <!-- Retake / Confirm buttons (after capture) -->
+                <template x-if="cameraState === 'captured'">
+                    <div class="flex gap-4">
+                        <button @click="retakePhoto()"
+                                class="px-6 py-3 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors flex items-center gap-2">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            <span>Retake</span>
+                        </button>
+                        <button @click="identifyBook()"
+                                class="px-6 py-3 bg-ocean-500 hover:bg-ocean-600 text-white rounded-lg transition-colors flex items-center gap-2">
+                            <i class="bi bi-search"></i>
+                            <span>Search</span>
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Hidden canvas for capturing frames -->
+        <canvas x-ref="cameraCanvas" class="hidden"></canvas>
+    </div>
 
     <!-- App Script -->
     <script src="/js/app.js"></script>
