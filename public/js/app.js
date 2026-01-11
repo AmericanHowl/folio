@@ -405,39 +405,15 @@ function folioApp() {
         },
 
         /**
-         * Restore saved view from localStorage (after page refresh)
+         * Initialize view on page load - always start at library
          */
         restoreSavedView() {
-            try {
-                const savedState = localStorage.getItem('folio_current_view');
-                if (!savedState) {
-                    // Initialize library view in history
-                    history.replaceState({ view: 'library' }, '', '#library');
-                    return;
-                }
-
-                const state = JSON.parse(savedState);
-                console.log('📖 Restoring view:', state.view);
-
-                // Replace current history state with saved state
-                history.replaceState(state, '', `#${state.view}`);
-
-                // Navigate to the saved view
-                switch (state.view) {
-                    case 'bookshelf':
-                        this.navigateToBookshelf(state.title || 'Reading List');
-                        break;
-                    case 'requests':
-                        this.navigateToRequests();
-                        break;
-                    default:
-                        // Already on library view, just update state
-                        this.currentView = 'library';
-                }
-            } catch (error) {
-                console.error('Failed to restore view:', error);
-                history.replaceState({ view: 'library' }, '', '#library');
-            }
+            // Always start at library view on page load/refresh
+            this.currentView = 'library';
+            this.showBookshelf = false;
+            this.showRequests = false;
+            localStorage.setItem('folio_current_view', JSON.stringify({ view: 'library' }));
+            history.replaceState({ view: 'library' }, '', '#library');
         },
 
         /**

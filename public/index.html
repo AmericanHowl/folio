@@ -536,11 +536,6 @@
             background: #0ea5e9;
         }
         
-        /* Compact header */
-        .compact-header {
-            height: 48px;
-        }
-        
         /* Divider with text */
         .divider-text {
             display: flex;
@@ -838,76 +833,76 @@
     <!-- Main App -->
     <div x-show="!showSetup" x-cloak class="min-h-screen">
         
-        <!-- Compact Header -->
-        <header class="sticky top-0 z-40 glass border-b border-ink-200 safe-area-top backdrop-blur-md bg-white/95">
-            <div class="max-w-7xl mx-auto px-3">
-                <div class="flex items-center justify-between compact-header">
-                    <!-- Logo -->
-                    <a @click.prevent="searchQuery = ''; navigateToLibrary(); pushHistoryState('library'); window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                        <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
-                    </a>
+        <!-- Fixed Header Container -->
+        <div class="fixed top-0 left-0 right-0 z-40 safe-area-top">
+            <!-- Header Bar -->
+            <header class="bg-white border-b border-ink-200">
+                <div class="max-w-7xl mx-auto px-3">
+                    <div class="flex items-center justify-between h-14">
+                        <!-- Logo -->
+                        <a @click.prevent="searchQuery = ''; navigateToLibrary(); pushHistoryState('library'); window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                            <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
+                        </a>
 
-                    <!-- Actions -->
-                    <div class="flex items-center gap-2">
-                        <button 
-                            @click="openReadingList()" 
-                            class="px-4 py-3 text-base font-medium text-ink-700 hover:text-ink-900 hover:bg-ink-100 rounded-xl transition-colors flex items-center gap-2 min-h-[44px]"
-                        >
-                            <i class="bi bi-bookmark text-lg" style="color: #2fb8b8;"></i>
-                            <span>Reading List</span>
-                        </button>
-                        <!-- More Menu -->
-                        <div class="relative" x-data="{ menuOpen: false }">
+                        <!-- Actions -->
+                        <div class="flex items-center gap-1">
                             <button 
-                                @click="menuOpen = !menuOpen" 
-                                class="p-3 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-xl transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
-                                title="More options"
+                                @click="openReadingList()" 
+                                class="px-3 py-2 text-sm font-medium text-ink-700 hover:text-ink-900 hover:bg-ink-100 rounded-lg transition-colors flex items-center gap-2"
                             >
-                                <i class="bi bi-three-dots-vertical text-lg"></i>
+                                <i class="bi bi-bookmark text-base" style="color: #2fb8b8;"></i>
+                                <span class="hidden sm:inline">Reading List</span>
                             </button>
-                            <!-- Dropdown Menu -->
-                            <div 
-                                x-show="menuOpen" 
-                                @click.away="menuOpen = false" 
-                                x-cloak
-                                x-transition:enter="transition ease-out duration-150"
-                                x-transition:enter-start="opacity-0 scale-95 translate-y-1"
-                                x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                                x-transition:leave="transition ease-in duration-100"
-                                x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-                                x-transition:leave-end="opacity-0 scale-95 translate-y-1"
-                                class="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-ink-200/50 py-2 z-50 overflow-hidden"
-                                style="box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);"
-                            >
-                                <label class="flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 cursor-pointer transition-colors active:bg-ink-100">
-                                    <i class="bi bi-upload text-lg text-ink-600"></i>
-                                    <span class="font-medium">Import Books</span>
-                                    <input type="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.fb2,.lit,.prc,.txt,.rtf,.djvu,.cbz,.cbr" multiple @change="handleBookUpload($event)" class="hidden">
-                                </label>
-                                <button @click="menuOpen = false; openRequests()" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
-                                    <i class="bi bi-inbox-fill text-lg text-ink-600"></i>
-                                    <span class="font-medium">Requests</span>
+                            <!-- More Menu -->
+                            <div class="relative" x-data="{ menuOpen: false }">
+                                <button 
+                                    @click="menuOpen = !menuOpen" 
+                                    class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center"
+                                    title="More options"
+                                >
+                                    <i class="bi bi-three-dots-vertical text-lg"></i>
                                 </button>
-                                <button @click="menuOpen = false; toggleSelectionMode()" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
-                                    <i class="bi bi-check-square text-lg text-ink-600"></i>
-                                    <span class="font-medium">Select Books</span>
-                                </button>
-                                <div class="border-t border-ink-200 my-1"></div>
-                                <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
-                                    <i class="bi bi-gear text-lg text-ink-600"></i>
-                                    <span class="font-medium">Settings</span>
-                                </button>
+                                <!-- Dropdown Menu -->
+                                <div 
+                                    x-show="menuOpen" 
+                                    @click.away="menuOpen = false" 
+                                    x-cloak
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0 scale-95 translate-y-1"
+                                    x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                                    x-transition:leave="transition ease-in duration-100"
+                                    x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                                    x-transition:leave-end="opacity-0 scale-95 translate-y-1"
+                                    class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-ink-200 py-1 z-50 overflow-hidden"
+                                >
+                                    <label class="flex items-center gap-3 px-4 py-2.5 text-ink-700 hover:bg-ink-50 cursor-pointer transition-colors">
+                                        <i class="bi bi-upload text-ink-500"></i>
+                                        <span>Import Books</span>
+                                        <input type="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.fb2,.lit,.prc,.txt,.rtf,.djvu,.cbz,.cbr" multiple @change="handleBookUpload($event)" class="hidden">
+                                    </label>
+                                    <button @click="menuOpen = false; openRequests()" class="w-full flex items-center gap-3 px-4 py-2.5 text-ink-700 hover:bg-ink-50 transition-colors text-left">
+                                        <i class="bi bi-inbox-fill text-ink-500"></i>
+                                        <span>Requests</span>
+                                    </button>
+                                    <button @click="menuOpen = false; toggleSelectionMode()" class="w-full flex items-center gap-3 px-4 py-2.5 text-ink-700 hover:bg-ink-50 transition-colors text-left">
+                                        <i class="bi bi-check-square text-ink-500"></i>
+                                        <span>Select Books</span>
+                                    </button>
+                                    <div class="border-t border-ink-200 my-1"></div>
+                                    <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-center gap-3 px-4 py-2.5 text-ink-700 hover:bg-ink-50 transition-colors text-left">
+                                        <i class="bi bi-gear text-ink-500"></i>
+                                        <span>Settings</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </header>
-        
-        <!-- Search Bar - Sticky -->
-        <div class="sticky top-[60px] z-30 px-4 py-3 bg-ink-50 border-b border-ink-200 backdrop-blur-sm bg-ink-50/95">
-            <div class="relative max-w-7xl mx-auto">
-                <div class="relative flex-1">
+            </header>
+            
+            <!-- Search Bar -->
+            <div class="bg-ink-50 border-b border-ink-200 px-4 py-2">
+                <div class="relative max-w-7xl mx-auto">
                     <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
                     <input
                         type="text"
@@ -915,12 +910,12 @@
                         x-ref="searchInput"
                         @input.debounce.300ms="searchBooks()"
                         placeholder="Search for books"
-                        class="w-full pl-11 pr-14 py-3 bg-ink-100 border-0 rounded-xl text-base text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all min-h-[44px]"
+                        class="w-full pl-10 pr-12 py-2.5 bg-white border border-ink-200 rounded-lg text-base text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:border-ocean-500 transition-all"
                     >
                     <!-- Camera button inside search bar -->
                     <button
                         @click="openCameraCapture()"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-ink-400 hover:text-ink-600 hover:bg-ink-200 rounded-lg transition-colors"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-ink-400 hover:text-ink-600 hover:bg-ink-100 rounded-md transition-colors"
                         title="Scan book cover"
                     >
                         <i class="bi bi-camera text-lg"></i>
@@ -928,6 +923,9 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Spacer for fixed header (header height + search bar height) -->
+        <div class="h-[108px]"></div>
         
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto safe-area-bottom">
