@@ -1712,7 +1712,9 @@ def convert_book_to_kepub(book_id):
     """
     kepubify_path = find_kepubify()
     if not kepubify_path:
-        print("⚠️ kepubify not found - skipping KEPUB conversion")
+        print("⚠️ kepubify not found - skipping KEPUB conversion", flush=True)
+        sys.stderr.write("⚠️ kepubify not found - skipping KEPUB conversion\n")
+        sys.stderr.flush()
         return False
 
     try:
@@ -1724,7 +1726,9 @@ def convert_book_to_kepub(book_id):
         conn.close()
 
         if not row:
-            print(f"❌ Book {book_id} not found for KEPUB conversion")
+            print(f"❌ Book {book_id} not found for KEPUB conversion", flush=True)
+            sys.stderr.write(f"❌ Book {book_id} not found for KEPUB conversion\n")
+            sys.stderr.flush()
             return False
 
         book_path = row['path']
@@ -1739,7 +1743,9 @@ def convert_book_to_kepub(book_id):
                 break
 
         if not epub_file:
-            print(f"⚠️ No EPUB found for book {book_id} - skipping KEPUB conversion")
+            print(f"⚠️ No EPUB found for book {book_id} - skipping KEPUB conversion", flush=True)
+            sys.stderr.write(f"⚠️ No EPUB found for book {book_id} - skipping KEPUB conversion\n")
+            sys.stderr.flush()
             return False
 
         # Create output filename in a temp directory (not in library)
@@ -1750,6 +1756,7 @@ def convert_book_to_kepub(book_id):
 
         try:
             # Run kepubify
+            print(f"🔄 Running kepubify to convert book {book_id}...", flush=True)
             result = subprocess.run(
                 [kepubify_path, '-o', kepub_file, epub_file],
                 capture_output=True,
@@ -1760,7 +1767,7 @@ def convert_book_to_kepub(book_id):
             if result.returncode == 0 and os.path.exists(kepub_file):
                 # Verify kepub file was created and has content
                 file_size = os.path.getsize(kepub_file)
-                print(f"📦 KEPUB file created: {os.path.basename(kepub_file)} ({file_size} bytes)")
+                print(f"📦 KEPUB file created: {os.path.basename(kepub_file)} ({file_size} bytes)", flush=True)
                 
                 # Add the KEPUB format to the book in Calibre
                 # Don't suppress errors so we can see what's happening
@@ -1778,29 +1785,46 @@ def convert_book_to_kepub(book_id):
                     conn_verify.close()
                     
                     if format_exists:
-                        print(f"✅ Converted and added KEPUB for book {book_id} (verified in database as format: {actual_format})")
+                        print(f"✅ Converted and added KEPUB for book {book_id} (verified in database as format: {actual_format})", flush=True)
                         # Log the command output for debugging
                         if add_result.get('output'):
-                            print(f"   calibredb output: {add_result['output'].strip()}")
+                            print(f"   calibredb output: {add_result['output'].strip()}", flush=True)
                         return True
                     else:
-                        print(f"⚠️ calibredb reported success but KEPUB format not found in database for book {book_id}")
+                        error_msg = f"calibredb reported success but KEPUB format not found in database for book {book_id}"
+                        print(f"⚠️ {error_msg}", flush=True)
+                        sys.stderr.write(f"⚠️ {error_msg}\n")
                         # List all formats for this book to help debug
                         conn_debug = get_db_connection(readonly=True)
                         cursor_debug = conn_debug.cursor()
                         cursor_debug.execute("SELECT format FROM data WHERE book = ?", (book_id,))
                         all_formats = [row['format'] for row in cursor_debug.fetchall()]
                         conn_debug.close()
-                        print(f"   Available formats for book {book_id}: {', '.join(all_formats) if all_formats else 'none'}")
+                        formats_msg = f"   Available formats for book {book_id}: {', '.join(all_formats) if all_formats else 'none'}"
+                        print(formats_msg, flush=True)
+                        sys.stderr.write(formats_msg + "\n")
                         if add_result.get('output'):
-                            print(f"   calibredb output: {add_result['output'].strip()}")
+                            output_msg = f"   calibredb output: {add_result['output'].strip()}"
+                            print(output_msg, flush=True)
+                            sys.stderr.write(output_msg + "\n")
+                        sys.stderr.flush()
                         return False
                 else:
                     error_msg = add_result.get('error', 'Unknown error')
-                    print(f"❌ Failed to add KEPUB format: {error_msg}")
+                    error_full = f"❌ Failed to add KEPUB format to book {book_id}: {error_msg}"
+                    print(error_full, flush=True)
+                    sys.stderr.write(error_full + "\n")
+                    sys.stderr.flush()
                     return False
             else:
-                print(f"❌ kepubify failed: {result.stderr}")
+                error_msg = f"❌ kepubify failed for book {book_id} (returncode={result.returncode})"
+                if result.stderr:
+                    error_msg += f"\n   stderr: {result.stderr}"
+                if result.stdout:
+                    error_msg += f"\n   stdout: {result.stdout}"
+                print(error_msg, flush=True)
+                sys.stderr.write(error_msg + "\n")
+                sys.stderr.flush()
                 return False
         finally:
             # Always clean up temp directory
@@ -1810,7 +1834,12 @@ def convert_book_to_kepub(book_id):
                 pass
 
     except Exception as e:
-        print(f"❌ KEPUB conversion error: {e}")
+        import traceback
+        error_msg = f"❌ KEPUB conversion error for book {book_id}: {e}"
+        print(error_msg, flush=True)
+        sys.stderr.write(error_msg + "\n")
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
         return False
 
 
@@ -2081,12 +2110,14 @@ def run_calibredb(args, suppress_errors=False):
     if not calibredb_path:
         error_msg = 'calibredb not found. Please install Calibre or set CALIBREDB_PATH environment variable.'
         if not suppress_errors:
-            print(f"❌ {error_msg}")
+            print(f"❌ {error_msg}", flush=True)
+            sys.stderr.write(f"❌ {error_msg}\n")
+            sys.stderr.flush()
         return {'success': False, 'error': error_msg}
     
     cmd = [calibredb_path] + args + ['--library-path', library_path]
     if not suppress_errors:
-        print(f"🔧 Running: {' '.join(cmd)}")
+        print(f"🔧 Running: {' '.join(cmd)}", flush=True)
     try:
         result = subprocess.run(
             cmd,
@@ -2099,22 +2130,34 @@ def run_calibredb(args, suppress_errors=False):
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() if e.stderr else str(e)
         if not suppress_errors:
-            print(f"❌ calibredb error: {error_msg}")
+            print(f"❌ calibredb error: {error_msg}", flush=True)
+            sys.stderr.write(f"❌ calibredb error: {error_msg}\n")
+            if e.stdout:
+                sys.stderr.write(f"   stdout: {e.stdout}\n")
+            sys.stderr.flush()
         return {'success': False, 'error': error_msg}
     except subprocess.TimeoutExpired:
         error_msg = 'calibredb command timed out'
         if not suppress_errors:
-            print(f"❌ {error_msg}")
+            print(f"❌ {error_msg}", flush=True)
+            sys.stderr.write(f"❌ {error_msg}\n")
+            sys.stderr.flush()
         return {'success': False, 'error': error_msg}
     except FileNotFoundError:
         error_msg = f'calibredb not found at {calibredb_path}. Please install Calibre.'
         if not suppress_errors:
-            print(f"❌ {error_msg}")
+            print(f"❌ {error_msg}", flush=True)
+            sys.stderr.write(f"❌ {error_msg}\n")
+            sys.stderr.flush()
         return {'success': False, 'error': error_msg}
     except Exception as e:
         error_msg = str(e)
         if not suppress_errors:
-            print(f"❌ calibredb unexpected error: {error_msg}")
+            print(f"❌ calibredb unexpected error: {error_msg}", flush=True)
+            sys.stderr.write(f"❌ calibredb unexpected error: {error_msg}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
         return {'success': False, 'error': error_msg}
 
 
