@@ -1810,31 +1810,43 @@
             <div x-show="requestedBooks.length > 0" class="space-y-3">
                 <template x-for="book in requestedBooks" :key="book.id">
                     <div class="flex items-center gap-3 p-3 bg-white border border-ink-200 rounded-xl hover:border-ink-300 transition-colors">
-                        <!-- Cover -->
-                        <img 
-                            :src="book.image" 
-                            :alt="book.title" 
-                            class="w-16 h-24 object-cover rounded-lg flex-shrink-0"
+                        <!-- Cover (clickable) -->
+                        <img
+                            @click="openHardcoverModal(book)"
+                            :src="book.image"
+                            :alt="book.title"
+                            class="w-16 h-24 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                             @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'"
                         >
-                        
-                        <!-- Details -->
-                        <div class="flex-1 min-w-0">
+
+                        <!-- Details (clickable) -->
+                        <div @click="openHardcoverModal(book)" class="flex-1 min-w-0 cursor-pointer">
                             <h3 class="text-sm font-semibold text-ink-900 line-clamp-2 mb-1" x-text="book.title"></h3>
                             <p class="text-xs text-ink-600 mb-1" x-text="book.author || 'Unknown Author'"></p>
                             <p class="text-xs text-ink-400" x-text="formatRequestDate(book.requested_at)"></p>
                                         </div>
-                        
-                        <!-- Search Button -->
-                        <button 
-                            @click="searchProwlarr(book)"
-                            :disabled="!prowlarrUrl || !prowlarrApiKey"
-                            class="px-4 py-2 bg-coral-500 hover:bg-coral-600 disabled:bg-ink-200 disabled:text-ink-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 flex-shrink-0"
-                            title="Search in Prowlarr"
-                        >
-                            <i class="bi bi-search"></i>
-                            <span class="hidden sm:inline">Search</span>
-                                        </button>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col gap-2 flex-shrink-0">
+                            <!-- Search Button -->
+                            <button
+                                @click="searchProwlarr(book)"
+                                :disabled="!prowlarrUrl || !prowlarrApiKey"
+                                class="p-3 bg-coral-500 hover:bg-coral-600 disabled:bg-ink-200 disabled:text-ink-400 text-white rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                                title="Search in Prowlarr"
+                            >
+                                <i class="bi bi-search"></i>
+                            </button>
+
+                            <!-- Remove Button -->
+                            <button
+                                @click="cancelRequest(book)"
+                                class="p-3 bg-ink-100 hover:bg-red-100 text-ink-600 hover:text-red-600 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                                title="Remove from requests"
+                            >
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
                                     </div>
                                 </template>
             </div>
