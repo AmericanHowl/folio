@@ -887,23 +887,23 @@
                                     x-transition:leave-start="opacity-100 scale-100 translate-y-0"
                                     x-transition:leave-end="opacity-0 scale-95 translate-y-1"
                                     class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-ink-200 py-1.5 z-50 overflow-hidden">
-                                    <label class="w-full flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left cursor-pointer>
+                                    <label class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors cursor-pointer">
+                                        <i class="bi bi-upload text-ink-400 text-sm"></i>
                                         <span>Import Books</span>
                                         <input type="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.fb2,.lit,.prc,.txt,.rtf,.djvu,.cbz,.cbr" multiple @change="handleBookUpload($event)" class="hidden">
-                                        <i class="bi bi-upload text-ink-400 text-sm"></i>
                                     </label>
-                                    <button @click="menuOpen = false; openRequests()" class="flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <span>Requests</span>
+                                    <button @click="menuOpen = false; openRequests()" class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
                                         <i class="bi bi-inbox-fill text-ink-400 text-sm"></i>
+                                        <span>Requests</span>
                                     </button>
-                                    <button @click="menuOpen = false; toggleSelectionMode()" class="flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <span>Select Books</span>
+                                    <button @click="menuOpen = false; toggleSelectionMode()" class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
                                         <i class="bi bi-check-square text-ink-400 text-sm"></i>
+                                        <span>Select Books</span>
                                     </button>
                                     <div class="border-t border-ink-200 my-1"></div>
-                                    <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <span>Settings</span>
+                                    <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
                                         <i class="bi bi-gear text-ink-400 text-sm"></i>
+                                        <span>Settings</span>
                                     </button>
                                 </div>
                             </div>
@@ -912,9 +912,15 @@
                 </div>
             </header>
             
-            <!-- Search Bar (fades out on scroll) -->
-            <div class="bg-ink-50 px-4 overflow-hidden transition-all duration-300 ease-in-out"
-                 :class="headerCompact ? 'h-0 py-0 opacity-0' : 'h-auto py-2 opacity-100'">
+            <!-- Search Bar (visible when not scrolled) -->
+            <div x-show="!headerCompact" 
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 -translate-y-2"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 -translate-y-2"
+                 class="bg-ink-50 px-4 py-2">
                 <div class="relative max-w-7xl mx-auto">
                     <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
                     <input
@@ -925,7 +931,6 @@
                         placeholder="Search for books"
                         class="w-full pl-10 pr-12 py-2.5 bg-white border border-ink-200 rounded-lg text-base text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:border-ocean-500 transition-all"
                     >
-                    <!-- Camera button inside search bar -->
                     <button
                         @click="openCameraCapture()"
                         class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-ink-400 hover:text-ink-600 hover:bg-ink-100 rounded-md transition-colors"
@@ -937,19 +942,26 @@
             </div>
             
             <!-- Section Title Bar -->
-            <div class="border-b border-ink-200 px-4 shadow-sm transition-all duration-300 ease-in-out"
-                 :class="headerCompact ? 'py-2 bg-white' : 'py-3 bg-ink-50'">
+            <div class="bg-white border-b border-ink-200 px-4 shadow-sm"
+                 :class="headerCompact ? 'py-2' : 'py-3'">
                 <div class="max-w-7xl mx-auto flex items-center justify-between">
-                    <h1 class="font-display font-bold text-ink-900 transition-all duration-300"
-                        :class="headerCompact ? 'text-base' : 'text-2xl'"
+                    <h1 class="font-display font-bold text-ink-900 transition-all duration-200"
+                        :class="headerCompact ? 'text-base' : 'text-xl'"
                         x-text="getSectionTitle()">
+                        Your Library
                     </h1>
                     
-                    <!-- Compact Icons (appear when scrolled) -->
-                    <div class="flex items-center gap-2 transition-all duration-300"
-                         :class="headerCompact ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'">
+                    <!-- Compact Icons (only visible when scrolled) -->
+                    <div x-show="headerCompact" 
+                         x-transition:enter="transition ease-out duration-150"
+                         x-transition:enter-start="opacity-0 scale-90"
+                         x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-100"
+                         x-transition:leave-start="opacity-100 scale-100"
+                         x-transition:leave-end="opacity-0 scale-90"
+                         class="flex items-center gap-1">
                         <button
-                            @click="window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $refs.searchInput.focus(), 350)"
+                            @click="window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $refs.searchInput.focus(), 300)"
                             class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
                             title="Search"
                         >
@@ -967,8 +979,8 @@
             </div>
         </div>
         
-        <!-- Spacer for fixed header (header + search + section title) -->
-        <div class="h-[160px]"></div>
+        <!-- Spacer for fixed header (uses expanded height to prevent content jump) -->
+        <div class="h-[156px]"></div>
         
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto safe-area-bottom">
@@ -1840,7 +1852,7 @@
             </div>
 
     <!-- Requests View (List format) -->
-    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[160px] overflow-y-auto">
+    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[156px] overflow-y-auto">
         <!-- Requests List -->
         <div class="p-3 pb-16">
             <!-- Empty State -->
@@ -1897,7 +1909,7 @@
     </div>
 
     <!-- Bookshelf View (Full page grid of books) -->
-    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[160px] overflow-y-auto">
+    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[156px] overflow-y-auto">
         <!-- View Toggle -->
         <div class="bg-white border-b border-ink-200 px-3 py-2">
             <div class="flex items-center justify-between">
