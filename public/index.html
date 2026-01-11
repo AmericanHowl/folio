@@ -833,10 +833,10 @@
     <!-- Main App -->
     <div x-show="!showSetup" x-cloak class="min-h-screen">
         
-        <!-- Fixed Header Container -->
-        <div class="fixed top-0 left-0 right-0 z-40 safe-area-top bg-white">
+        <!-- Fixed Header Container - unified background, no borders -->
+        <div class="fixed top-0 left-0 right-0 z-40 safe-area-top bg-ink-50">
             <!-- Header Bar -->
-            <header class="border-b border-ink-200">
+            <header>
                 <div class="max-w-7xl mx-auto px-3">
                     <div class="flex items-center justify-between h-14">
                         <!-- Back Button + Logo -->
@@ -845,14 +845,14 @@
                             <button 
                                 x-show="showBackButton()"
                                 @click="handleBackButton()"
-                                class="p-2 -ml-2 mr-1 text-ink-600 hover:text-ink-800 hover:bg-ink-100 rounded-lg transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                                class="p-2 -ml-1 text-ink-600 hover:text-ink-800 hover:bg-ink-100 rounded-lg transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                             >
                                 <i class="bi bi-arrow-left text-lg"></i>
                             </button>
                             <!-- Spacer when no back button (keeps logo position consistent) -->
-                            <div x-show="!showBackButton()" class="w-1"></div>
+                            <div x-show="!showBackButton()" class="w-[44px]"></div>
                             <!-- Logo -->
-                            <a @click.prevent="searchQuery = ''; navigateToLibrary(); pushHistoryState('library'); window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                            <a @click.prevent="searchQuery = ''; navigateToLibrary(); pushHistoryState('library'); window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center cursor-pointer hover:opacity-80 transition-opacity">
                                 <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
                             </a>
                         </div>
@@ -920,7 +920,7 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100 translate-y-0"
                  x-transition:leave-end="opacity-0 -translate-y-2"
-                 class="bg-ink-50 px-4 py-2">
+                 class="px-4 py-2">
                 <div class="relative max-w-7xl mx-auto">
                     <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
                     <input
@@ -942,8 +942,7 @@
             </div>
             
             <!-- Section Title Bar -->
-            <div class="bg-white border-b border-ink-200 px-4 shadow-sm"
-                 :class="headerCompact ? 'py-2' : 'py-3'">
+            <div class="px-4 pb-3" :class="headerCompact ? 'pt-2' : 'pt-1'">
                 <div class="max-w-7xl mx-auto flex items-center justify-between">
                     <h1 class="font-display font-bold text-ink-900 transition-all duration-200"
                         :class="headerCompact ? 'text-base' : 'text-xl'"
@@ -951,36 +950,47 @@
                         Your Library
                     </h1>
                     
-                    <!-- Compact Icons (only visible when scrolled) -->
-                    <div x-show="headerCompact" 
-                         x-transition:enter="transition ease-out duration-150"
-                         x-transition:enter-start="opacity-0 scale-90"
-                         x-transition:enter-end="opacity-100 scale-100"
-                         x-transition:leave="transition ease-in duration-100"
-                         x-transition:leave-start="opacity-100 scale-100"
-                         x-transition:leave-end="opacity-0 scale-90"
-                         class="flex items-center gap-1">
-                        <button
-                            @click="window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $refs.searchInput.focus(), 300)"
+                    <!-- Right side actions -->
+                    <div class="flex items-center gap-1">
+                        <!-- Compact Icons (only visible when scrolled) -->
+                        <template x-if="headerCompact">
+                            <div class="flex items-center gap-1">
+                                <button
+                                    @click="window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $refs.searchInput.focus(), 300)"
+                                    class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
+                                    title="Search"
+                                >
+                                    <i class="bi bi-search text-lg"></i>
+                                </button>
+                                <button
+                                    @click="openCameraCapture()"
+                                    class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
+                                    title="Scan book cover"
+                                >
+                                    <i class="bi bi-camera text-lg"></i>
+                                </button>
+                            </div>
+                        </template>
+                        
+                        <!-- View All arrow (only on library view, not in sub-views) -->
+                        <button 
+                            x-show="!showBackButton() && !searchQuery"
+                            @click="openBookshelf('library-all', 'Your Library')" 
                             class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
-                            title="Search"
+                            title="View all books"
                         >
-                            <i class="bi bi-search text-lg"></i>
-                        </button>
-                        <button
-                            @click="openCameraCapture()"
-                            class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
-                            title="Scan book cover"
-                        >
-                            <i class="bi bi-camera text-lg"></i>
+                            <i class="bi bi-chevron-right text-lg"></i>
                         </button>
                     </div>
                 </div>
             </div>
+            
+            <!-- Bottom shadow line -->
+            <div class="h-px bg-ink-200 shadow-sm"></div>
         </div>
         
-        <!-- Spacer for fixed header (uses expanded height to prevent content jump) -->
-        <div class="h-[156px]"></div>
+        <!-- Spacer for fixed header -->
+        <div class="h-[120px]"></div>
         
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto safe-area-bottom">
@@ -1061,28 +1071,16 @@
             <!-- ============================================ -->
             <!-- YOUR LIBRARY - Primary Section -->
             <!-- ============================================ -->
-            <section x-show="!searchQuery && !libraryLoading && books.length > 0" class="pt-3 pb-4">
-                <!-- Library Actions -->
-                <div class="px-3 mb-3">
-                    <div class="flex items-center justify-end gap-2">
-                        <!-- Cancel Selection (only shown when selection mode is active from menu) -->
-                        <button 
-                            x-show="selectionMode"
-                            @click="toggleSelectionMode(); selectedBookIds = []" 
-                            class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
-                        >
-                            <i class="bi bi-x-lg"></i>
-                            <span>Cancel</span>
-                        </button>
-                        <button 
-                            x-show="!selectionMode"
-                            @click="openBookshelf('library-all', 'Your Library')" 
-                            class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700"
-                        >
-                            <span>View all</span>
-                            <i class="bi bi-chevron-right text-xs"></i>
-                        </button>
-                    </div>
+            <section x-show="!searchQuery && !libraryLoading && books.length > 0" class="pb-4">
+                <!-- Cancel Selection (only shown when selection mode is active from menu) -->
+                <div x-show="selectionMode" class="px-3 mb-2">
+                    <button 
+                        @click="toggleSelectionMode(); selectedBookIds = []" 
+                        class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
+                    >
+                        <i class="bi bi-x-lg"></i>
+                        <span>Cancel Selection</span>
+                    </button>
                 </div>
 
                     <!-- Bulk Action Toolbar -->
@@ -1852,7 +1850,7 @@
             </div>
 
     <!-- Requests View (List format) -->
-    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[156px] overflow-y-auto">
+    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[120px] overflow-y-auto">
         <!-- Requests List -->
         <div class="p-3 pb-16">
             <!-- Empty State -->
@@ -1909,7 +1907,7 @@
     </div>
 
     <!-- Bookshelf View (Full page grid of books) -->
-    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[156px] overflow-y-auto">
+    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[120px] overflow-y-auto">
         <!-- View Toggle -->
         <div class="bg-white border-b border-ink-200 px-3 py-2">
             <div class="flex items-center justify-between">
