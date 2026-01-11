@@ -1574,18 +1574,26 @@ def scan_import_folder():
     """
     import_folder = config.get('import_folder', '')
     if not import_folder or not os.path.isdir(import_folder):
+        print(f"⚠️  Import folder check failed: folder='{import_folder}', isdir={os.path.isdir(import_folder) if import_folder else 'N/A'}")
+        sys.stdout.flush()
         return []
 
     recursive = config.get('import_recursive', True)
     files = []
     skipped_immature = 0
+    total_files_seen = 0
+    skipped_wrong_ext = 0
 
     print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})")
+    sys.stdout.flush()
 
     if recursive:
         # Walk through all subdirectories
         for root, dirs, filenames in os.walk(import_folder):
+            print(f"   📁 Dir: {root} ({len(filenames)} files, {len(dirs)} subdirs)")
+            sys.stdout.flush()
             for filename in filenames:
+                total_files_seen += 1
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EBOOK_EXTENSIONS:
                     filepath = os.path.join(root, filename)
@@ -1599,11 +1607,16 @@ def scan_import_folder():
                     # Show relative path for better readability
                     rel_path = os.path.relpath(filepath, import_folder)
                     print(f"   📖 Found: {rel_path}")
+                else:
+                    skipped_wrong_ext += 1
+                    if total_files_seen <= 20:  # Only log first 20 to avoid spam
+                        print(f"   ⏭️  Skip (ext={ext}): {filename}")
     else:
         # Only scan top-level directory
         for filename in os.listdir(import_folder):
             filepath = os.path.join(import_folder, filename)
             if os.path.isfile(filepath):
+                total_files_seen += 1
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EBOOK_EXTENSIONS:
                     # Skip files still being written
@@ -1613,10 +1626,17 @@ def scan_import_folder():
                         continue
                     files.append(filepath)
                     print(f"   📖 Found: {filename}")
+                else:
+                    skipped_wrong_ext += 1
+                    if total_files_seen <= 20:
+                        print(f"   ⏭️  Skip (ext={ext}): {filename}")
 
     if skipped_immature > 0:
         print(f"   ℹ️  Skipped {skipped_immature} file(s) still being written")
-    print(f"🔍 Scan complete: found {len(files)} ebook file(s)")
+    if skipped_wrong_ext > 0:
+        print(f"   ℹ️  Skipped {skipped_wrong_ext} file(s) with non-ebook extensions")
+    print(f"🔍 Scan complete: {total_files_seen} total files, {len(files)} ebook file(s)")
+    sys.stdout.flush()
     return files
 
 
@@ -1800,24 +1820,30 @@ def import_watcher_thread():
     interval = config.get('import_interval', 60)
 
     print(f"📂 Import watcher started (interval: {interval}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})")
+    sys.stdout.flush()
 
+    scan_count = 0
     while True:
         # Check running state with lock
         with import_state_lock:
             if not import_state['running']:
                 break
 
+        scan_count += 1
         try:
-            print(f"\n⏰ Starting scheduled import scan at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"\n⏰ Starting scheduled import scan #{scan_count} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            sys.stdout.flush()
             result = import_books_from_folder()
             if result.get('imported', 0) > 0:
                 print(f"📚 Import scan complete: {result.get('message', '')}")
             else:
                 print(f"📚 Import scan complete: {result.get('message', 'No new books found')}")
+            sys.stdout.flush()
         except Exception as e:
             print(f"❌ Import watcher error: {e}")
             import traceback
             traceback.print_exc()
+            sys.stdout.flush()
             with import_state_lock:
                 import_state['errors'].append(str(e))
                 # Limit error list to 10 entries
@@ -1825,13 +1851,14 @@ def import_watcher_thread():
                     import_state['errors'] = import_state['errors'][-10:]
 
         # Sleep in small increments so we can stop quickly
-        for _ in range(interval):
+        for i in range(interval):
             with import_state_lock:
                 if not import_state['running']:
                     break
             time.sleep(1)
 
     print("📂 Import watcher stopped")
+    sys.stdout.flush()
 
 
 def start_import_watcher():
@@ -2982,9 +3009,12 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     'kepub_last_success': import_state.get('kepub_last_success'),
                     'kepub_last_log': import_state.get('kepub_last_log'),
                 }
+            # Check if watcher thread is actually alive
+            thread_alive = _import_watcher_thread is not None and _import_watcher_thread.is_alive()
             status = {
                 'enabled': bool(config.get('import_folder')),
                 'running': state_snapshot['running'],
+                'thread_alive': thread_alive,
                 'folder': config.get('import_folder', ''),
                 'interval': config.get('import_interval', 60),
                 'recursive': config.get('import_recursive', True),
