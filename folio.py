@@ -1582,13 +1582,46 @@ def convert_book_to_kepub(book_id):
             )
 
             if result.returncode == 0 and os.path.exists(kepub_file):
+                # Verify kepub file was created and has content
+                file_size = os.path.getsize(kepub_file)
+                print(f"📦 KEPUB file created: {os.path.basename(kepub_file)} ({file_size} bytes)")
+                
                 # Add the KEPUB format to the book in Calibre
-                add_result = run_calibredb(['add_format', str(book_id), kepub_file], suppress_errors=True)
+                # Don't suppress errors so we can see what's happening
+                add_result = run_calibredb(['add_format', str(book_id), kepub_file], suppress_errors=False)
+                
                 if add_result['success']:
-                    print(f"✅ Converted and added KEPUB for book {book_id}")
-                    return True
+                    # Verify the format was actually added to the database
+                    # Check both uppercase and lowercase since Calibre format names can vary
+                    conn_verify = get_db_connection(readonly=True)
+                    cursor_verify = conn_verify.cursor()
+                    cursor_verify.execute("SELECT format FROM data WHERE book = ? AND UPPER(format) = ?", (book_id, 'KEPUB'))
+                    format_row = cursor_verify.fetchone()
+                    format_exists = format_row is not None
+                    actual_format = format_row['format'] if format_row else None
+                    conn_verify.close()
+                    
+                    if format_exists:
+                        print(f"✅ Converted and added KEPUB for book {book_id} (verified in database as format: {actual_format})")
+                        # Log the command output for debugging
+                        if add_result.get('output'):
+                            print(f"   calibredb output: {add_result['output'].strip()}")
+                        return True
+                    else:
+                        print(f"⚠️ calibredb reported success but KEPUB format not found in database for book {book_id}")
+                        # List all formats for this book to help debug
+                        conn_debug = get_db_connection(readonly=True)
+                        cursor_debug = conn_debug.cursor()
+                        cursor_debug.execute("SELECT format FROM data WHERE book = ?", (book_id,))
+                        all_formats = [row['format'] for row in cursor_debug.fetchall()]
+                        conn_debug.close()
+                        print(f"   Available formats for book {book_id}: {', '.join(all_formats) if all_formats else 'none'}")
+                        if add_result.get('output'):
+                            print(f"   calibredb output: {add_result['output'].strip()}")
+                        return False
                 else:
-                    print(f"❌ Failed to add KEPUB format: {add_result.get('error', 'Unknown error')}")
+                    error_msg = add_result.get('error', 'Unknown error')
+                    print(f"❌ Failed to add KEPUB format: {error_msg}")
                     return False
             else:
                 print(f"❌ kepubify failed: {result.stderr}")
