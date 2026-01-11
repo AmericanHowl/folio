@@ -1574,11 +1574,15 @@ def scan_import_folder():
     """
     import_folder = config.get('import_folder', '')
     if not import_folder or not os.path.isdir(import_folder):
+        print(f"⚠️  Import folder check failed: folder='{import_folder}', isdir={os.path.isdir(import_folder) if import_folder else 'N/A'}")
+        sys.stdout.flush()
         return []
 
     recursive = config.get('import_recursive', True)
     files = []
     skipped_immature = 0
+    total_files_seen = 0
+    skipped_wrong_ext = 0
 
     print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})")
     sys.stdout.flush()
@@ -1586,7 +1590,10 @@ def scan_import_folder():
     if recursive:
         # Walk through all subdirectories
         for root, dirs, filenames in os.walk(import_folder):
+            print(f"   📁 Dir: {root} ({len(filenames)} files, {len(dirs)} subdirs)")
+            sys.stdout.flush()
             for filename in filenames:
+                total_files_seen += 1
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EBOOK_EXTENSIONS:
                     filepath = os.path.join(root, filename)
@@ -1600,11 +1607,16 @@ def scan_import_folder():
                     # Show relative path for better readability
                     rel_path = os.path.relpath(filepath, import_folder)
                     print(f"   📖 Found: {rel_path}")
+                else:
+                    skipped_wrong_ext += 1
+                    if total_files_seen <= 20:  # Only log first 20 to avoid spam
+                        print(f"   ⏭️  Skip (ext={ext}): {filename}")
     else:
         # Only scan top-level directory
         for filename in os.listdir(import_folder):
             filepath = os.path.join(import_folder, filename)
             if os.path.isfile(filepath):
+                total_files_seen += 1
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EBOOK_EXTENSIONS:
                     # Skip files still being written
@@ -1614,10 +1626,16 @@ def scan_import_folder():
                         continue
                     files.append(filepath)
                     print(f"   📖 Found: {filename}")
+                else:
+                    skipped_wrong_ext += 1
+                    if total_files_seen <= 20:
+                        print(f"   ⏭️  Skip (ext={ext}): {filename}")
 
     if skipped_immature > 0:
         print(f"   ℹ️  Skipped {skipped_immature} file(s) still being written")
-    print(f"🔍 Scan complete: found {len(files)} ebook file(s)")
+    if skipped_wrong_ext > 0:
+        print(f"   ℹ️  Skipped {skipped_wrong_ext} file(s) with non-ebook extensions")
+    print(f"🔍 Scan complete: {total_files_seen} total files, {len(files)} ebook file(s)")
     sys.stdout.flush()
     return files
 
