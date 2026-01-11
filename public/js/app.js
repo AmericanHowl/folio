@@ -95,7 +95,7 @@ function folioApp() {
         searchQuery: '',
         sortBy: 'recent',
         libraryView: 'grid', // 'list' or 'grid' - default to grid for main page
-        bookshelfView: 'list', // 'list' or 'grid' - default to list for bookshelf
+        bookshelfView: 'grid', // 'list' or 'grid' - default to grid for bookshelf
         booksPerPage: 10, // Books per page in list view
         currentListPage: 1, // Current page in list view
         libraryLoading: false,
@@ -180,6 +180,10 @@ function folioApp() {
         showBookshelf: false,
         bookshelfTitle: '',
         bookshelfBooks: [],
+        bookshelfType: '', // Track current bookshelf type for infinite scroll
+        bookshelfHasMore: false, // Whether more books can be loaded
+        loadingMoreBookshelf: false, // Prevent double-loading
+        bookshelfSortBy: 'recent', // Sorting option for bookshelf
 
         // Search (iTunes)
         searchiTunesResults: [],
@@ -202,6 +206,8 @@ function folioApp() {
         currentView: 'library', // 'library' | 'bookshelf' | 'requests'
         navigationLocked: false, // Prevent navigation loops
         headerCompact: false, // Whether the header title should be compact (on scroll)
+        headerHidden: false, // Whether the header is hidden (scroll down = hide, scroll up = show)
+        lastScrollY: 0, // Track last scroll position for direction detection
 
         /**
          * Initialize the application
@@ -213,18 +219,47 @@ function folioApp() {
             this.calculateBooksPerPage();
             window.addEventListener('resize', () => this.calculateBooksPerPage());
 
-            // Back-to-top visibility, header compact state, and infinite scroll
+            // Back-to-top visibility, header compact state, scroll direction, and infinite scroll
             window.addEventListener('scroll', () => {
-                this.showBackToTop = window.scrollY > 400;
-                this.headerCompact = window.scrollY > 50;
+                const currentScrollY = window.scrollY;
+                this.showBackToTop = currentScrollY > 400;
+                this.headerCompact = currentScrollY > 50;
+
+                // Detect scroll direction for header visibility
+                // Only hide/show after scrolling past threshold (50px) to avoid jitter
+                if (currentScrollY > 50) {
+                    const scrollDiff = currentScrollY - this.lastScrollY;
+                    // Only trigger if scrolled more than 5px to avoid micro-movements
+                    if (scrollDiff > 5) {
+                        // Scrolling down - hide header
+                        this.headerHidden = true;
+                    } else if (scrollDiff < -5) {
+                        // Scrolling up - show header
+                        this.headerHidden = false;
+                    }
+                } else {
+                    // At top of page - always show header
+                    this.headerHidden = false;
+                }
+                this.lastScrollY = currentScrollY;
 
                 // Infinite scroll for search results
                 if (this.searchQuery && this.searchQuery.trim() && !this.loadingSearchiTunes && this.searchiTunesHasMore) {
-                    const scrollPosition = window.innerHeight + window.scrollY;
+                    const scrollPosition = window.innerHeight + currentScrollY;
                     const documentHeight = document.documentElement.scrollHeight;
                     // Load more when within 200px of bottom
                     if (scrollPosition >= documentHeight - 200) {
                         this.loadMoreiTunesSearch();
+                    }
+                }
+
+                // Infinite scroll for bookshelf (grid view only)
+                if (this.showBookshelf && this.bookshelfView === 'grid' && !this.loadingMoreBookshelf && this.bookshelfHasMore) {
+                    const scrollPosition = window.innerHeight + currentScrollY;
+                    const documentHeight = document.documentElement.scrollHeight;
+                    // Load more when within 300px of bottom
+                    if (scrollPosition >= documentHeight - 300) {
+                        this.loadMoreBookshelf();
                     }
                 }
             });
@@ -2029,21 +2064,26 @@ function folioApp() {
         async openBookshelf(type, title) {
             this.bookshelfTitle = title;
             this.bookshelfBooks = [];
-            this.bookshelfView = 'list'; // Default to list view for bookshelf
+            this.bookshelfView = 'grid'; // Default to grid view for bookshelf
+            this.bookshelfType = type; // Track type for infinite scroll
+            this.bookshelfHasMore = false; // Will be set based on results
+            this.bookshelfSortBy = 'recent'; // Reset sort
             this.currentListPage = 1; // Reset to first page
             this.showBookshelf = true;
-            
+
             // Load 30 books for the bookshelf
             try {
                 let cacheKey;
                 let data;
-                
+
                 switch (type) {
                     case 'library':
                         this.bookshelfBooks = this.sortedBooks.slice(0, 30);
+                        this.bookshelfHasMore = this.sortedBooks.length > 30;
                         return;
                     case 'library-all':
                         this.bookshelfBooks = this.sortedBooks;
+                        this.bookshelfHasMore = false; // All loaded
                         return;
                     case 'trending':
                         cacheKey = 'bookshelf_trending_30';
@@ -2107,12 +2147,64 @@ function folioApp() {
                 
                 if (data && data.books) {
                     this.bookshelfBooks = this.matchWithLibrary(data.books);
+                    // Set hasMore if we received the full limit (30 books)
+                    this.bookshelfHasMore = data.books.length >= 30;
                     if (cacheKey && FolioCache.get(cacheKey)) {
                         console.log(`📦 Cache hit: bookshelf ${type}`);
                     }
                 }
             } catch (error) {
                 console.error('Failed to load bookshelf:', error);
+            }
+        },
+
+        /**
+         * Load more books for infinite scroll in bookshelf
+         */
+        async loadMoreBookshelf() {
+            if (this.loadingMoreBookshelf || !this.bookshelfHasMore) return;
+
+            this.loadingMoreBookshelf = true;
+            const offset = this.bookshelfBooks.length;
+            const limit = 30;
+
+            try {
+                let data;
+                const type = this.bookshelfType;
+
+                switch (type) {
+                    case 'library':
+                        // Load more from local library
+                        const moreBooks = this.sortedBooks.slice(offset, offset + limit);
+                        this.bookshelfBooks = [...this.bookshelfBooks, ...moreBooks];
+                        this.bookshelfHasMore = offset + limit < this.sortedBooks.length;
+                        break;
+                    case 'trending':
+                    case 'trending-month':
+                        const trendingResponse = await fetch(`/api/hardcover/trending?limit=${limit}&offset=${offset}`);
+                        data = await trendingResponse.json();
+                        break;
+                    case 'recent':
+                        const recentResponse = await fetch(`/api/hardcover/recent?limit=${limit}&offset=${offset}`);
+                        data = await recentResponse.json();
+                        break;
+                    default:
+                        if (type.startsWith('list-')) {
+                            const listId = type.replace('list-', '');
+                            const listResponse = await fetch(`/api/hardcover/list?id=${listId}&limit=${limit}&offset=${offset}`);
+                            data = await listResponse.json();
+                        }
+                }
+
+                if (data && data.books) {
+                    const matchedBooks = this.matchWithLibrary(data.books);
+                    this.bookshelfBooks = [...this.bookshelfBooks, ...matchedBooks];
+                    this.bookshelfHasMore = data.books.length >= limit;
+                }
+            } catch (error) {
+                console.error('Failed to load more bookshelf books:', error);
+            } finally {
+                this.loadingMoreBookshelf = false;
             }
         },
 
@@ -2434,12 +2526,61 @@ function folioApp() {
         },
 
         /**
+         * Sort bookshelf books based on bookshelfSortBy
+         */
+        sortBookshelf() {
+            let sorted = [...this.bookshelfBooks];
+
+            switch (this.bookshelfSortBy) {
+                case 'recent':
+                    // Sort by timestamp, newest first
+                    sorted.sort((a, b) => {
+                        const dateA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+                        const dateB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+                        return dateB - dateA;
+                    });
+                    break;
+                case 'title':
+                    sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                    break;
+                case 'title-desc':
+                    sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+                    break;
+                case 'author':
+                    sorted.sort((a, b) => {
+                        const authorA = a.authors ? this.formatAuthors(a.authors) : (a.author || '');
+                        const authorB = b.authors ? this.formatAuthors(b.authors) : (b.author || '');
+                        const lastNameA = this.getLastNameForSort(authorA);
+                        const lastNameB = this.getLastNameForSort(authorB);
+                        return lastNameA.localeCompare(lastNameB);
+                    });
+                    break;
+                case 'author-desc':
+                    sorted.sort((a, b) => {
+                        const authorA = a.authors ? this.formatAuthors(a.authors) : (a.author || '');
+                        const authorB = b.authors ? this.formatAuthors(b.authors) : (b.author || '');
+                        const lastNameA = this.getLastNameForSort(authorA);
+                        const lastNameB = this.getLastNameForSort(authorB);
+                        return lastNameB.localeCompare(lastNameA);
+                    });
+                    break;
+            }
+
+            this.bookshelfBooks = sorted;
+            this.currentListPage = 1; // Reset to first page
+        },
+
+        /**
          * Close bookshelf view
          */
         closeBookshelf() {
             this.showBookshelf = false;
             this.bookshelfTitle = '';
             this.bookshelfBooks = [];
+            this.bookshelfType = '';
+            this.bookshelfHasMore = false;
+            this.loadingMoreBookshelf = false;
+            this.bookshelfSortBy = 'recent';
             this.currentListPage = 1; // Reset pagination
         },
 
