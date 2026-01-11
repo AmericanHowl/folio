@@ -912,8 +912,9 @@
                 </div>
             </header>
             
-            <!-- Search Bar -->
-            <div class="bg-ink-50 px-4 py-2">
+            <!-- Search Bar (fades out on scroll) -->
+            <div class="bg-ink-50 px-4 overflow-hidden transition-all duration-300 ease-in-out"
+                 :class="headerCompact ? 'h-0 py-0 opacity-0' : 'h-auto py-2 opacity-100'">
                 <div class="relative max-w-7xl mx-auto">
                     <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
                     <input
@@ -936,19 +937,38 @@
             </div>
             
             <!-- Section Title Bar -->
-            <div class="bg-white border-b border-ink-200 px-4 shadow-sm transition-all duration-200"
-                 :class="headerCompact ? 'py-2' : 'py-3'">
-                <div class="max-w-7xl mx-auto">
-                    <h1 class="font-display font-bold text-ink-900 transition-all duration-200"
-                        :class="headerCompact ? 'text-base' : 'text-xl'"
+            <div class="border-b border-ink-200 px-4 shadow-sm transition-all duration-300 ease-in-out"
+                 :class="headerCompact ? 'py-2 bg-white' : 'py-3 bg-ink-50'">
+                <div class="max-w-7xl mx-auto flex items-center justify-between">
+                    <h1 class="font-display font-bold text-ink-900 transition-all duration-300"
+                        :class="headerCompact ? 'text-base' : 'text-2xl'"
                         x-text="getSectionTitle()">
                     </h1>
+                    
+                    <!-- Compact Icons (appear when scrolled) -->
+                    <div class="flex items-center gap-2 transition-all duration-300"
+                         :class="headerCompact ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'">
+                        <button
+                            @click="window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $refs.searchInput.focus(), 350)"
+                            class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
+                            title="Search"
+                        >
+                            <i class="bi bi-search text-lg"></i>
+                        </button>
+                        <button
+                            @click="openCameraCapture()"
+                            class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
+                            title="Scan book cover"
+                        >
+                            <i class="bi bi-camera text-lg"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
         
         <!-- Spacer for fixed header (header + search + section title) -->
-        <div class="h-[152px]"></div>
+        <div class="h-[160px]"></div>
         
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto safe-area-bottom">
@@ -1033,24 +1053,14 @@
                 <!-- Library Actions -->
                 <div class="px-3 mb-3">
                     <div class="flex items-center justify-end gap-2">
-                        <!-- Selection Mode Toggle -->
-                        <button 
-                            x-show="!selectionMode"
-                            @click="toggleSelectionMode()" 
-                            class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
-                            title="Select multiple books"
-                        >
-                            <i class="bi bi-check-square"></i>
-                            <span class="hidden sm:inline">Select</span>
-                        </button>
-                        <!-- Cancel Selection -->
+                        <!-- Cancel Selection (only shown when selection mode is active from menu) -->
                         <button 
                             x-show="selectionMode"
                             @click="toggleSelectionMode(); selectedBookIds = []" 
                             class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
                         >
                             <i class="bi bi-x-lg"></i>
-                            <span class="hidden sm:inline">Cancel</span>
+                            <span>Cancel</span>
                         </button>
                         <button 
                             x-show="!selectionMode"
@@ -1830,7 +1840,7 @@
             </div>
 
     <!-- Requests View (List format) -->
-    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[152px] overflow-y-auto">
+    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[160px] overflow-y-auto">
         <!-- Requests List -->
         <div class="p-3 pb-16">
             <!-- Empty State -->
@@ -1887,7 +1897,7 @@
     </div>
 
     <!-- Bookshelf View (Full page grid of books) -->
-    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[152px] overflow-y-auto">
+    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[160px] overflow-y-auto">
         <!-- View Toggle -->
         <div class="bg-white border-b border-ink-200 px-3 py-2">
             <div class="flex items-center justify-between">
