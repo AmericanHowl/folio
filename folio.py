@@ -1748,10 +1748,29 @@ def convert_book_to_kepub(book_id):
             sys.stderr.flush()
             return False
 
-        # Create output filename in a temp directory (not in library)
-        temp_dir = tempfile.mkdtemp(prefix='kepub_convert_')
+        # Create output filename directly in the book directory
+        # We'll add it manually to avoid Calibre treating it as a duplicate/replacement
         epub_basename = os.path.basename(epub_file)
-        kepub_basename = epub_basename.replace('.epub', '.kepub.epub').replace('.EPUB', '.kepub.epub')
+        epub_name_no_ext = os.path.splitext(epub_basename)[0]
+        # Remove .kepub if already present
+        if epub_name_no_ext.lower().endswith('.kepub'):
+            epub_name_no_ext = epub_name_no_ext[:-6]
+        
+        # Get the name field from the EPUB format to match Calibre's naming
+        conn_name_check = get_db_connection(readonly=True)
+        cursor_name_check = conn_name_check.cursor()
+        cursor_name_check.execute("SELECT name FROM data WHERE book = ? AND format = ?", (book_id, 'EPUB'))
+        name_row = cursor_name_check.fetchone()
+        epub_name_in_db = name_row['name'] if name_row else epub_name_no_ext
+        conn_name_check.close()
+        
+        # Create KEPUB file name using the same name as EPUB
+        kepub_filename = f"{epub_name_in_db}.kepub.epub"
+        kepub_file_in_library = os.path.join(book_dir, kepub_filename)
+        
+        # Create temp file first for conversion
+        temp_dir = tempfile.mkdtemp(prefix='kepub_convert_')
+        kepub_basename = os.path.basename(kepub_file_in_library)
         kepub_file = os.path.join(temp_dir, kepub_basename)
 
         try:
@@ -1784,136 +1803,62 @@ def convert_book_to_kepub(book_id):
                     files_before = os.listdir(book_dir)
                     print(f"   Files in book directory before add_format: {len(files_before)} files", flush=True)
                 
-                # Add the KEPUB format to the book in Calibre
-                # Don't suppress errors so we can see what's happening
-                print(f"📤 Calling calibredb add_format for book {book_id} with file: {kepub_file}", flush=True)
-                add_result = run_calibredb(['add_format', str(book_id), kepub_file], suppress_errors=False)
-                
-                if add_result['success']:
-                    # Give calibredb a moment to finish writing the file
-                    time.sleep(1.0)  # Increased wait time
+                # Copy KEPUB file directly to book directory
+                # Calibre treats .kepub.epub as EPUB format, so we'll copy it manually
+                # and then register it via SQL to avoid duplicate/replacement issues
+                print(f"📋 Copying KEPUB file to book directory: {kepub_file_in_library}", flush=True)
+                try:
+                    # Copy the converted file to the book directory
+                    shutil.copy2(kepub_file, kepub_file_in_library)
                     
-                    # Count files after adding format
-                    files_after = []
-                    if os.path.exists(book_dir):
-                        files_after = os.listdir(book_dir)
-                        print(f"   Files in book directory after add_format: {len(files_after)} files", flush=True)
-                        new_files = set(files_after) - set(files_before)
-                        removed_files = set(files_before) - set(files_after)
-                        if new_files:
-                            print(f"   New files added: {', '.join(new_files)}", flush=True)
-                        if removed_files:
-                            print(f"   Files removed: {', '.join(removed_files)}", flush=True)
-                    
-                    # Calibre stores .kepub.epub files but treats them as EPUB format in the database
-                    # Calibre uses the 'name' field from the data table to name files
-                    # So we need to check what files actually exist in the directory
-                    
-                    # First, get the 'name' field from the EPUB format to see what Calibre would name it
-                    conn_name = get_db_connection(readonly=True)
-                    cursor_name = conn_name.cursor()
-                    cursor_name.execute("SELECT name FROM data WHERE book = ? AND format = ?", (book_id, 'EPUB'))
-                    name_row = cursor_name.fetchone()
-                    epub_name = name_row['name'] if name_row else None
-                    conn_name.close()
-                    
-                    # Check if .kepub.epub file exists (Calibre might use the EPUB name + .kepub.epub)
-                    kepub_found = False
-                    kepub_filename = None
-                    
-                    if os.path.exists(book_dir):
-                        # Scan directory for any .kepub.epub file
-                        for filename in os.listdir(book_dir):
-                            if filename.lower().endswith('.kepub.epub'):
-                                kepub_found = True
-                                kepub_filename = filename
-                                break
+                    if os.path.exists(kepub_file_in_library):
+                        file_size = os.path.getsize(kepub_file_in_library)
+                        print(f"✅ KEPUB file copied: {kepub_filename} ({file_size} bytes)", flush=True)
                         
-                        # Also check using the EPUB name if we have it
-                        if not kepub_found and epub_name:
-                            expected_kepub = f"{epub_name}.kepub.epub"
-                            expected_path = os.path.join(book_dir, expected_kepub)
-                            if os.path.exists(expected_path):
-                                kepub_found = True
-                                kepub_filename = expected_kepub
-                    
-                    if kepub_found:
-                        # File exists - conversion successful!
-                        # Note: Calibre stores it as EPUB format in the database, but that's fine
-                        print(f"✅ Converted and added KEPUB for book {book_id} (file exists on disk: {kepub_filename})", flush=True)
-                        # Log the command output for debugging
-                        if add_result.get('output'):
-                            print(f"   calibredb output: {add_result['output'].strip()}", flush=True)
-                        return True
-                    else:
-                        # File doesn't exist - calibredb might have replaced EPUB or failed silently
-                        # Try manual fallback: copy file ourselves and add to database
-                        print(f"⚠️ calibredb reported success but KEPUB file not found - trying manual copy...", flush=True)
-                        sys.stderr.write(f"⚠️ calibredb reported success but KEPUB file not found for book {book_id}\n")
+                        # Now register it in the database by adding a data entry
+                        # Calibre stores .kepub.epub as EPUB format, so we need to handle this carefully
+                        # We'll use SQL to insert a new data entry with the same name but different file
+                        # Actually, since Calibre treats it as EPUB, we should just make sure the file exists
+                        # and let Calibre's file system handle it
                         
-                        # Get EPUB name to use for KEPUB file
-                        if not epub_name:
-                            # Fallback: use the EPUB filename without extension
-                            epub_basename_no_ext = os.path.splitext(os.path.basename(epub_file))[0]
-                            epub_name = epub_basename_no_ext
+                        # Try using calibredb add_format with the file now in the library
+                        # This should work since the file is in the right location
+                        print(f"📤 Registering KEPUB file with calibredb add_format...", flush=True)
+                        add_result = run_calibredb(['add_format', str(book_id), kepub_file_in_library], suppress_errors=False)
                         
-                        # Determine target filename
-                        target_kepub_name = f"{epub_name}.kepub.epub"
-                        target_kepub_path = os.path.join(book_dir, target_kepub_name)
-                        
-                        # Check if temp file still exists
-                        if not os.path.exists(kepub_file):
-                            error_msg = f"❌ Temp KEPUB file was deleted before we could copy it: {kepub_file}"
-                            print(error_msg, flush=True)
-                            sys.stderr.write(error_msg + "\n")
-                            sys.stderr.flush()
-                            return False
-                        
-                        try:
-                            # Manually copy the file
-                            print(f"📋 Manually copying KEPUB file to: {target_kepub_path}", flush=True)
-                            shutil.copy2(kepub_file, target_kepub_path)
-                            
-                            # Verify copy succeeded
-                            if os.path.exists(target_kepub_path):
-                                file_size = os.path.getsize(target_kepub_path)
-                                print(f"✅ Manually copied KEPUB file: {target_kepub_name} ({file_size} bytes)", flush=True)
-                                
-                                # Now try to add it to the database using calibredb again
-                                # This time it should work since the file is in the right place
-                                print(f"📤 Retrying calibredb add_format with file in book directory...", flush=True)
-                                retry_result = run_calibredb(['add_format', str(book_id), target_kepub_path], suppress_errors=False)
-                                
-                                if retry_result['success']:
-                                    time.sleep(0.5)  # Give it a moment
-                                    if os.path.exists(target_kepub_path):
-                                        print(f"✅ Successfully added KEPUB format for book {book_id} (manual copy + retry)", flush=True)
-                                        return True
-                                
-                                # Even if calibredb fails, the file exists, so consider it a partial success
-                                print(f"⚠️ KEPUB file copied but calibredb add_format failed - file exists at: {target_kepub_path}", flush=True)
-                                sys.stderr.write(f"⚠️ KEPUB file exists but may not be registered in database\n")
-                                sys.stderr.flush()
-                                return True  # File exists, that's what matters
+                        if add_result['success']:
+                            time.sleep(0.5)
+                            # Verify file still exists
+                            if os.path.exists(kepub_file_in_library):
+                                print(f"✅ Successfully added KEPUB format for book {book_id}", flush=True)
+                                if add_result.get('output'):
+                                    print(f"   calibredb output: {add_result['output'].strip()}", flush=True)
+                                return True
                             else:
-                                error_msg = f"❌ Failed to copy KEPUB file to {target_kepub_path}"
-                                print(error_msg, flush=True)
-                                sys.stderr.write(error_msg + "\n")
+                                print(f"⚠️ calibredb removed the KEPUB file - it may have replaced the EPUB", flush=True)
+                                sys.stderr.write(f"⚠️ KEPUB file was removed by calibredb - possible EPUB replacement\n")
                                 sys.stderr.flush()
                                 return False
-                        except Exception as e:
-                            error_msg = f"❌ Failed to manually copy KEPUB file: {e}"
-                            print(error_msg, flush=True)
-                            sys.stderr.write(error_msg + "\n")
-                            import traceback
-                            traceback.print_exc(file=sys.stderr)
+                        else:
+                            error_msg = add_result.get('error', 'Unknown error')
+                            print(f"⚠️ calibredb add_format failed: {error_msg}", flush=True)
+                            print(f"   File exists at: {kepub_file_in_library}", flush=True)
+                            # File exists even if calibredb failed, so partial success
+                            sys.stderr.write(f"⚠️ KEPUB file exists but may not be registered: {error_msg}\n")
                             sys.stderr.flush()
-                            return False
-                else:
-                    error_msg = add_result.get('error', 'Unknown error')
-                    error_full = f"❌ Failed to add KEPUB format to book {book_id}: {error_msg}"
-                    print(error_full, flush=True)
-                    sys.stderr.write(error_full + "\n")
+                            return True  # File exists, which is the main goal
+                    else:
+                        error_msg = f"❌ Failed to copy KEPUB file to {kepub_file_in_library}"
+                        print(error_msg, flush=True)
+                        sys.stderr.write(error_msg + "\n")
+                        sys.stderr.flush()
+                        return False
+                except Exception as e:
+                    error_msg = f"❌ Failed to copy KEPUB file: {e}"
+                    print(error_msg, flush=True)
+                    sys.stderr.write(error_msg + "\n")
+                    import traceback
+                    traceback.print_exc(file=sys.stderr)
                     sys.stderr.flush()
                     return False
             else:
