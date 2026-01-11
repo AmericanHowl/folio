@@ -12,6 +12,11 @@ RUN apt-get update && \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install kepubify for EPUB to KEPUB conversion
+RUN curl -L -o /usr/local/bin/kepubify \
+    https://github.com/pgaskin/kepubify/releases/latest/download/kepubify-linux-64bit \
+    && chmod +x /usr/local/bin/kepubify
+
 # Set working directory
 WORKDIR /app
 
