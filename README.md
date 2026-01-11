@@ -44,7 +44,7 @@ git clone https://github.com/yourusername/folio.git
 cd folio
 
 # Run the server
-python3 serve.py
+python3 folio.py
 ```
 
 Open your browser to `http://localhost:9099`
@@ -98,7 +98,7 @@ That's it!
 
 ```
 folio/
-├── serve.py              # Python server (static files + APIs)
+├── folio.py              # Python server (static files + APIs)
 ├── config.json           # Configuration (auto-generated)
 ├── docker-compose.yml    # Docker Compose configuration
 ├── public/               # Frontend files
@@ -114,7 +114,7 @@ folio/
 
 ## How It Works
 
-### Backend (serve.py)
+### Backend (folio.py)
 
 A single Python script that:
 - Serves static files from `public/`
@@ -178,7 +178,7 @@ export QBITTORRENT_USERNAME="admin"
 export QBITTORRENT_PASSWORD="adminadmin"
 
 # Run the server
-python3 serve.py
+python3 folio.py
 ```
 
 ### config.json
@@ -200,7 +200,7 @@ All settings can be configured via the Settings UI in the app, or by editing `co
 
 ### Server Settings
 
-Edit `serve.py` to change:
+Edit `folio.py` to change:
 
 ```python
 PORT = 9099  # Web server port
@@ -212,7 +212,7 @@ PORT = 9099  # Web server port
 
 ```bash
 # Run in background
-nohup python3 serve.py > folio.log 2>&1 &
+nohup python3 folio.py > folio.log 2>&1 &
 
 # Or with systemd (create /etc/systemd/system/folio.service)
 [Unit]
@@ -223,7 +223,7 @@ After=network.target
 Type=simple
 User=youruser
 WorkingDirectory=/path/to/folio
-ExecStart=/usr/bin/python3 serve.py
+ExecStart=/usr/bin/python3 folio.py
 Restart=always
 
 [Install]
