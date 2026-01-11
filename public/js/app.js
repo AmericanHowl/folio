@@ -1439,12 +1439,18 @@ function folioApp() {
         },
 
         /**
-         * Check if book can be converted to KEPUB (has EPUB but not KEPUB)
+         * Check if book can be converted to KEPUB (has convertible format but not KEPUB)
          */
         canConvertToKepub(book) {
             if (!book || !book.formats) return false;
             const formats = book.formats.map(f => f.toUpperCase());
-            return formats.includes('EPUB') && !formats.includes('KEPUB');
+            
+            // Already has KEPUB - no conversion needed
+            if (formats.includes('KEPUB')) return false;
+            
+            // Can convert if we have any of these formats
+            const convertibleFormats = ['EPUB', 'MOBI', 'AZW3', 'AZW', 'FB2'];
+            return convertibleFormats.some(f => formats.includes(f));
         },
 
         /**

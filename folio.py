@@ -979,9 +979,22 @@ def get_books(limit=50, offset=0, search=None, sort='recent'):
                     formats_map[book_id] = []
                 formats_map[book_id].append(fmt_row['format'].upper())
 
+        # Get library path for filesystem-based format detection
+        library_path = get_calibre_library()
+        
         books = []
         for row in rows:
             formats = formats_map.get(row['id'], [])
+            
+            # Filesystem-based KEPUB detection as fallback
+            # Check if .kepub file exists but isn't in the database
+            if 'KEPUB' not in formats and row['path']:
+                book_dir = os.path.join(library_path, row['path'])
+                if os.path.isdir(book_dir):
+                    for filename in os.listdir(book_dir):
+                        if filename.lower().endswith('.kepub'):
+                            formats.append('KEPUB')
+                            break
 
             # Parse authors - handle various separators and formats, and deduplicate
             # Calibre stores authors as "LastName, FirstName" or "LastName| FirstName" - convert to "FirstName LastName"
@@ -1193,9 +1206,29 @@ def get_reading_list_books(sort='added', user='default'):
                     'size': fmt_row['uncompressed_size'] or 0
                 })
         
+        # Get library path for filesystem-based format detection
+        library_path = get_calibre_library()
+        
         books = []
         for row in rows:
             formats = formats_map.get(row['id'], [])
+            
+            # Filesystem-based KEPUB detection as fallback
+            # Check if .kepub file exists but isn't in the database
+            format_names = [f['format'] for f in formats]
+            if 'KEPUB' not in format_names and row['path']:
+                book_dir = os.path.join(library_path, row['path'])
+                if os.path.isdir(book_dir):
+                    for filename in os.listdir(book_dir):
+                        if filename.lower().endswith('.kepub'):
+                            # Get file size
+                            kepub_path = os.path.join(book_dir, filename)
+                            try:
+                                size = os.path.getsize(kepub_path)
+                            except:
+                                size = 0
+                            formats.append({'format': 'KEPUB', 'size': size})
+                            break
             
             # Parse authors - handle "LastName, FirstName" format
             authors_list = []
@@ -1735,138 +1768,165 @@ def convert_book_to_kepub(book_id):
         library_path = get_calibre_library()
         book_dir = os.path.join(library_path, book_path)
 
-        # Find the EPUB file in the book directory
-        epub_file = None
+        # Check if KEPUB already exists
         for filename in os.listdir(book_dir):
-            if filename.lower().endswith('.epub') and not filename.lower().endswith('.kepub.epub'):
-                epub_file = os.path.join(book_dir, filename)
+            if filename.lower().endswith('.kepub'):
+                print(f"✅ KEPUB already exists for book {book_id}: {filename}", flush=True)
+                return True
+        
+        # Find a source file to convert - prefer EPUB, but support other formats
+        epub_file = None
+        source_file = None
+        source_format = None
+        
+        for filename in os.listdir(book_dir):
+            lower = filename.lower()
+            filepath = os.path.join(book_dir, filename)
+            
+            # Skip KEPUB files
+            if lower.endswith('.kepub'):
+                continue
+            
+            # Prefer EPUB for direct conversion
+            if lower.endswith('.epub'):
+                epub_file = filepath
+                source_file = filepath
+                source_format = 'EPUB'
                 break
+            
+            # Track other convertible formats as fallback
+            if not source_file:
+                for ext in ['.mobi', '.azw3', '.azw', '.fb2']:
+                    if lower.endswith(ext):
+                        source_file = filepath
+                        source_format = ext[1:].upper()
+                        break
 
-        if not epub_file:
-            print(f"⚠️ No EPUB found for book {book_id} - skipping KEPUB conversion", flush=True)
-            sys.stderr.write(f"⚠️ No EPUB found for book {book_id} - skipping KEPUB conversion\n")
+        if not source_file:
+            print(f"⚠️ No convertible format found for book {book_id} - skipping KEPUB conversion", flush=True)
+            sys.stderr.write(f"⚠️ No convertible format found for book {book_id}\n")
             sys.stderr.flush()
             return False
 
-        # Create output filename directly in the book directory
-        # We'll add it manually to avoid Calibre treating it as a duplicate/replacement
-        epub_basename = os.path.basename(epub_file)
-        epub_name_no_ext = os.path.splitext(epub_basename)[0]
-        # Remove .kepub if already present
-        if epub_name_no_ext.lower().endswith('.kepub'):
-            epub_name_no_ext = epub_name_no_ext[:-6]
-        
-        # Get the name field from the EPUB format to match Calibre's naming
+        # Get base name for the KEPUB file from the database
         conn_name_check = get_db_connection(readonly=True)
         cursor_name_check = conn_name_check.cursor()
-        cursor_name_check.execute("SELECT name FROM data WHERE book = ? AND format = ?", (book_id, 'EPUB'))
+        cursor_name_check.execute("SELECT name FROM data WHERE book = ? ORDER BY format", (book_id,))
         name_row = cursor_name_check.fetchone()
-        epub_name_in_db = name_row['name'] if name_row else epub_name_no_ext
+        base_name = name_row['name'] if name_row else os.path.splitext(os.path.basename(source_file))[0]
         conn_name_check.close()
         
-        # Create KEPUB file name using the same name as EPUB
-        kepub_filename = f"{epub_name_in_db}.kepub.epub"
+        # Create KEPUB filename with .kepub extension (not .kepub.epub)
+        kepub_filename = f"{base_name}.kepub"
         kepub_file_in_library = os.path.join(book_dir, kepub_filename)
         
-        # Create temp file first for conversion
+        # Create temp directory for conversion work
         temp_dir = tempfile.mkdtemp(prefix='kepub_convert_')
-        kepub_basename = os.path.basename(kepub_file_in_library)
-        kepub_file = os.path.join(temp_dir, kepub_basename)
 
         try:
-            # Run kepubify
+            # If source is not EPUB, we need to convert to EPUB first using ebook-convert
+            epub_for_kepubify = epub_file
+            
+            if not epub_file and source_file:
+                print(f"🔄 Converting {source_format} to EPUB first...", flush=True)
+                
+                # Create temp EPUB file
+                temp_epub = os.path.join(temp_dir, f"{base_name}.epub")
+                
+                # Use Calibre's ebook-convert to convert to EPUB
+                ebook_convert_path = shutil.which('ebook-convert')
+                if not ebook_convert_path:
+                    # Try common locations
+                    for path in ['/opt/homebrew/bin/ebook-convert', '/usr/local/bin/ebook-convert', '/Applications/calibre.app/Contents/MacOS/ebook-convert']:
+                        if os.path.exists(path):
+                            ebook_convert_path = path
+                            break
+                
+                if not ebook_convert_path:
+                    print(f"❌ ebook-convert not found - cannot convert {source_format} to KEPUB", flush=True)
+                    sys.stderr.write(f"❌ ebook-convert not found\n")
+                    sys.stderr.flush()
+                    return False
+                
+                result = subprocess.run(
+                    [ebook_convert_path, source_file, temp_epub],
+                    capture_output=True,
+                    text=True,
+                    timeout=300
+                )
+                
+                if result.returncode != 0 or not os.path.exists(temp_epub):
+                    error_msg = f"❌ ebook-convert failed for {source_format}: {result.stderr}"
+                    print(error_msg, flush=True)
+                    sys.stderr.write(error_msg + "\n")
+                    sys.stderr.flush()
+                    return False
+                
+                print(f"   ✅ Converted {source_format} to EPUB", flush=True)
+                epub_for_kepubify = temp_epub
+            
+            # Now run kepubify on the EPUB
+            temp_kepub = os.path.join(temp_dir, kepub_filename)
+            
             print(f"🔄 Running kepubify to convert book {book_id}...", flush=True)
             result = subprocess.run(
-                [kepubify_path, '-o', kepub_file, epub_file],
+                [kepubify_path, '-o', temp_kepub, epub_for_kepubify],
                 capture_output=True,
                 text=True,
                 timeout=120
             )
 
-            if result.returncode == 0 and os.path.exists(kepub_file):
-                # Verify kepub file was created and has content
-                file_size = os.path.getsize(kepub_file)
-                print(f"📦 KEPUB file created: {os.path.basename(kepub_file)} ({file_size} bytes)", flush=True)
-                print(f"   Temp file location: {kepub_file}", flush=True)
-                
-                # Verify temp file is readable before passing to calibredb
-                if not os.access(kepub_file, os.R_OK):
-                    error_msg = f"❌ Temp KEPUB file is not readable: {kepub_file}"
-                    print(error_msg, flush=True)
-                    sys.stderr.write(error_msg + "\n")
-                    sys.stderr.flush()
-                    return False
-                
-                # Count files before adding format
-                files_before = []
-                if os.path.exists(book_dir):
-                    files_before = os.listdir(book_dir)
-                    print(f"   Files in book directory before add_format: {len(files_before)} files", flush=True)
+            if result.returncode == 0 and os.path.exists(temp_kepub):
+                file_size = os.path.getsize(temp_kepub)
+                print(f"📦 KEPUB file created: {kepub_filename} ({file_size} bytes)", flush=True)
                 
                 # Copy KEPUB file directly to book directory
-                # Calibre treats .kepub.epub as EPUB format, so we'll copy it manually
-                # and then register it via SQL to avoid duplicate/replacement issues
                 print(f"📋 Copying KEPUB file to book directory: {kepub_file_in_library}", flush=True)
                 try:
-                    # Copy the converted file to the book directory
-                    shutil.copy2(kepub_file, kepub_file_in_library)
+                    shutil.copy2(temp_kepub, kepub_file_in_library)
                     
                     if os.path.exists(kepub_file_in_library):
                         file_size = os.path.getsize(kepub_file_in_library)
                         print(f"✅ KEPUB file copied: {kepub_filename} ({file_size} bytes)", flush=True)
                         
-                        # Now register it in the database by adding a data entry
-                        # Calibre stores .kepub.epub as EPUB format, so we need to handle this carefully
-                        # We'll use SQL to insert a new data entry with the same name but different file
-                        # Actually, since Calibre treats it as EPUB, we should just make sure the file exists
-                        # and let Calibre's file system handle it
-                        
-                        # Try using calibredb add_format with the file now in the library
-                        # This should work since the file is in the right location
+                        # Register with calibredb add_format
                         print(f"📤 Registering KEPUB file with calibredb add_format...", flush=True)
                         add_result = run_calibredb(['add_format', str(book_id), kepub_file_in_library], suppress_errors=False)
                         
                         if add_result['success']:
-                            time.sleep(0.5)
-                            # Verify file still exists
+                            time.sleep(0.3)
                             if os.path.exists(kepub_file_in_library):
                                 print(f"✅ Successfully added KEPUB format for book {book_id}", flush=True)
-                                if add_result.get('output'):
-                                    print(f"   calibredb output: {add_result['output'].strip()}", flush=True)
                                 return True
                             else:
-                                print(f"⚠️ calibredb removed the KEPUB file - it may have replaced the EPUB", flush=True)
-                                sys.stderr.write(f"⚠️ KEPUB file was removed by calibredb - possible EPUB replacement\n")
-                                sys.stderr.flush()
-                                return False
+                                print(f"⚠️ calibredb may have moved/renamed the file", flush=True)
                         else:
-                            error_msg = add_result.get('error', 'Unknown error')
-                            print(f"⚠️ calibredb add_format failed: {error_msg}", flush=True)
-                            print(f"   File exists at: {kepub_file_in_library}", flush=True)
-                            # File exists even if calibredb failed, so partial success
-                            sys.stderr.write(f"⚠️ KEPUB file exists but may not be registered: {error_msg}\n")
-                            sys.stderr.flush()
-                            return True  # File exists, which is the main goal
+                            # File exists even if registration failed - that's OK
+                            print(f"⚠️ calibredb registration note: {add_result.get('error', 'unknown')}", flush=True)
+                        
+                        # Check if file exists (may have been renamed by calibredb)
+                        if os.path.exists(kepub_file_in_library):
+                            return True
+                        
+                        # Look for any .kepub file that appeared
+                        for f in os.listdir(book_dir):
+                            if f.lower().endswith('.kepub'):
+                                print(f"✅ KEPUB file found: {f}", flush=True)
+                                return True
+                        
+                        return False
                     else:
-                        error_msg = f"❌ Failed to copy KEPUB file to {kepub_file_in_library}"
-                        print(error_msg, flush=True)
-                        sys.stderr.write(error_msg + "\n")
-                        sys.stderr.flush()
+                        print(f"❌ Failed to copy KEPUB file", flush=True)
                         return False
                 except Exception as e:
-                    error_msg = f"❌ Failed to copy KEPUB file: {e}"
-                    print(error_msg, flush=True)
-                    sys.stderr.write(error_msg + "\n")
+                    print(f"❌ Failed to copy KEPUB file: {e}", flush=True)
                     import traceback
                     traceback.print_exc(file=sys.stderr)
-                    sys.stderr.flush()
                     return False
             else:
-                error_msg = f"❌ kepubify failed for book {book_id} (returncode={result.returncode})"
+                error_msg = f"❌ kepubify failed (returncode={result.returncode})"
                 if result.stderr:
-                    error_msg += f"\n   stderr: {result.stderr}"
-                if result.stdout:
-                    error_msg += f"\n   stdout: {result.stdout}"
+                    error_msg += f": {result.stderr}"
                 print(error_msg, flush=True)
                 sys.stderr.write(error_msg + "\n")
                 sys.stderr.flush()
@@ -1899,19 +1959,24 @@ def convert_file_to_kepub(filepath):
         print("⚠️ kepubify not found - cannot convert to KEPUB")
         return None
 
-    if not filepath.lower().endswith('.epub'):
+    lower_path = filepath.lower()
+    
+    # Already a KEPUB - return as-is
+    if lower_path.endswith('.kepub'):
+        return filepath
+
+    # Must be an EPUB for kepubify
+    if not lower_path.endswith('.epub'):
         print(f"⚠️ File is not an EPUB, cannot convert to KEPUB: {os.path.basename(filepath)}")
         return None
 
-    if filepath.lower().endswith('.kepub.epub'):
-        # Already a KEPUB
-        return filepath
-
     try:
-        # Create output filename in a temp directory
+        # Create output filename in a temp directory with .kepub extension (not .kepub.epub)
         temp_dir = tempfile.mkdtemp(prefix='kepub_')
         base_name = os.path.basename(filepath)
-        kepub_name = base_name.replace('.epub', '.kepub.epub').replace('.EPUB', '.kepub.epub')
+        # Remove .epub extension and add .kepub
+        name_without_ext = os.path.splitext(base_name)[0]
+        kepub_name = f"{name_without_ext}.kepub"
         kepub_file = os.path.join(temp_dir, kepub_name)
 
         # Run kepubify
@@ -1950,9 +2015,13 @@ def group_import_files_by_book(files):
         filename = os.path.basename(filepath)
         # Get base name without extension
         base_name, ext = os.path.splitext(filename)
-        # Handle double extensions like .kepub.epub
-        if base_name.lower().endswith('.kepub'):
-            base_name = base_name[:-6]
+        
+        # Handle .kepub extension
+        if base_name.lower().endswith('.kepub') or ext.lower() == '.kepub':
+            if ext.lower() == '.kepub':
+                pass  # base_name is already correct
+            else:
+                base_name = base_name[:-6]
 
         # Normalize the base name for grouping (lowercase, strip whitespace)
         group_key = base_name.lower().strip()
@@ -1967,14 +2036,14 @@ def group_import_files_by_book(files):
 def select_best_format_for_import(filepaths):
     """
     Given a list of file paths for the same book (different formats),
-    select the best one for import. Prefers EPUB (can be converted to KEPUB),
+    select the best one for import. Prefers KEPUB, then EPUB (can be converted to KEPUB),
     then other formats in order of preference.
     Returns (best_file, other_files) tuple.
     """
-    # Priority order: EPUB (for KEPUB conversion) > MOBI > AZW3 > others
+    # Priority order: KEPUB (already converted) > EPUB (for KEPUB conversion) > MOBI > AZW3 > others
     priority = {
+        '.kepub': 0,  # Already KEPUB is best
         '.epub': 1,
-        '.kepub.epub': 0,  # Already KEPUB is best
         '.mobi': 2,
         '.azw3': 3,
         '.azw': 4,
@@ -1983,8 +2052,9 @@ def select_best_format_for_import(filepaths):
 
     def get_priority(filepath):
         lower = filepath.lower()
-        if lower.endswith('.kepub.epub'):
-            return priority.get('.kepub.epub', 99)
+        # Check .kepub first (it won't match .epub check)
+        if lower.endswith('.kepub'):
+            return priority.get('.kepub', 99)
         for ext, prio in priority.items():
             if lower.endswith(ext):
                 return prio
@@ -2364,7 +2434,7 @@ def import_books_from_folder():
 
         try:
             # Convert EPUB to KEPUB before importing
-            if best_file.lower().endswith('.epub') and not best_file.lower().endswith('.kepub.epub'):
+            if best_file.lower().endswith('.epub') and not best_file.lower().endswith('.kepub'):
                 print(f"\n🔄 Converting to KEPUB: {os.path.basename(best_file)}")
                 kepub_file = convert_file_to_kepub(best_file)
                 if kepub_file:
@@ -4154,11 +4224,26 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 library_path = get_calibre_library()
-                book_file_path = os.path.join(library_path, row['path'], f"{row['name']}.{format.lower()}")
+                book_dir = os.path.join(library_path, row['path'])
+                book_file_path = os.path.join(book_dir, f"{row['name']}.{format.lower()}")
 
-                # Handle KEPUB files which may have .kepub.epub extension
+                # Handle KEPUB files - check multiple naming conventions
                 if not os.path.exists(book_file_path) and format == 'KEPUB':
-                    book_file_path = os.path.join(library_path, row['path'], f"{row['name']}.kepub.epub")
+                    # Try .kepub extension (new convention)
+                    alt_path = os.path.join(book_dir, f"{row['name']}.kepub")
+                    if os.path.exists(alt_path):
+                        book_file_path = alt_path
+                    else:
+                        # Try .kepub.epub extension (old convention)
+                        alt_path = os.path.join(book_dir, f"{row['name']}.kepub.epub")
+                        if os.path.exists(alt_path):
+                            book_file_path = alt_path
+                        else:
+                            # Search for any .kepub file in the directory
+                            for f in os.listdir(book_dir):
+                                if f.lower().endswith('.kepub') or f.lower().endswith('.kepub.epub'):
+                                    book_file_path = os.path.join(book_dir, f)
+                                    break
 
                 if not os.path.exists(book_file_path):
                     self.send_error(404, f"Book file not found at {book_file_path}")
