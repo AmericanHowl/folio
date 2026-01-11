@@ -19,7 +19,7 @@
                     fontFamily: {
                         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
                         display: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                        logo: ['Cal Sans', 'system-ui', 'sans-serif'],
+                        logo: ['Oldenburg', 'system-ui', 'serif'],
                     },
                     colors: {
                         ink: {
@@ -107,7 +107,7 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cal+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oldenburg&display=swap" rel="stylesheet">
 
     <!-- Bootstrap Icons (CSS-only, no JS needed) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -118,7 +118,7 @@
         :root {
             --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
             --font-display: 'Inter', system-ui, -apple-system, sans-serif;
-            --font-logo: 'Cal Sans', system-ui, sans-serif;
+            --font-logo: 'Oldenburg', system-ui, serif;
         }
         
         * {
@@ -581,7 +581,7 @@
         <div class="setup-card max-w-md w-full mx-auto p-8 fade-in">
             <!-- Logo -->
             <div class="text-center mb-8">
-                <h1 class="font-logo text-5xl sm:text-6xl font-bold mb-4" style="color: #D4406F;">folio</h1>
+                <h1 class="font-logo text-5xl sm:text-6xl font-bold mb-4" style="color: #1f1f2e;">folio</h1>
                 <p class="text-ink-500 mt-2">Let's get your library set up</p>
         </div>
 
@@ -834,15 +834,19 @@
     <div x-show="!showSetup" x-cloak class="min-h-screen">
         
         <!-- Fixed Header Container - unified background, no borders -->
-        <div class="fixed top-0 left-0 right-0 z-40 safe-area-top bg-ink-50">
+        <div class="fixed top-0 left-0 right-0 z-40 safe-area-top bg-ink-50 transition-transform duration-300"
+             :class="headerHidden ? '-translate-y-full' : 'translate-y-0'">
             <!-- Header Bar -->
             <header>
                 <div class="max-w-7xl mx-auto px-3">
                     <div class="flex items-center justify-between h-14">
+                        <!-- Logo -->
+                        <span class="font-logo text-2xl" style="color: #1f1f2e;">folio</span>
+
                         <!-- Actions -->
                         <div class="flex items-center gap-1">
-                            <button 
-                                @click="openReadingList()" 
+                            <button
+                                @click="openReadingList()"
                                 class="px-3 py-2 text-sm font-medium text-ink-700 hover:text-ink-900 hover:bg-ink-100 rounded-lg transition-colors flex items-center gap-2"
                             >
                                 <i class="bi bi-bookmark text-base" style="color: #2fb8b8;"></i>
@@ -925,23 +929,21 @@
             
             <!-- Section Title Bar -->
             <div class="px-4 pb-3" :class="headerCompact ? 'pt-2' : 'pt-1'">
-                <div class="max-w-7xl mx-auto flex items-center justify-between">
-                <!-- Back button (only visible in sub-views) -->
-                                                <button 
-                                                x-show="showBackButton()"
-                                                @click="handleBackButton()"
-                                                class="p-2 -ml-1 text-ink-600 hover:text-ink-800 hover:bg-ink-100 rounded-lg transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-                                            >
-                                                <i class="bi chevron-left text-lg"></i>
-                                            </button>
-                                            <!-- Spacer when no back button (keeps logo position consistent) -->
-                                            <div x-show="!showBackButton()" class="w-[44px]"></div>
-                    <h1 class="font-display font-bold text-ink-900 transition-all duration-200"
+                <div class="max-w-7xl mx-auto flex items-center gap-2">
+                    <!-- Back button (only visible in sub-views) -->
+                    <button
+                        x-show="showBackButton()"
+                        @click="handleBackButton()"
+                        class="p-2 -ml-2 text-ink-600 hover:text-ink-800 hover:bg-ink-100 rounded-lg transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    >
+                        <i class="bi bi-chevron-left text-lg"></i>
+                    </button>
+                    <h1 class="font-display font-bold text-ink-900 transition-all duration-200 flex-1"
                         :class="headerCompact ? 'text-base' : 'text-xl'"
                         x-text="getSectionTitle()">
                         Your Library
                     </h1>
-                    
+
                     <!-- Right side actions -->
                     <div class="flex items-center gap-1">
                         <!-- Compact Icons (only visible when scrolled) -->
@@ -963,11 +965,11 @@
                                 </button>
                             </div>
                         </template>
-                        
+
                         <!-- View All arrow (only on library view, not in sub-views) -->
-                        <button 
+                        <button
                             x-show="!showBackButton() && !searchQuery"
-                            @click="openBookshelf('library-all', 'Your Library')" 
+                            @click="openBookshelf('library-all', 'Your Library')"
                             class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
                             title="View all books"
                         >
@@ -1899,11 +1901,21 @@
 
     <!-- Bookshelf View (Full page grid of books) -->
     <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[160px] overflow-y-auto">
-        <!-- View Toggle -->
+        <!-- Sorting and View Toggle -->
         <div class="bg-white border-b border-ink-200 px-3 py-2">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-3">
+                <!-- Sorting Options -->
+                <select x-model="bookshelfSortBy" @change="sortBookshelf()" class="sort-select flex-1">
+                    <option value="recent">Date Added</option>
+                    <option value="title">Title A-Z</option>
+                    <option value="title-desc">Title Z-A</option>
+                    <option value="author">Author A-Z</option>
+                    <option value="author-desc">Author Z-A</option>
+                </select>
+
+                <!-- View Toggle -->
                 <div class="flex items-center gap-1 bg-ink-100 rounded-lg p-1">
-                    <button 
+                    <button
                         @click="bookshelfView = 'list'; currentListPage = 1"
                         :class="bookshelfView === 'list' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'"
                         class="p-2 rounded transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
@@ -1911,7 +1923,7 @@
                     >
                         <i class="bi bi-list"></i>
                     </button>
-                    <button 
+                    <button
                         @click="bookshelfView = 'grid'; currentListPage = 1"
                         :class="bookshelfView === 'grid' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'"
                         class="p-2 rounded transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
@@ -1997,15 +2009,23 @@
                         <p class="text-xs text-ink-500 line-clamp-1" x-text="book.authors ? formatAuthors(book.authors) : (book.author || 'Unknown Author')"></p>
                                     </div>
                 </template>
-                                </div>
+            </div>
+
+            <!-- Loading more indicator for infinite scroll -->
+            <div x-show="loadingMoreBookshelf" class="py-4 text-center">
+                <div class="flex items-center justify-center gap-2 text-ink-500">
+                    <div class="spinner w-4 h-4"></div>
+                    <span class="text-sm">Loading more books...</span>
+                </div>
+            </div>
 
             <!-- Empty State -->
-            <div x-show="bookshelfBooks.length === 0" class="py-12 text-center">
+            <div x-show="bookshelfBooks.length === 0 && !loadingMoreBookshelf" class="py-12 text-center">
                 <div class="spinner w-6 h-6 mx-auto"></div>
                 <p class="text-ink-500 text-sm mt-3">Loading books...</p>
-                                        </div>
-                                    </div>
-                                </div>
+            </div>
+        </div>
+    </div>
 
         <!-- Back to top button -->
         <button 
