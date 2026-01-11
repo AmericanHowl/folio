@@ -188,6 +188,9 @@ CONFIG_FILE = "config.json"
 IMPORTED_FILES_FILE = "imported_files.json"  # Persists list of already-imported files
 HARDCOVER_API_URL = "https://api.hardcover.app/v1/graphql"
 
+# Folio database for multi-user data (stored in calibre library for persistence)
+FOLIO_DB_FILE = "folio.db"
+
 # Global config
 config = {
     'calibre_library': os.getenv('CALIBRE_LIBRARY', os.path.expanduser('~/Calibre Library')),
@@ -351,6 +354,334 @@ def save_imported_files():
 def get_calibre_library():
     """Get the current Calibre library path"""
     return config.get('calibre_library', os.path.expanduser('~/Calibre Library'))
+
+
+def get_folio_db_path():
+    """Get path to folio.db in the calibre library directory (for persistence)"""
+    library_path = get_calibre_library()
+    return os.path.join(library_path, FOLIO_DB_FILE)
+
+
+def init_folio_db():
+    """Initialize the folio database with required tables"""
+    db_path = get_folio_db_path()
+    try:
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+
+        # Create reading_list table for multi-user support
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reading_list (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user TEXT NOT NULL,
+                book_id INTEGER NOT NULL,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user, book_id)
+            )
+        """)
+
+        # Create index for fast lookups by user
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_reading_list_user
+            ON reading_list(user)
+        """)
+
+        # Create requests table for book requests (shared across all users)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                external_id TEXT UNIQUE,
+                title TEXT NOT NULL,
+                author TEXT,
+                year INTEGER,
+                description TEXT,
+                image TEXT,
+                requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                actioned_at TIMESTAMP
+            )
+        """)
+
+        conn.commit()
+        conn.close()
+        print(f"✅ Folio database initialized at {db_path}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to initialize folio database: {e}")
+        return False
+
+
+def get_folio_db_connection(readonly=False):
+    """Get a connection to the folio database"""
+    db_path = get_folio_db_path()
+
+    if readonly:
+        conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=10.0)
+    else:
+        conn = sqlite3.connect(db_path, timeout=10.0)
+
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_user_from_headers(headers):
+    """
+    Extract username from authentik proxy headers.
+    Returns 'default' if no user header is found (backward compatible).
+
+    Authentik typically sends these headers:
+    - X-authentik-username
+    - Remote-User
+    - X-Forwarded-User
+    """
+    # Check common authentik/proxy headers in order of preference
+    user_headers = [
+        'X-authentik-username',
+        'Remote-User',
+        'X-Forwarded-User',
+        'X-Auth-Request-User',
+    ]
+
+    for header in user_headers:
+        user = headers.get(header)
+        if user:
+            # Sanitize username (lowercase, strip whitespace)
+            return user.strip().lower()
+
+    return 'default'
+
+
+def get_reading_list_ids_for_user(user='default'):
+    """
+    Get IDs of books on the reading list for a specific user.
+    Returns empty list on any error.
+    """
+    try:
+        conn = get_folio_db_connection(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT book_id FROM reading_list WHERE user = ? ORDER BY added_at DESC",
+            (user,)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [row['book_id'] for row in rows]
+    except Exception as e:
+        print(f"⚠️ Failed to get reading list for user {user}: {e}")
+        return []
+
+
+def add_to_reading_list_for_user(book_id, user='default'):
+    """
+    Add a book to the reading list for a specific user.
+    Returns True on success, False on failure.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR IGNORE INTO reading_list (user, book_id) VALUES (?, ?)",
+            (user, book_id)
+        )
+        conn.commit()
+        conn.close()
+        print(f"✅ Added book {book_id} to reading list for user '{user}'")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to add book {book_id} to reading list for user {user}: {e}")
+        return False
+
+
+def remove_from_reading_list_for_user(book_id, user='default'):
+    """
+    Remove a book from the reading list for a specific user.
+    Returns True on success, False on failure.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM reading_list WHERE user = ? AND book_id = ?",
+            (user, book_id)
+        )
+        conn.commit()
+        conn.close()
+        print(f"✅ Removed book {book_id} from reading list for user '{user}'")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to remove book {book_id} from reading list for user {user}: {e}")
+        return False
+
+
+# ============================================================================
+# Request database functions (shared across all users)
+# ============================================================================
+
+def get_all_requests():
+    """
+    Get all book requests from the database.
+    Returns list of request dicts.
+    """
+    try:
+        conn = get_folio_db_connection(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, external_id, title, author, year, description, image,
+                   requested_at, actioned_at
+            FROM requests
+            ORDER BY requested_at DESC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        requests = []
+        for row in rows:
+            requests.append({
+                'id': row['external_id'] or str(row['id']),
+                'title': row['title'],
+                'author': row['author'],
+                'year': row['year'],
+                'description': row['description'],
+                'image': row['image'],
+                'requested_at': row['requested_at'],
+                'actioned_at': row['actioned_at']
+            })
+        return requests
+    except Exception as e:
+        print(f"⚠️ Failed to get requests: {e}")
+        return []
+
+
+def add_request(book):
+    """
+    Add a book request to the database.
+    book should have: id (external), title, author, year, description, image
+    Returns True on success, False on failure.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+
+        external_id = book.get('id')
+        title = book.get('title', '')
+        author = book.get('author', '')
+        year = book.get('year')
+        description = book.get('description', '')
+        image = book.get('image', '')
+        requested_at = int(time.time())
+
+        # Use INSERT OR REPLACE to update if exists
+        cursor.execute("""
+            INSERT INTO requests (external_id, title, author, year, description, image, requested_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(external_id) DO UPDATE SET
+                requested_at = excluded.requested_at
+        """, (external_id, title, author, year, description, image, requested_at))
+
+        conn.commit()
+        conn.close()
+        print(f"✅ Added request: {title}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to add request: {e}")
+        return False
+
+
+def remove_request(request_id):
+    """
+    Remove a book request from the database.
+    request_id can be either the external_id or the internal id.
+    Returns True on success, False on failure.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+
+        # Try to delete by external_id first, then by internal id
+        cursor.execute("DELETE FROM requests WHERE external_id = ?", (request_id,))
+        if cursor.rowcount == 0:
+            # Try as internal id
+            try:
+                internal_id = int(request_id)
+                cursor.execute("DELETE FROM requests WHERE id = ?", (internal_id,))
+            except ValueError:
+                pass
+
+        conn.commit()
+        deleted = cursor.rowcount > 0
+        conn.close()
+
+        if deleted:
+            print(f"✅ Removed request: {request_id}")
+        return deleted
+    except Exception as e:
+        print(f"❌ Failed to remove request {request_id}: {e}")
+        return False
+
+
+def mark_request_actioned_db(book_title):
+    """
+    Mark a request as actioned (sent to qBittorrent) by matching title.
+    Returns True if a request was marked, False otherwise.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+
+        actioned_at = int(time.time())
+        title_lower = book_title.lower().strip()
+
+        # Find and update matching request
+        cursor.execute("SELECT id, title FROM requests WHERE actioned_at IS NULL")
+        rows = cursor.fetchall()
+
+        for row in rows:
+            req_title = row['title'].lower().strip()
+            if req_title == title_lower or title_lower in req_title or req_title in title_lower:
+                cursor.execute(
+                    "UPDATE requests SET actioned_at = ? WHERE id = ?",
+                    (actioned_at, row['id'])
+                )
+                conn.commit()
+                conn.close()
+                print(f"✅ Marked request as actioned: {row['title']}")
+                return True
+
+        conn.close()
+        return False
+    except Exception as e:
+        print(f"⚠️ Failed to mark request as actioned: {e}")
+        return False
+
+
+def cleanup_fulfilled_requests_db():
+    """
+    Remove requests for books that are now in the Calibre library.
+    Returns list of removed book titles.
+    """
+    try:
+        requests = get_all_requests()
+        if not requests:
+            return []
+
+        removed = []
+        for req in requests:
+            title = req.get('title', '')
+            author = req.get('author', '')
+
+            # Check if book is now in library
+            book_id = check_book_in_library(title, author)
+            if book_id:
+                remove_request(req.get('id'))
+                removed.append(title)
+                print(f"📚 Request fulfilled - found in library: {title}")
+
+        if removed:
+            print(f"🧹 Cleaned up {len(removed)} fulfilled request(s)")
+
+        return removed
+    except Exception as e:
+        print(f"⚠️ Failed to cleanup fulfilled requests: {e}")
+        return []
 
 
 def get_db_connection(readonly=False):
@@ -617,16 +948,17 @@ def get_book_cover(book_id):
         return None
 
 
-def get_reading_list_books(sort='added'):
-    """Get books that are on the reading list.
-    
+def get_reading_list_books(sort='added', user='default'):
+    """Get books that are on the reading list for a specific user.
+
     Args:
         sort: Sort order - 'added' (default, by timestamp), 'title', 'author'
-    
+        user: Username for multi-user reading lists (default: 'default')
+
     Returns:
         List of book dicts with id, title, authors, timestamp, formats, has_cover, etc.
     """
-    reading_list_ids = get_reading_list_ids()
+    reading_list_ids = get_reading_list_ids_for_user(user)
     if not reading_list_ids:
         return []
     
@@ -1230,34 +1562,39 @@ def convert_book_to_kepub(book_id):
             print(f"⚠️ No EPUB found for book {book_id} - skipping KEPUB conversion")
             return False
 
-        # Create output filename
-        kepub_file = epub_file.replace('.epub', '.kepub.epub')
+        # Create output filename in a temp directory (not in library)
+        temp_dir = tempfile.mkdtemp(prefix='kepub_convert_')
+        epub_basename = os.path.basename(epub_file)
+        kepub_basename = epub_basename.replace('.epub', '.kepub.epub').replace('.EPUB', '.kepub.epub')
+        kepub_file = os.path.join(temp_dir, kepub_basename)
 
-        # Run kepubify
-        result = subprocess.run(
-            [kepubify_path, '-o', kepub_file, epub_file],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
+        try:
+            # Run kepubify
+            result = subprocess.run(
+                [kepubify_path, '-o', kepub_file, epub_file],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
 
-        if result.returncode == 0 and os.path.exists(kepub_file):
-            # Add the KEPUB format to the book in Calibre
-            add_result = run_calibredb(['add_format', str(book_id), kepub_file], suppress_errors=True)
-            if add_result['success']:
-                print(f"✅ Converted and added KEPUB for book {book_id}")
-                # Remove the temporary kepub file since it's now in the library
-                try:
-                    os.remove(kepub_file)
-                except:
-                    pass
-                return True
+            if result.returncode == 0 and os.path.exists(kepub_file):
+                # Add the KEPUB format to the book in Calibre
+                add_result = run_calibredb(['add_format', str(book_id), kepub_file], suppress_errors=True)
+                if add_result['success']:
+                    print(f"✅ Converted and added KEPUB for book {book_id}")
+                    return True
+                else:
+                    print(f"❌ Failed to add KEPUB format: {add_result.get('error', 'Unknown error')}")
+                    return False
             else:
-                print(f"❌ Failed to add KEPUB format: {add_result.get('error', 'Unknown error')}")
+                print(f"❌ kepubify failed: {result.stderr}")
                 return False
-        else:
-            print(f"❌ kepubify failed: {result.stderr}")
-            return False
+        finally:
+            # Always clean up temp directory
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
 
     except Exception as e:
         print(f"❌ KEPUB conversion error: {e}")
@@ -1429,8 +1766,19 @@ def fetch_and_apply_itunes_metadata(book_id):
 
         # Apply description/comments if available
         if best_match.get('description'):
-            # Strip HTML tags for Calibre comments
-            description = re.sub(r'<[^>]+>', '', best_match['description'])
+            # Convert HTML to plain text while preserving paragraph structure
+            description = best_match['description']
+            # Convert <br> tags to newlines
+            description = re.sub(r'<br\s*/?>', '\n', description, flags=re.IGNORECASE)
+            # Convert </p> and <p> tags to double newlines for paragraph breaks
+            description = re.sub(r'</p>\s*<p[^>]*>', '\n\n', description, flags=re.IGNORECASE)
+            description = re.sub(r'</?p[^>]*>', '\n', description, flags=re.IGNORECASE)
+            # Strip remaining HTML tags
+            description = re.sub(r'<[^>]+>', '', description)
+            # Clean up excessive whitespace while preserving intentional newlines
+            description = re.sub(r'[^\S\n]+', ' ', description)  # Collapse spaces/tabs but not newlines
+            description = re.sub(r'\n{3,}', '\n\n', description)  # Max 2 consecutive newlines
+            description = description.strip()
             metadata_args.extend(['--field', f'comments:{description}'])
 
         # Apply cover if available
@@ -1467,10 +1815,16 @@ def fetch_and_apply_itunes_metadata(book_id):
             result = run_calibredb(metadata_args, suppress_errors=True)
             if result['success']:
                 print(f"✅ Applied iTunes metadata for book {book_id}")
-                return True
             else:
                 print(f"⚠️ Failed to apply metadata: {result.get('error', 'Unknown')}")
                 return False
+
+        # Embed metadata into the actual ebook files (so Kobo/other readers see it)
+        embed_result = run_calibredb(['embed_metadata', str(book_id)], suppress_errors=True)
+        if embed_result['success']:
+            print(f"✅ Embedded metadata into ebook files for book {book_id}")
+        else:
+            print(f"⚠️ Failed to embed metadata: {embed_result.get('error', 'Unknown')}")
 
         return True
 
@@ -1748,16 +2102,10 @@ def import_books_from_folder():
                     except Exception as e:
                         print(f"   ⚠️ iTunes metadata fetch failed: {e}")
 
-                # Handle file cleanup
-                # IMPORTANT: Keep EPUB files for seeding (torrents), only delete non-EPUB formats
+                # Handle file cleanup - delete all original files after successful import
                 delete_after = config.get('import_delete', False)
-                for filepath in filepaths:
-                    is_epub = filepath.lower().endswith('.epub')
-                    if is_epub:
-                        # Always keep EPUBs for seeding
-                        print(f"📁 Kept for seeding: {os.path.basename(filepath)}")
-                    elif delete_after:
-                        # Delete non-EPUB formats if configured
+                if delete_after:
+                    for filepath in filepaths:
                         try:
                             if os.path.exists(filepath):
                                 os.remove(filepath)
@@ -2974,8 +3322,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 sort = query_params.get('sort', ['added'])[0]
                 if sort not in ('added', 'title', 'author'):
                     sort = 'added'
-                
-                books = get_reading_list_books(sort=sort)
+                user = get_user_from_headers(self.headers)
+
+                books = get_reading_list_books(sort=sort, user=user)
                 html = render_kobo_page(books, page=page, sort=sort, books_per_page=5)
                 
                 self.send_response(200)
@@ -3301,24 +3650,13 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Get requested books
+        # API: Get requested books (from persistent database)
         if path == '/api/requests':
             # First, clean up any requests for books now in the library
-            fulfilled = cleanup_fulfilled_requests()
+            fulfilled = cleanup_fulfilled_requests_db()
 
-            requested_books = config.get('requested_books', [])
-            # Ensure all books have a requested_at timestamp (set to today if missing)
-            current_timestamp = int(time.time())
-            needs_save = False
-            for book in requested_books:
-                if 'requested_at' not in book or not book.get('requested_at'):
-                    book['requested_at'] = current_timestamp
-                    needs_save = True
-
-            # Save updated books back to config if needed
-            if needs_save:
-                config['requested_books'] = requested_books
-                save_config()
+            # Get all requests from database
+            requested_books = get_all_requests()
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -3330,16 +3668,15 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Get reading list (IDs of library books)
+        # API: Get reading list (IDs of library books) - multi-user support
         if path == '/api/reading-list':
             try:
-                # Ensure the column exists before trying to get reading list
-                ensure_reading_list_column()
-                ids = get_reading_list_ids()
+                user = get_user_from_headers(self.headers)
+                ids = get_reading_list_ids_for_user(user)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                response = json.dumps({'ids': ids})
+                response = json.dumps({'ids': ids, 'user': user})
                 self.wfile.write(response.encode('utf-8'))
             except Exception as e:
                 self.send_error(500, f"Failed to load reading list: {e}")
@@ -3816,7 +4153,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Add book request
+        # API: Add book request (to persistent database)
         if self.path == '/api/requests':
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
@@ -3833,32 +4170,20 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(response.encode('utf-8'))
                     return
 
-                # Add to requested books if not already there, or update timestamp if already exists
-                requested_books = config.get('requested_books', [])
-                existing_index = None
-                for i, b in enumerate(requested_books):
-                    if b.get('id') == book.get('id'):
-                        existing_index = i
-                        break
-                
-                # Add timestamp when requested
-                book['requested_at'] = int(time.time())
-                
-                if existing_index is not None:
-                    # Update existing request with new timestamp
-                    requested_books[existing_index] = book
+                # Add request to database
+                if add_request(book):
+                    requested_books = get_all_requests()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': True, 'books': requested_books})
+                    self.wfile.write(response.encode('utf-8'))
                 else:
-                    # Add new request
-                    requested_books.append(book)
-                
-                config['requested_books'] = requested_books
-                save_config()
-
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                response = json.dumps({'success': True, 'books': requested_books})
-                self.wfile.write(response.encode('utf-8'))
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': 'Failed to add request'})
+                    self.wfile.write(response.encode('utf-8'))
             except Exception as e:
                 self.send_error(400, f"Bad Request: {e}")
             return
@@ -4045,7 +4370,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         print(f"✅ Successfully added to qBittorrent: {title}", flush=True)
 
                         # Mark the corresponding book request as actioned
-                        mark_request_actioned(title)
+                        mark_request_actioned_db(title)
 
                         self.send_response(200)
                         self.send_header('Content-Type', 'application/json')
@@ -4323,7 +4648,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Bulk add books to reading list
+        # API: Bulk add books to reading list - multi-user support
         if self.path == '/api/reading-list/bulk-add':
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
@@ -4331,7 +4656,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body.decode('utf-8'))
                 book_ids = data.get('book_ids', [])
-                
+                user = get_user_from_headers(self.headers)
+
                 if not book_ids or not isinstance(book_ids, list):
                     self.send_response(400)
                     self.send_header('Content-Type', 'application/json')
@@ -4343,11 +4669,11 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 added_count = 0
                 errors = []
 
-                # Add each book to reading list using direct database access
+                # Add each book to reading list for user
                 for book_id in book_ids:
                     try:
                         book_id_int = int(book_id)
-                        if add_to_reading_list(book_id_int):
+                        if add_to_reading_list_for_user(book_id_int, user):
                             added_count += 1
                         else:
                             errors.append(f"Book {book_id_int}: Failed to add")
@@ -4356,8 +4682,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     except Exception as e:
                         errors.append(f"Book {book_id}: {str(e)}")
 
-                # Get updated reading list IDs
-                ids = get_reading_list_ids()
+                # Get updated reading list IDs for user
+                ids = get_reading_list_ids_for_user(user)
 
                 if added_count > 0:
                     self.send_response(200)
@@ -4367,6 +4693,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         'success': True,
                         'added_count': added_count,
                         'ids': ids,
+                        'user': user,
                         'errors': errors if errors else None
                     })
                     self.wfile.write(response.encode('utf-8'))
@@ -4395,7 +4722,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Add book to reading list (set #reading_list:true)
+        # API: Add book to reading list - multi-user support
         if self.path == '/api/reading-list':
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
@@ -4403,6 +4730,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body.decode('utf-8'))
                 book_id = data.get('book_id')
+                user = get_user_from_headers(self.headers)
 
                 if book_id is None:
                     self.send_response(400)
@@ -4422,13 +4750,13 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(response.encode('utf-8'))
                     return
 
-                # Add to reading list using direct database access
-                if add_to_reading_list(book_id_int):
-                    ids = get_reading_list_ids()
+                # Add to reading list for user
+                if add_to_reading_list_for_user(book_id_int, user):
+                    ids = get_reading_list_ids_for_user(user)
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
-                    response = json.dumps({'success': True, 'ids': ids})
+                    response = json.dumps({'success': True, 'ids': ids, 'user': user})
                     self.wfile.write(response.encode('utf-8'))
                 else:
                     self.send_response(500)
@@ -4444,34 +4772,39 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_DELETE(self):
         """Handle DELETE requests"""
-        # API: Remove book request
-        match = re.match(r'/api/requests/(\d+)', self.path)
+        # API: Remove book request (from persistent database)
+        match = re.match(r'/api/requests/(.+)', self.path)
         if match:
-            book_id = int(match.group(1))
+            request_id = match.group(1)
 
-            requested_books = config.get('requested_books', [])
-            config['requested_books'] = [b for b in requested_books if b.get('id') != book_id]
-            save_config()
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            response = json.dumps({'success': True, 'books': config['requested_books']})
-            self.wfile.write(response.encode('utf-8'))
-            return
-
-        # API: Remove book from reading list
-        match = re.match(r'/api/reading-list/(\d+)', self.path)
-        if match:
-            book_id = int(match.group(1))
-
-            # Remove from reading list using direct database access
-            if remove_from_reading_list(book_id):
-                ids = get_reading_list_ids()
+            if remove_request(request_id):
+                requested_books = get_all_requests()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                response = json.dumps({'success': True, 'ids': ids})
+                response = json.dumps({'success': True, 'books': requested_books})
+                self.wfile.write(response.encode('utf-8'))
+            else:
+                self.send_response(404)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Request not found'})
+                self.wfile.write(response.encode('utf-8'))
+            return
+
+        # API: Remove book from reading list - multi-user support
+        match = re.match(r'/api/reading-list/(\d+)', self.path)
+        if match:
+            book_id = int(match.group(1))
+            user = get_user_from_headers(self.headers)
+
+            # Remove from reading list for user
+            if remove_from_reading_list_for_user(book_id, user):
+                ids = get_reading_list_ids_for_user(user)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': True, 'ids': ids, 'user': user})
                 self.wfile.write(response.encode('utf-8'))
             else:
                 self.send_response(500)
@@ -4582,6 +4915,13 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 errors.append(f'Failed to process cover: {str(e)}')
                 print(f"❌ Cover update error: {e}")
 
+        # Embed metadata into the actual ebook files (so Kobo/other readers see it)
+        embed_result = run_calibredb(['embed_metadata', book_id], suppress_errors=True)
+        if embed_result['success']:
+            print(f"✅ Embedded metadata into ebook files for book {book_id}")
+        else:
+            print(f"⚠️ Failed to embed metadata into files: {embed_result.get('error', 'Unknown')}")
+
         # Send response
         # Treat cover issues as non-fatal: metadata changes should still be considered success
         metadata_errors = [e for e in errors if not e.lower().startswith('failed to update cover')
@@ -4632,6 +4972,9 @@ if __name__ == "__main__":
 
     # Load previously imported files (survives restarts)
     load_imported_files()
+
+    # Initialize folio database for multi-user reading lists
+    init_folio_db()
 
     # Pre-load cover cache asynchronously (don't block server startup)
     def preload_cover_cache():
