@@ -1581,6 +1581,7 @@ def scan_import_folder():
     skipped_immature = 0
 
     print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})")
+    sys.stdout.flush()
 
     if recursive:
         # Walk through all subdirectories
@@ -1617,6 +1618,7 @@ def scan_import_folder():
     if skipped_immature > 0:
         print(f"   ℹ️  Skipped {skipped_immature} file(s) still being written")
     print(f"🔍 Scan complete: found {len(files)} ebook file(s)")
+    sys.stdout.flush()
     return files
 
 
@@ -1800,24 +1802,30 @@ def import_watcher_thread():
     interval = config.get('import_interval', 60)
 
     print(f"📂 Import watcher started (interval: {interval}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})")
+    sys.stdout.flush()
 
+    scan_count = 0
     while True:
         # Check running state with lock
         with import_state_lock:
             if not import_state['running']:
                 break
 
+        scan_count += 1
         try:
-            print(f"\n⏰ Starting scheduled import scan at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"\n⏰ Starting scheduled import scan #{scan_count} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            sys.stdout.flush()
             result = import_books_from_folder()
             if result.get('imported', 0) > 0:
                 print(f"📚 Import scan complete: {result.get('message', '')}")
             else:
                 print(f"📚 Import scan complete: {result.get('message', 'No new books found')}")
+            sys.stdout.flush()
         except Exception as e:
             print(f"❌ Import watcher error: {e}")
             import traceback
             traceback.print_exc()
+            sys.stdout.flush()
             with import_state_lock:
                 import_state['errors'].append(str(e))
                 # Limit error list to 10 entries
@@ -1825,13 +1833,14 @@ def import_watcher_thread():
                     import_state['errors'] = import_state['errors'][-10:]
 
         # Sleep in small increments so we can stop quickly
-        for _ in range(interval):
+        for i in range(interval):
             with import_state_lock:
                 if not import_state['running']:
                     break
             time.sleep(1)
 
     print("📂 Import watcher stopped")
+    sys.stdout.flush()
 
 
 def start_import_watcher():
@@ -2982,9 +2991,12 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     'kepub_last_success': import_state.get('kepub_last_success'),
                     'kepub_last_log': import_state.get('kepub_last_log'),
                 }
+            # Check if watcher thread is actually alive
+            thread_alive = _import_watcher_thread is not None and _import_watcher_thread.is_alive()
             status = {
                 'enabled': bool(config.get('import_folder')),
                 'running': state_snapshot['running'],
+                'thread_alive': thread_alive,
                 'folder': config.get('import_folder', ''),
                 'interval': config.get('import_interval', 60),
                 'recursive': config.get('import_recursive', True),
