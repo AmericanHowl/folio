@@ -1531,13 +1531,19 @@ def scan_import_folder():
     recursive = config.get('import_recursive', True)
     files = []
 
+    print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})")
+
     if recursive:
         # Walk through all subdirectories
         for root, dirs, filenames in os.walk(import_folder):
             for filename in filenames:
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EBOOK_EXTENSIONS:
-                    files.append(os.path.join(root, filename))
+                    filepath = os.path.join(root, filename)
+                    files.append(filepath)
+                    # Show relative path for better readability
+                    rel_path = os.path.relpath(filepath, import_folder)
+                    print(f"   📖 Found: {rel_path}")
     else:
         # Only scan top-level directory
         for filename in os.listdir(import_folder):
@@ -1546,7 +1552,9 @@ def scan_import_folder():
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EBOOK_EXTENSIONS:
                     files.append(filepath)
+                    print(f"   📖 Found: {filename}")
 
+    print(f"🔍 Scan complete: found {len(files)} ebook file(s)")
     return files
 
 
@@ -1580,10 +1588,17 @@ def import_books_from_folder():
 
     if not new_files:
         import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        if len(already_imported) > 0:
+            print(f"   ℹ️  All {len(files)} file(s) already imported previously")
         return {'success': True, 'imported': 0, 'message': 'No new files to import'}
+
+    print(f"\n📥 Found {len(new_files)} new file(s) to process:")
+    for f in new_files:
+        print(f"   📄 {os.path.basename(f)}")
 
     # Group files by book name to detect duplicates
     book_groups = group_import_files_by_book(new_files)
+    print(f"\n📊 Grouped into {len(book_groups)} unique book(s) (handling duplicate formats)")
 
     imported_count = 0
     errors = []
@@ -1605,20 +1620,23 @@ def import_books_from_folder():
         try:
             # Convert EPUB to KEPUB before importing
             if best_file.lower().endswith('.epub') and not best_file.lower().endswith('.kepub.epub'):
+                print(f"\n🔄 Converting to KEPUB: {os.path.basename(best_file)}")
                 kepub_file = convert_file_to_kepub(best_file)
                 if kepub_file:
                     # Remember the temp dir for cleanup
                     temp_dir_to_cleanup = os.path.dirname(kepub_file)
                     file_to_import = kepub_file
+                    print(f"   ✅ KEPUB conversion successful")
                 else:
                     # Conversion failed, fall back to importing original EPUB
-                    print(f"⚠️ KEPUB conversion failed, importing original EPUB: {os.path.basename(best_file)}")
+                    print(f"   ⚠️ KEPUB conversion failed, importing original EPUB: {os.path.basename(best_file)}")
                     file_to_import = best_file
             else:
                 file_to_import = best_file
 
             # Build calibredb add command
             # --duplicates flag allows adding even if similar book exists
+            print(f"\n📚 Importing to Calibre library: {os.path.basename(file_to_import)}")
             args = ['add', file_to_import, '--duplicates']
 
             result = run_calibredb(args)
@@ -1630,17 +1648,19 @@ def import_books_from_folder():
                     import_state['imported_files'].append(filepath)
                 save_imported_files()  # Persist to disk immediately
 
-                print(f"✅ Imported: {os.path.basename(file_to_import)}")
+                print(f"   ✅ Successfully imported to Calibre: {os.path.basename(file_to_import)}")
 
                 # Get the book ID from the calibredb output for post-processing
                 book_id = get_book_id_from_calibredb_output(result.get('output', ''))
 
                 if book_id:
+                    print(f"   📋 Book ID: {book_id}")
                     # Fetch and apply iTunes metadata
                     try:
+                        print(f"   🔍 Fetching iTunes metadata for book {book_id}...")
                         fetch_and_apply_itunes_metadata(book_id)
                     except Exception as e:
-                        print(f"⚠️ iTunes metadata fetch failed: {e}")
+                        print(f"   ⚠️ iTunes metadata fetch failed: {e}")
 
                 # Handle file cleanup
                 # IMPORTANT: Keep EPUB files for seeding (torrents), only delete non-EPUB formats
@@ -1712,9 +1732,12 @@ def import_watcher_thread():
 
     while import_state['running']:
         try:
+            print(f"\n⏰ Starting scheduled import scan at {time.strftime('%Y-%m-%d %H:%M:%S')}")
             result = import_books_from_folder()
             if result.get('imported', 0) > 0:
                 print(f"📚 Import scan complete: {result.get('message', '')}")
+            else:
+                print(f"📚 Import scan complete: {result.get('message', 'No new books found')}")
         except Exception as e:
             print(f"❌ Import watcher error: {e}")
             import_state['errors'].append(str(e))
