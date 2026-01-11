@@ -148,7 +148,6 @@ function folioApp() {
         selectedBookiTunesMatch: null,
         updatingMetadata: false,
         savingMetadata: false, // Track if we're saving edited metadata
-        convertingToKepub: false, // Track if KEPUB conversion is in progress
         // iTunes metadata search in edit mode
         itunesMetadataResults: [], // Multiple results for user to pick from
         searchingItunesMetadata: false, // Loading state for metadata search
@@ -1436,68 +1435,6 @@ function folioApp() {
             this.selectedBookHardcoverMatch = null;
             this.exitEditMode();
             this.unlockBodyScroll();
-        },
-
-        /**
-         * Check if book can be converted to KEPUB (has convertible format but not KEPUB)
-         */
-        canConvertToKepub(book) {
-            if (!book || !book.formats) return false;
-            const formats = book.formats.map(f => f.toUpperCase());
-            
-            // Already has KEPUB - no conversion needed
-            if (formats.includes('KEPUB')) return false;
-            
-            // Can convert if we have any of these formats
-            const convertibleFormats = ['EPUB', 'MOBI', 'AZW3', 'AZW', 'FB2'];
-            return convertibleFormats.some(f => formats.includes(f));
-        },
-
-        /**
-         * Convert book to KEPUB format
-         */
-        async convertToKepub() {
-            if (!this.selectedBook || this.convertingToKepub) return;
-
-            const bookId = this.selectedBook.id;
-            this.convertingToKepub = true;
-
-            try {
-                const response = await fetch(`/api/convert-to-kepub/${bookId}`, {
-                    method: 'POST',
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    console.log(`✅ Converted book ${bookId} to KEPUB`);
-
-                    // Update the book's formats locally
-                    if (this.selectedBook && this.selectedBook.id === bookId) {
-                        if (!this.selectedBook.formats.includes('KEPUB')) {
-                            this.selectedBook.formats = [...this.selectedBook.formats, 'KEPUB'];
-                        }
-                    }
-
-                    // Update in books array too
-                    const bookIndex = this.books.findIndex(b => b.id === bookId);
-                    if (bookIndex !== -1) {
-                        const book = this.books[bookIndex];
-                        if (!book.formats.includes('KEPUB')) {
-                            book.formats = [...book.formats, 'KEPUB'];
-                        }
-                    }
-
-                    alert('Book converted to KEPUB successfully!');
-                } else {
-                    console.error('KEPUB conversion failed:', result.error);
-                    alert('KEPUB conversion failed: ' + (result.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('KEPUB conversion error:', error);
-                alert('Error converting to KEPUB: ' + error.message);
-            } finally {
-                this.convertingToKepub = false;
-            }
         },
 
         /**

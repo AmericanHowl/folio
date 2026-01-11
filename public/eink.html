@@ -307,11 +307,7 @@
                     <div class="modal-label">Year</div>
                     <div id="modal-year"></div>
                 </div>
-                <div class="modal-info" id="modal-formats-wrap" style="display:none">
-                    <div class="modal-label">Formats</div>
-                    <div id="modal-formats"></div>
-                </div>
-                <button class="download-btn" onclick="downloadBook()">Download to Kobo</button>
+                <button class="download-btn" onclick="downloadBook()">Download KEPUB</button>
             </div>
         </div>
     </div>
@@ -463,14 +459,6 @@
                 document.getElementById('modal-year-wrap').style.display = 'none';
             }
 
-            if (currentBook.formats && currentBook.formats.length) {
-                document.getElementById('modal-formats').textContent =
-                    currentBook.formats.join(', ');
-                document.getElementById('modal-formats-wrap').style.display = 'block';
-            } else {
-                document.getElementById('modal-formats-wrap').style.display = 'none';
-            }
-
             document.getElementById('modal').classList.add('active');
         }
 
@@ -480,18 +468,16 @@
             currentBook = null;
         }
 
-        // Download book
+        // Download book - always download KEPUB for Kobo
         function downloadBook() {
-            if (!currentBook || !currentBook.formats || !currentBook.formats.length) {
-                alert('No formats available');
+            if (!currentBook) {
+                alert('No book selected');
                 return;
             }
 
-            var format = currentBook.formats.indexOf('EPUB') >= 0
-                ? 'EPUB'
-                : currentBook.formats[0];
-
-            window.location.href = '/api/download/' + currentBook.id + '/' + format;
+            // Always request KEPUB format for Kobo devices
+            // The backend will find the .kepub file even if not in database
+            window.location.href = '/api/download/' + currentBook.id + '/KEPUB';
 
             setTimeout(function() {
                 closeModal();

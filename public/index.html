@@ -1382,10 +1382,6 @@
                     <button @click="enterEditMode()" title="Edit" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                         <i class="bi bi-pencil text-ink-600"></i>
                     </button>
-                    <button x-show="canConvertToKepub(selectedBook)" @click="convertToKepub()" :disabled="convertingToKepub" title="Convert to KEPUB" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
-                        <span x-show="!convertingToKepub"><i class="bi bi-arrow-repeat text-ink-600"></i></span>
-                        <span x-show="convertingToKepub" class="spinner w-5 h-5"></span>
-                    </button>
                     <button @click="closeBookModal()" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                         <i class="bi bi-x-lg text-ink-600"></i>
                     </button>
@@ -1430,13 +1426,6 @@
                             <span class="font-semibold">Publisher:</span> <span x-text="selectedBook?.publisher"></span>
                                         </div>
 
-                        <!-- Formats -->
-                        <div x-show="selectedBook?.formats?.length" class="text-sm text-ink-500">
-                            <span class="font-semibold">Formats:</span> 
-                            <template x-for="(format, index) in (selectedBook?.formats || [])" :key="format">
-                                <span><span x-text="format"></span><span x-show="index < selectedBook.formats.length - 1">, </span></span>
-                                                </template>
-                                        </div>
                                     </div>
                                 </div>
 

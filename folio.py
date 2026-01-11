@@ -4211,42 +4211,168 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 conn = get_db_connection()
                 cursor = conn.cursor()
 
-                # Get book path and format file
+                # Get book info
                 cursor.execute(
-                    "SELECT b.path, b.title, d.name, d.format FROM books b JOIN data d ON b.id = d.book WHERE b.id = ? AND d.format = ?",
-                    (book_id, format)
+                    "SELECT b.path, b.title FROM books b WHERE b.id = ?",
+                    (book_id,)
                 )
-                row = cursor.fetchone()
-                conn.close()
-
-                if not row:
-                    self.send_error(404, f"Book format {format} not found")
+                book_row = cursor.fetchone()
+                
+                if not book_row:
+                    conn.close()
+                    self.send_error(404, f"Book {book_id} not found")
                     return
 
                 library_path = get_calibre_library()
-                book_dir = os.path.join(library_path, row['path'])
-                book_file_path = os.path.join(book_dir, f"{row['name']}.{format.lower()}")
-
-                # Handle KEPUB files - check multiple naming conventions
-                if not os.path.exists(book_file_path) and format == 'KEPUB':
-                    # Try .kepub extension (new convention)
-                    alt_path = os.path.join(book_dir, f"{row['name']}.kepub")
-                    if os.path.exists(alt_path):
-                        book_file_path = alt_path
-                    else:
-                        # Try .kepub.epub extension (old convention)
-                        alt_path = os.path.join(book_dir, f"{row['name']}.kepub.epub")
-                        if os.path.exists(alt_path):
-                            book_file_path = alt_path
-                        else:
-                            # Search for any .kepub file in the directory
-                            for f in os.listdir(book_dir):
-                                if f.lower().endswith('.kepub') or f.lower().endswith('.kepub.epub'):
-                                    book_file_path = os.path.join(book_dir, f)
-                                    break
+                book_dir = os.path.join(library_path, book_row['path'])
+                book_title = book_row['title']
+                book_file_path = None
+                temp_file_to_cleanup = None
+                
+                # For KEPUB: convert on-the-fly from any available format
+                if format == 'KEPUB':
+                    # First check if KEPUB already exists
+                    if os.path.isdir(book_dir):
+                        for f in os.listdir(book_dir):
+                            if f.lower().endswith('.kepub') or f.lower().endswith('.kepub.epub'):
+                                book_file_path = os.path.join(book_dir, f)
+                                break
+                    
+                    # If no KEPUB, we need to convert
+                    if not book_file_path:
+                        kepubify_path = find_kepubify()
+                        if not kepubify_path:
+                            conn.close()
+                            self.send_error(500, f"kepubify not installed - cannot convert to KEPUB")
+                            return
+                        
+                        # Create temp directory for conversion work
+                        temp_dir = tempfile.mkdtemp(prefix='kepub_download_')
+                        temp_file_to_cleanup = temp_dir
+                        
+                        # Find source file - prefer EPUB, then other formats
+                        epub_file = None
+                        other_source = None
+                        other_format = None
+                        
+                        for f in os.listdir(book_dir):
+                            lower_f = f.lower()
+                            filepath = os.path.join(book_dir, f)
+                            
+                            # Skip existing KEPUB files
+                            if lower_f.endswith('.kepub') or lower_f.endswith('.kepub.epub'):
+                                continue
+                            
+                            # Prefer EPUB for direct conversion
+                            if lower_f.endswith('.epub'):
+                                epub_file = filepath
+                                break
+                            
+                            # Track other convertible formats as fallback
+                            if not other_source:
+                                for ext in ['.mobi', '.azw3', '.azw', '.fb2']:
+                                    if lower_f.endswith(ext):
+                                        other_source = filepath
+                                        other_format = ext[1:].upper()
+                                        break
+                        
+                        # If no EPUB, convert from other format to EPUB first
+                        if not epub_file and other_source:
+                            print(f"🔄 Converting {other_format} to EPUB first...")
+                            
+                            # Find ebook-convert
+                            ebook_convert_path = shutil.which('ebook-convert')
+                            if not ebook_convert_path:
+                                for path in ['/opt/homebrew/bin/ebook-convert', '/usr/local/bin/ebook-convert', 
+                                             '/Applications/calibre.app/Contents/MacOS/ebook-convert']:
+                                    if os.path.exists(path):
+                                        ebook_convert_path = path
+                                        break
+                            
+                            if not ebook_convert_path:
+                                shutil.rmtree(temp_dir)
+                                conn.close()
+                                self.send_error(500, f"ebook-convert not found - cannot convert {other_format} to KEPUB")
+                                return
+                            
+                            # Convert to EPUB
+                            source_basename = os.path.splitext(os.path.basename(other_source))[0]
+                            temp_epub = os.path.join(temp_dir, f"{source_basename}.epub")
+                            
+                            result = subprocess.run(
+                                [ebook_convert_path, other_source, temp_epub],
+                                capture_output=True,
+                                text=True,
+                                timeout=300
+                            )
+                            
+                            if result.returncode != 0 or not os.path.exists(temp_epub):
+                                shutil.rmtree(temp_dir)
+                                conn.close()
+                                self.send_error(500, f"Failed to convert {other_format} to EPUB: {result.stderr}")
+                                return
+                            
+                            epub_file = temp_epub
+                            print(f"✅ Converted {other_format} to EPUB")
+                        
+                        if not epub_file:
+                            shutil.rmtree(temp_dir)
+                            conn.close()
+                            self.send_error(404, f"No convertible format found for this book")
+                            return
+                        
+                        # Now convert EPUB to KEPUB
+                        epub_basename = os.path.splitext(os.path.basename(epub_file))[0]
+                        temp_kepub = os.path.join(temp_dir, f"{epub_basename}.kepub")
+                        
+                        print(f"🔄 Converting to KEPUB: {epub_basename}")
+                        result = subprocess.run(
+                            [kepubify_path, '-o', temp_kepub, epub_file],
+                            capture_output=True,
+                            text=True,
+                            timeout=120
+                        )
+                        
+                        if result.returncode != 0 or not os.path.exists(temp_kepub):
+                            shutil.rmtree(temp_dir)
+                            conn.close()
+                            self.send_error(500, f"KEPUB conversion failed: {result.stderr}")
+                            return
+                        
+                        book_file_path = temp_kepub
+                        print(f"✅ KEPUB conversion complete: {os.path.basename(temp_kepub)}")
+                        
+                        # Cache the KEPUB for future downloads
+                        try:
+                            permanent_kepub = os.path.join(book_dir, f"{epub_basename}.kepub")
+                            shutil.copy2(temp_kepub, permanent_kepub)
+                            print(f"💾 Cached KEPUB for future downloads: {os.path.basename(permanent_kepub)}")
+                        except Exception as e:
+                            print(f"⚠️ Could not cache KEPUB (will reconvert next time): {e}")
+                else:
+                    # For other formats, look up in database
+                    cursor.execute(
+                        "SELECT name FROM data WHERE book = ? AND format = ?",
+                        (book_id, format)
+                    )
+                    format_row = cursor.fetchone()
+                    
+                    if not format_row:
+                        conn.close()
+                        self.send_error(404, f"Format {format} not found for this book")
+                        return
+                    
+                    book_file_path = os.path.join(book_dir, f"{format_row['name']}.{format.lower()}")
+                
+                conn.close()
 
                 if not os.path.exists(book_file_path):
-                    self.send_error(404, f"Book file not found at {book_file_path}")
+                    if temp_file_to_cleanup:
+                        try:
+                            shutil.rmtree(temp_file_to_cleanup)
+                        except:
+                            pass
+                    self.send_error(404, f"Book file not found")
                     return
 
                 # Determine MIME type based on format
@@ -4261,13 +4387,20 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 mime_type = mime_types.get(format, 'application/octet-stream')
 
                 # Clean filename for Content-Disposition header
-                safe_title = row["title"].replace('"', "'").replace('\n', ' ').replace('\r', '')
-                # Use .epub extension for KEPUB files so devices recognize them
-                file_ext = 'epub' if format == 'KEPUB' else format.lower()
+                safe_title = book_title.replace('"', "'").replace('\n', ' ').replace('\r', '')
+                # Use .kepub.epub extension for KEPUB files so Kobo devices recognize them
+                file_ext = 'kepub.epub' if format == 'KEPUB' else format.lower()
 
                 # Send the file
                 with open(book_file_path, 'rb') as f:
                     book_data = f.read()
+                
+                # Cleanup temp file after reading
+                if temp_file_to_cleanup:
+                    try:
+                        shutil.rmtree(temp_file_to_cleanup)
+                    except:
+                        pass
 
                 self.send_response(200)
                 self.send_header('Content-Type', mime_type)
