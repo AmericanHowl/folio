@@ -188,6 +188,9 @@ CONFIG_FILE = "config.json"
 IMPORTED_FILES_FILE = "imported_files.json"  # Persists list of already-imported files
 HARDCOVER_API_URL = "https://api.hardcover.app/v1/graphql"
 
+# Folio database for multi-user data (stored in calibre library for persistence)
+FOLIO_DB_FILE = "folio.db"
+
 # Global config
 config = {
     'calibre_library': os.getenv('CALIBRE_LIBRARY', os.path.expanduser('~/Calibre Library')),
@@ -351,6 +354,147 @@ def save_imported_files():
 def get_calibre_library():
     """Get the current Calibre library path"""
     return config.get('calibre_library', os.path.expanduser('~/Calibre Library'))
+
+
+def get_folio_db_path():
+    """Get path to folio.db in the calibre library directory (for persistence)"""
+    library_path = get_calibre_library()
+    return os.path.join(library_path, FOLIO_DB_FILE)
+
+
+def init_folio_db():
+    """Initialize the folio database with required tables"""
+    db_path = get_folio_db_path()
+    try:
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+
+        # Create reading_list table for multi-user support
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reading_list (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user TEXT NOT NULL,
+                book_id INTEGER NOT NULL,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user, book_id)
+            )
+        """)
+
+        # Create index for fast lookups by user
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_reading_list_user
+            ON reading_list(user)
+        """)
+
+        conn.commit()
+        conn.close()
+        print(f"✅ Folio database initialized at {db_path}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to initialize folio database: {e}")
+        return False
+
+
+def get_folio_db_connection(readonly=False):
+    """Get a connection to the folio database"""
+    db_path = get_folio_db_path()
+
+    if readonly:
+        conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=10.0)
+    else:
+        conn = sqlite3.connect(db_path, timeout=10.0)
+
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_user_from_headers(headers):
+    """
+    Extract username from authentik proxy headers.
+    Returns 'default' if no user header is found (backward compatible).
+
+    Authentik typically sends these headers:
+    - X-authentik-username
+    - Remote-User
+    - X-Forwarded-User
+    """
+    # Check common authentik/proxy headers in order of preference
+    user_headers = [
+        'X-authentik-username',
+        'Remote-User',
+        'X-Forwarded-User',
+        'X-Auth-Request-User',
+    ]
+
+    for header in user_headers:
+        user = headers.get(header)
+        if user:
+            # Sanitize username (lowercase, strip whitespace)
+            return user.strip().lower()
+
+    return 'default'
+
+
+def get_reading_list_ids_for_user(user='default'):
+    """
+    Get IDs of books on the reading list for a specific user.
+    Returns empty list on any error.
+    """
+    try:
+        conn = get_folio_db_connection(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT book_id FROM reading_list WHERE user = ? ORDER BY added_at DESC",
+            (user,)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [row['book_id'] for row in rows]
+    except Exception as e:
+        print(f"⚠️ Failed to get reading list for user {user}: {e}")
+        return []
+
+
+def add_to_reading_list_for_user(book_id, user='default'):
+    """
+    Add a book to the reading list for a specific user.
+    Returns True on success, False on failure.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR IGNORE INTO reading_list (user, book_id) VALUES (?, ?)",
+            (user, book_id)
+        )
+        conn.commit()
+        conn.close()
+        print(f"✅ Added book {book_id} to reading list for user '{user}'")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to add book {book_id} to reading list for user {user}: {e}")
+        return False
+
+
+def remove_from_reading_list_for_user(book_id, user='default'):
+    """
+    Remove a book from the reading list for a specific user.
+    Returns True on success, False on failure.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM reading_list WHERE user = ? AND book_id = ?",
+            (user, book_id)
+        )
+        conn.commit()
+        conn.close()
+        print(f"✅ Removed book {book_id} from reading list for user '{user}'")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to remove book {book_id} from reading list for user {user}: {e}")
+        return False
 
 
 def get_db_connection(readonly=False):
@@ -617,16 +761,17 @@ def get_book_cover(book_id):
         return None
 
 
-def get_reading_list_books(sort='added'):
-    """Get books that are on the reading list.
-    
+def get_reading_list_books(sort='added', user='default'):
+    """Get books that are on the reading list for a specific user.
+
     Args:
         sort: Sort order - 'added' (default, by timestamp), 'title', 'author'
-    
+        user: Username for multi-user reading lists (default: 'default')
+
     Returns:
         List of book dicts with id, title, authors, timestamp, formats, has_cover, etc.
     """
-    reading_list_ids = get_reading_list_ids()
+    reading_list_ids = get_reading_list_ids_for_user(user)
     if not reading_list_ids:
         return []
     
@@ -2990,8 +3135,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 sort = query_params.get('sort', ['added'])[0]
                 if sort not in ('added', 'title', 'author'):
                     sort = 'added'
-                
-                books = get_reading_list_books(sort=sort)
+                user = get_user_from_headers(self.headers)
+
+                books = get_reading_list_books(sort=sort, user=user)
                 html = render_kobo_page(books, page=page, sort=sort, books_per_page=5)
                 
                 self.send_response(200)
@@ -3346,16 +3492,15 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Get reading list (IDs of library books)
+        # API: Get reading list (IDs of library books) - multi-user support
         if path == '/api/reading-list':
             try:
-                # Ensure the column exists before trying to get reading list
-                ensure_reading_list_column()
-                ids = get_reading_list_ids()
+                user = get_user_from_headers(self.headers)
+                ids = get_reading_list_ids_for_user(user)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                response = json.dumps({'ids': ids})
+                response = json.dumps({'ids': ids, 'user': user})
                 self.wfile.write(response.encode('utf-8'))
             except Exception as e:
                 self.send_error(500, f"Failed to load reading list: {e}")
@@ -4339,7 +4484,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Bulk add books to reading list
+        # API: Bulk add books to reading list - multi-user support
         if self.path == '/api/reading-list/bulk-add':
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
@@ -4347,7 +4492,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body.decode('utf-8'))
                 book_ids = data.get('book_ids', [])
-                
+                user = get_user_from_headers(self.headers)
+
                 if not book_ids or not isinstance(book_ids, list):
                     self.send_response(400)
                     self.send_header('Content-Type', 'application/json')
@@ -4359,11 +4505,11 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 added_count = 0
                 errors = []
 
-                # Add each book to reading list using direct database access
+                # Add each book to reading list for user
                 for book_id in book_ids:
                     try:
                         book_id_int = int(book_id)
-                        if add_to_reading_list(book_id_int):
+                        if add_to_reading_list_for_user(book_id_int, user):
                             added_count += 1
                         else:
                             errors.append(f"Book {book_id_int}: Failed to add")
@@ -4372,8 +4518,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     except Exception as e:
                         errors.append(f"Book {book_id}: {str(e)}")
 
-                # Get updated reading list IDs
-                ids = get_reading_list_ids()
+                # Get updated reading list IDs for user
+                ids = get_reading_list_ids_for_user(user)
 
                 if added_count > 0:
                     self.send_response(200)
@@ -4383,6 +4529,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                         'success': True,
                         'added_count': added_count,
                         'ids': ids,
+                        'user': user,
                         'errors': errors if errors else None
                     })
                     self.wfile.write(response.encode('utf-8'))
@@ -4411,7 +4558,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Add book to reading list (set #reading_list:true)
+        # API: Add book to reading list - multi-user support
         if self.path == '/api/reading-list':
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
@@ -4419,6 +4566,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body.decode('utf-8'))
                 book_id = data.get('book_id')
+                user = get_user_from_headers(self.headers)
 
                 if book_id is None:
                     self.send_response(400)
@@ -4438,13 +4586,13 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(response.encode('utf-8'))
                     return
 
-                # Add to reading list using direct database access
-                if add_to_reading_list(book_id_int):
-                    ids = get_reading_list_ids()
+                # Add to reading list for user
+                if add_to_reading_list_for_user(book_id_int, user):
+                    ids = get_reading_list_ids_for_user(user)
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
-                    response = json.dumps({'success': True, 'ids': ids})
+                    response = json.dumps({'success': True, 'ids': ids, 'user': user})
                     self.wfile.write(response.encode('utf-8'))
                 else:
                     self.send_response(500)
@@ -4476,18 +4624,19 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response.encode('utf-8'))
             return
 
-        # API: Remove book from reading list
+        # API: Remove book from reading list - multi-user support
         match = re.match(r'/api/reading-list/(\d+)', self.path)
         if match:
             book_id = int(match.group(1))
+            user = get_user_from_headers(self.headers)
 
-            # Remove from reading list using direct database access
-            if remove_from_reading_list(book_id):
-                ids = get_reading_list_ids()
+            # Remove from reading list for user
+            if remove_from_reading_list_for_user(book_id, user):
+                ids = get_reading_list_ids_for_user(user)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                response = json.dumps({'success': True, 'ids': ids})
+                response = json.dumps({'success': True, 'ids': ids, 'user': user})
                 self.wfile.write(response.encode('utf-8'))
             else:
                 self.send_response(500)
@@ -4655,6 +4804,9 @@ if __name__ == "__main__":
 
     # Load previously imported files (survives restarts)
     load_imported_files()
+
+    # Initialize folio database for multi-user reading lists
+    init_folio_db()
 
     # Pre-load cover cache asynchronously (don't block server startup)
     def preload_cover_cache():
