@@ -199,6 +199,10 @@ function folioApp() {
         capturedImageSrc: '',
         cameraRequestId: 0, // Used to track/cancel pending camera requests
 
+        // Navigation state for browser history
+        currentView: 'library', // 'library' | 'bookshelf' | 'requests'
+        navigationLocked: false, // Prevent navigation loops
+
         /**
          * Initialize the application
          */
@@ -212,7 +216,7 @@ function folioApp() {
             // Back-to-top visibility and infinite scroll
             window.addEventListener('scroll', () => {
                 this.showBackToTop = window.scrollY > 400;
-                
+
                 // Infinite scroll for search results
                 if (this.searchQuery && this.searchQuery.trim() && !this.loadingSearchiTunes && this.searchiTunesHasMore) {
                     const scrollPosition = window.innerHeight + window.scrollY;
@@ -224,6 +228,10 @@ function folioApp() {
                 }
             });
 
+            // Browser history navigation (back/forward)
+            window.addEventListener('popstate', (event) => {
+                this.handleHistoryNavigation(event.state);
+            });
 
             // Load server config
             await this.loadConfig();
@@ -299,6 +307,9 @@ function folioApp() {
                 this.libraryLoading = false;
             }
 
+            // Restore previous view if page was refreshed
+            this.restoreSavedView();
+
             // Periodically refresh library to pick up external changes
             // Only refresh if not searching (to prevent library view from reappearing)
             setInterval(() => {
@@ -330,7 +341,7 @@ function folioApp() {
                 // Note: prowlarr_api_key is sent as boolean for security, so we can't pre-populate it
                 // But if prowlarrApiKey is true, we know it's configured
                 
-                console.log('📖 Loaded config:', { 
+                console.log('📖 Loaded config:', {
                     library: this.calibreLibraryPath ? 'Set' : 'Not set',
                     token: this.hardcoverToken ? 'Set' : 'Not set',
                     prowlarr: this.prowlarrUrl ? 'Set' : 'Not set'
@@ -338,6 +349,156 @@ function folioApp() {
             } catch (error) {
                 console.error('Failed to load config:', error);
             }
+        },
+
+        /**
+         * Navigation Management - Browser History Integration
+         */
+
+        /**
+         * Push a new history state for navigation
+         */
+        pushHistoryState(view, data = {}) {
+            if (this.navigationLocked) return;
+
+            const state = { view, ...data };
+            const url = `#${view}`;
+
+            // Save to localStorage for page refresh restoration
+            localStorage.setItem('folio_current_view', JSON.stringify(state));
+
+            // Push to browser history
+            history.pushState(state, '', url);
+            this.currentView = view;
+        },
+
+        /**
+         * Handle browser back/forward navigation
+         */
+        handleHistoryNavigation(state) {
+            if (this.navigationLocked) return;
+
+            this.navigationLocked = true;
+
+            // If no state, we're back at library view
+            if (!state || !state.view) {
+                this.navigateToLibrary();
+            } else {
+                // Restore the view from history state
+                switch (state.view) {
+                    case 'library':
+                        this.navigateToLibrary();
+                        break;
+                    case 'bookshelf':
+                        this.navigateToBookshelf(state.title || 'Reading List');
+                        break;
+                    case 'requests':
+                        this.navigateToRequests();
+                        break;
+                    default:
+                        this.navigateToLibrary();
+                }
+            }
+
+            setTimeout(() => {
+                this.navigationLocked = false;
+            }, 100);
+        },
+
+        /**
+         * Restore saved view from localStorage (after page refresh)
+         */
+        restoreSavedView() {
+            try {
+                const savedState = localStorage.getItem('folio_current_view');
+                if (!savedState) {
+                    // Initialize library view in history
+                    history.replaceState({ view: 'library' }, '', '#library');
+                    return;
+                }
+
+                const state = JSON.parse(savedState);
+                console.log('📖 Restoring view:', state.view);
+
+                // Replace current history state with saved state
+                history.replaceState(state, '', `#${state.view}`);
+
+                // Navigate to the saved view
+                switch (state.view) {
+                    case 'bookshelf':
+                        this.navigateToBookshelf(state.title || 'Reading List');
+                        break;
+                    case 'requests':
+                        this.navigateToRequests();
+                        break;
+                    default:
+                        // Already on library view, just update state
+                        this.currentView = 'library';
+                }
+            } catch (error) {
+                console.error('Failed to restore view:', error);
+                history.replaceState({ view: 'library' }, '', '#library');
+            }
+        },
+
+        /**
+         * Navigate to library view
+         */
+        navigateToLibrary() {
+            this.showBookshelf = false;
+            this.showRequests = false;
+            this.selectedBook = null;
+            this.selectedHardcoverBook = null;
+            this.showSettings = false;
+            this.showCameraCapture = false;
+            this.currentView = 'library';
+            this.unlockBodyScroll();
+            localStorage.setItem('folio_current_view', JSON.stringify({ view: 'library' }));
+        },
+
+        /**
+         * Navigate to bookshelf view (reading list or Hardcover sections)
+         */
+        navigateToBookshelf(title) {
+            this.showBookshelf = true;
+            this.bookshelfTitle = title;
+            this.showRequests = false;
+            this.selectedBook = null;
+            this.selectedHardcoverBook = null;
+            this.showSettings = false;
+            this.showCameraCapture = false;
+            this.currentView = 'bookshelf';
+            this.unlockBodyScroll();
+        },
+
+        /**
+         * Navigate to requests view
+         */
+        navigateToRequests() {
+            this.showRequests = true;
+            this.showBookshelf = false;
+            this.selectedBook = null;
+            this.selectedHardcoverBook = null;
+            this.showSettings = false;
+            this.showCameraCapture = false;
+            this.currentView = 'requests';
+            this.unlockBodyScroll();
+        },
+
+        /**
+         * Lock body scroll (for modals)
+         */
+        lockBodyScroll() {
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+        },
+
+        /**
+         * Unlock body scroll
+         */
+        unlockBodyScroll() {
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         },
 
         /**
@@ -856,10 +1017,11 @@ function folioApp() {
             if (this.selectionMode) {
                 return;
             }
-            
+
             this.selectedBook = book;
             this.selectedHardcoverBook = null;
-            
+            this.lockBodyScroll();
+
             // Check if book is already in reading list and set status accordingly
             if (this.isInReadingList(book.id)) {
                 this.readingListStatus = 'remove';
@@ -1223,6 +1385,7 @@ function folioApp() {
             this.selectedBook = null;
             this.selectedBookHardcoverMatch = null;
             this.exitEditMode();
+            this.unlockBodyScroll();
         },
 
         /**
@@ -1444,6 +1607,7 @@ function folioApp() {
         openHardcoverModal(book) {
             this.selectedHardcoverBook = this.enrichHardcoverBook(book);
             this.selectedBook = null;
+            this.lockBodyScroll();
         },
 
         /**
@@ -1991,13 +2155,15 @@ function folioApp() {
                 this.bookshelfBooks = this.sortedBooks.filter(book =>
                     this.isInReadingList(book.id)
                 );
-                this.showBookshelf = true;
+                this.navigateToBookshelf('Reading List');
+                this.pushHistoryState('bookshelf', { title: 'Reading List' });
             }).catch(() => {
                 // Fallback: use current ids even if reload fails
                 this.bookshelfBooks = this.sortedBooks.filter(book =>
                     this.isInReadingList(book.id)
                 );
-                this.showBookshelf = true;
+                this.navigateToBookshelf('Reading List');
+                this.pushHistoryState('bookshelf', { title: 'Reading List' });
             });
         },
 
@@ -2006,20 +2172,22 @@ function folioApp() {
          */
         async openRequests() {
             await this.loadRequestedBooks();
-            this.showRequests = true;
+            this.navigateToRequests();
+            this.pushHistoryState('requests');
         },
 
         /**
-         * Close requests view
+         * Close requests view (navigate back)
          */
         closeRequests() {
-            this.showRequests = false;
             this.selectedRequestBook = null;
             this.prowlarrSearchResults = [];
             // Clear download states
             this.downloadingProwlarr = null;
             this.downloadProwlarrSuccess = null;
             this.downloadProwlarrError = null;
+            // Use browser back to return to previous view
+            history.back();
         },
         
         /**
@@ -2435,6 +2603,7 @@ function folioApp() {
             this.cameraState = 'initializing';
             this.cameraError = '';
             this.capturedImageSrc = '';
+            this.lockBodyScroll();
 
             // Increment request ID to track this specific request
             // This allows us to detect if the modal was closed while getUserMedia was pending
@@ -2519,6 +2688,7 @@ function folioApp() {
             this.showCameraCapture = false;
             this.cameraState = 'initializing';
             this.capturedImageSrc = '';
+            this.unlockBodyScroll();
 
             // Stop camera stream
             if (this.cameraStream) {

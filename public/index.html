@@ -843,7 +843,7 @@
             <div class="max-w-7xl mx-auto px-3">
                 <div class="flex items-center justify-between compact-header">
                     <!-- Logo -->
-                    <a @click.prevent="showSetup = false; searchQuery = ''; selectedBook = null; selectedHardcoverBook = null; showSettings = false; showRequests = false; showProwlarrSearch = false; showReadingList = false; bookshelfView = false; window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                    <a @click.prevent="searchQuery = ''; navigateToLibrary(); pushHistoryState('library'); window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                         <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
                     </a>
 
@@ -1325,7 +1325,7 @@
         <footer x-show="!showSetup && !searchQuery" class="py-6 px-4 border-t border-ink-200 bg-ink-50">
             <div class="max-w-7xl mx-auto flex items-center justify-center">
                 <button 
-                    @click="showSettings = true; hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" 
+                    @click="showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" 
                     class="text-sm text-ink-500 hover:text-ink-700 transition-colors flex items-center gap-2"
                 >
                     <i class="bi bi-gear"></i>
@@ -1577,11 +1577,11 @@
                                     </div>
 
     <!-- Hardcover Book Modal -->
-    <div x-show="selectedHardcoverBook" x-cloak @click.self="selectedHardcoverBook = null" 
+    <div x-show="selectedHardcoverBook" x-cloak @click.self="selectedHardcoverBook = null; unlockBodyScroll()"
          class="fixed inset-0 z-[60] modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div x-show="selectedHardcoverBook" x-transition:enter="slide-up" 
+        <div x-show="selectedHardcoverBook" x-transition:enter="slide-up"
              class="bg-ink-100 w-full sm:max-w-[720px] sm:rounded-2xl rounded-t-[20px] max-h-[90vh] flex flex-col shadow-2xl border border-ink-200">
-            
+
             <!-- Sticky Header -->
             <div class="flex justify-between items-center p-4 border-b border-ink-100 sticky top-0 bg-white z-10 rounded-t-[20px] sm:rounded-t-2xl">
                                 <div class="flex items-center gap-2">
@@ -1593,7 +1593,7 @@
                         <i class="bi bi-clock"></i> Requested
                                         </span>
                                     </div>
-                <button @click="selectedHardcoverBook = null" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
+                <button @click="selectedHardcoverBook = null; unlockBodyScroll()" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                     <i class="bi bi-x-lg text-ink-600"></i>
                                 </button>
                                 </div>
@@ -1668,12 +1668,12 @@
                                     </div>
 
     <!-- Settings Modal -->
-    <div x-show="showSettings" x-cloak @click.self="showSettings = false" 
+    <div x-show="showSettings" x-cloak @click.self="showSettings = false; unlockBodyScroll()"
          class="fixed inset-0 z-[60] modal-overlay flex items-center justify-center p-4">
         <div x-show="showSettings" x-transition class="bg-ink-100 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
             <div class="p-5 border-b border-ink-100 flex items-center justify-between">
                 <h2 class="font-display text-lg font-bold text-ink-900">Settings</h2>
-                <button @click="showSettings = false" class="p-3 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
+                <button @click="showSettings = false; unlockBodyScroll()" class="p-3 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                     <i class="bi bi-x-lg text-ink-500"></i>
                 </button>
                                 </div>
