@@ -835,74 +835,77 @@
                                             </div>
                                         </div>
 
-    <!-- Compact Header - Visible in all views except modals and setup -->
-    <header x-show="!showSetup && !showSettings && !showCameraCapture && !showBookModal && !showHardcoverModal" x-cloak class="sticky top-0 z-40 glass border-b border-ink-200 safe-area-top backdrop-blur-md bg-white/95">
-        <div class="max-w-7xl mx-auto px-3">
-            <div class="flex items-center justify-between compact-header">
-                <!-- Logo -->
-                <a @click.prevent="searchQuery = ''; navigateToLibrary(); pushHistoryState('library'); window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                    <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
-                </a>
+    <!-- Main App -->
+    <div x-show="!showSetup" x-cloak class="min-h-screen">
+        
+        <!-- Compact Header -->
+        <header class="sticky top-0 z-40 glass border-b border-ink-200 safe-area-top backdrop-blur-md bg-white/95">
+            <div class="max-w-7xl mx-auto px-3">
+                <div class="flex items-center justify-between compact-header">
+                    <!-- Logo -->
+                    <a @click.prevent="searchQuery = ''; navigateToLibrary(); pushHistoryState('library'); window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                        <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
+                    </a>
 
-                <!-- Actions -->
-                <div class="flex items-center gap-2">
-                    <button 
-                        @click="openReadingList()" 
-                        class="px-4 py-3 text-base font-medium text-ink-700 hover:text-ink-900 hover:bg-ink-100 rounded-xl transition-colors flex items-center gap-2 min-h-[44px]"
-                    >
-                        <i class="bi bi-bookmark text-lg" style="color: #2fb8b8;"></i>
-                        <span>Reading List</span>
-                    </button>
-                    <!-- More Menu -->
-                    <div class="relative" x-data="{ menuOpen: false }">
+                    <!-- Actions -->
+                    <div class="flex items-center gap-2">
                         <button 
-                            @click="menuOpen = !menuOpen" 
-                            class="p-3 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-xl transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
-                            title="More options"
+                            @click="openReadingList()" 
+                            class="px-4 py-3 text-base font-medium text-ink-700 hover:text-ink-900 hover:bg-ink-100 rounded-xl transition-colors flex items-center gap-2 min-h-[44px]"
                         >
-                            <i class="bi bi-three-dots-vertical text-lg"></i>
+                            <i class="bi bi-bookmark text-lg" style="color: #2fb8b8;"></i>
+                            <span>Reading List</span>
                         </button>
-                        <!-- Dropdown Menu -->
-                        <div 
-                            x-show="menuOpen" 
-                            @click.away="menuOpen = false" 
-                            x-cloak
-                            x-transition:enter="transition ease-out duration-150"
-                            x-transition:enter-start="opacity-0 scale-95 translate-y-1"
-                            x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                            x-transition:leave="transition ease-in duration-100"
-                            x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-                            x-transition:leave-end="opacity-0 scale-95 translate-y-1"
-                            class="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-ink-200/50 py-2 z-50 overflow-hidden"
-                            style="box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);"
-                        >
-                            <label class="flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 cursor-pointer transition-colors active:bg-ink-100">
-                                <i class="bi bi-upload text-lg text-ink-600"></i>
-                                <span class="font-medium">Import Books</span>
-                                <input type="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.fb2,.lit,.prc,.txt,.rtf,.djvu,.cbz,.cbr" multiple @change="handleBookUpload($event)" class="hidden">
-                            </label>
-                            <button @click="menuOpen = false; openRequests()" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
-                                <i class="bi bi-inbox-fill text-lg text-ink-600"></i>
-                                <span class="font-medium">Requests</span>
+                        <!-- More Menu -->
+                        <div class="relative" x-data="{ menuOpen: false }">
+                            <button 
+                                @click="menuOpen = !menuOpen" 
+                                class="p-3 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-xl transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                                title="More options"
+                            >
+                                <i class="bi bi-three-dots-vertical text-lg"></i>
                             </button>
-                            <button @click="menuOpen = false; toggleSelectionMode()" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
-                                <i class="bi bi-check-square text-lg text-ink-600"></i>
-                                <span class="font-medium">Select Books</span>
-                            </button>
-                            <div class="border-t border-ink-200 my-1"></div>
-                            <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
-                                <i class="bi bi-gear text-lg text-ink-600"></i>
-                                <span class="font-medium">Settings</span>
-                            </button>
+                            <!-- Dropdown Menu -->
+                            <div 
+                                x-show="menuOpen" 
+                                @click.away="menuOpen = false" 
+                                x-cloak
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 scale-95 translate-y-1"
+                                x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                                x-transition:leave-end="opacity-0 scale-95 translate-y-1"
+                                class="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-ink-200/50 py-2 z-50 overflow-hidden"
+                                style="box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);"
+                            >
+                                <label class="flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 cursor-pointer transition-colors active:bg-ink-100">
+                                    <i class="bi bi-upload text-lg text-ink-600"></i>
+                                    <span class="font-medium">Import Books</span>
+                                    <input type="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.fb2,.lit,.prc,.txt,.rtf,.djvu,.cbz,.cbr" multiple @change="handleBookUpload($event)" class="hidden">
+                                </label>
+                                <button @click="menuOpen = false; openRequests()" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
+                                    <i class="bi bi-inbox-fill text-lg text-ink-600"></i>
+                                    <span class="font-medium">Requests</span>
+                                </button>
+                                <button @click="menuOpen = false; toggleSelectionMode()" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
+                                    <i class="bi bi-check-square text-lg text-ink-600"></i>
+                                    <span class="font-medium">Select Books</span>
+                                </button>
+                                <div class="border-t border-ink-200 my-1"></div>
+                                <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-center gap-3 px-4 py-3 text-ink-800 hover:bg-ink-50 transition-colors text-left active:bg-ink-100">
+                                    <i class="bi bi-gear text-lg text-ink-600"></i>
+                                    <span class="font-medium">Settings</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </header>
-    
-    <!-- Search Bar - Sticky - Visible in all views except modals and setup -->
-    <div x-show="!showSetup && !showSettings && !showCameraCapture && !showBookModal && !showHardcoverModal" x-cloak class="sticky top-[60px] z-30 px-4 py-3 bg-ink-50 border-b border-ink-200 backdrop-blur-sm bg-ink-50/95">
+        </header>
+        
+        <!-- Search Bar - Sticky -->
+        <div class="sticky top-[60px] z-30 px-4 py-3 bg-ink-50 border-b border-ink-200 backdrop-blur-sm bg-ink-50/95">
             <div class="relative max-w-7xl mx-auto">
                 <div class="relative flex-1">
                     <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
@@ -1817,9 +1820,19 @@
             </div>
 
     <!-- Requests View (List format) -->
-    <div x-show="showRequests" x-cloak class="min-h-screen bg-ink-50">
+    <div x-show="showRequests" x-cloak class="fixed inset-0 z-50 bg-ink-50">
+        <!-- Header -->
+        <div class="sticky top-0 z-10 glass border-b border-ink-200 safe-area-top">
+            <div class="flex items-center h-14 px-3">
+                <button @click="closeRequests()" class="p-3 -ml-2 text-ink-600 hover:text-ink-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+                    <i class="bi bi-arrow-left text-lg"></i>
+                </button>
+                <h1 class="flex-1 text-center font-display text-lg font-semibold text-ink-800 truncate px-4">Book Requests</h1>
+                <div class="w-10"></div>
+            </div>
+        </div>
         <!-- Requests List -->
-        <div class="pt-24 pb-16 px-3 overflow-y-auto">
+        <div class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 56px);">
             <!-- Empty State -->
             <div x-show="requestedBooks.length === 0" class="py-12 text-center">
                 <i class="bi bi-inbox text-4xl text-ink-300 mb-3"></i>
@@ -1874,9 +1887,19 @@
     </div>
 
     <!-- Bookshelf View (Full page grid of books) -->
-    <div x-show="showBookshelf" x-cloak class="min-h-screen bg-white">
+    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-50 bg-white">
+        <!-- Header -->
+        <div class="sticky top-0 z-10 glass border-b border-ink-200 safe-area-top">
+            <div class="flex items-center h-14 px-3">
+                <button @click="closeBookshelf()" class="p-3 -ml-2 text-ink-600 hover:text-ink-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+                    <i class="bi bi-arrow-left text-lg"></i>
+                </button>
+                <h1 class="flex-1 text-center font-display text-lg font-semibold text-ink-800 truncate px-4" x-text="bookshelfTitle"></h1>
+                <div class="w-10"></div>
+            </div>
+        </div>
         <!-- View Toggle -->
-        <div class="sticky top-[124px] z-10 bg-white border-b border-ink-200 px-3 py-2">
+        <div class="sticky top-14 z-10 bg-white border-b border-ink-200 px-3 py-2">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1 bg-ink-100 rounded-lg p-1">
                     <button 
@@ -1900,7 +1923,7 @@
                     </div>
 
         <!-- List View -->
-        <div x-show="bookshelfView === 'list'" class="p-3 pb-16">
+        <div x-show="bookshelfView === 'list'" class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 110px);">
             <!-- Pagination Controls -->
             <div class="flex items-center justify-between mb-4 gap-2">
                 <div class="flex items-center gap-2">
@@ -1953,7 +1976,7 @@
                                 </div>
 
         <!-- Grid View -->
-        <div x-show="bookshelfView === 'grid'" class="p-3 pb-16">
+        <div x-show="bookshelfView === 'grid'" class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 110px);">
             <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                 <template x-for="book in bookshelfBooks" :key="book.id">
                     <div @click="book.authors ? openBookModal(book) : openHardcoverModal(book)" class="book-card cursor-pointer">
