@@ -1313,6 +1313,56 @@ function folioApp() {
         },
 
         /**
+         * Handle book file upload
+         */
+        async handleBookUpload(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+
+            const validExtensions = ['.epub', '.pdf', '.mobi', '.azw', '.azw3', '.fb2', '.lit', '.prc', '.txt', '.rtf', '.djvu', '.cbz', '.cbr'];
+            const validFiles = Array.from(files).filter(file => {
+                const ext = '.' + file.name.split('.').pop().toLowerCase();
+                return validExtensions.includes(ext);
+            });
+
+            if (validFiles.length === 0) {
+                alert('No valid book files selected. Supported formats: EPUB, PDF, MOBI, AZW, AZW3, FB2, LIT, PRC, TXT, RTF, DJVU, CBZ, CBR');
+                event.target.value = '';
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                validFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const response = await fetch('/api/upload-books', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`Successfully uploaded ${validFiles.length} book file(s). They will be imported shortly.`);
+                    // Reload books after a delay to show newly imported books
+                    setTimeout(() => {
+                        this.loadBooks();
+                    }, 2000);
+                } else {
+                    alert('Upload failed: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Error uploading files: ' + error.message);
+            } finally {
+                // Reset file input
+                event.target.value = '';
+            }
+        },
+
+        /**
          * Filter author suggestions
          */
         filterAuthorSuggestions() {

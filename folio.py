@@ -24,6 +24,9 @@ import shutil
 import threading
 import glob as glob_module
 from functools import wraps
+import hashlib
+from email.parser import BytesParser
+from email import message_from_bytes
 
 PORT = 9099
 
@@ -401,6 +404,34 @@ def init_folio_db():
             )
         """)
 
+        # Create import_history table for tracking imported files
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS import_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path TEXT NOT NULL,
+                file_hash TEXT NOT NULL,
+                file_size INTEGER,
+                book_id INTEGER,
+                imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(file_path),
+                UNIQUE(file_hash)
+            )
+        """)
+
+        # Create indexes for fast lookups
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_import_history_file_path
+            ON import_history(file_path)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_import_history_file_hash
+            ON import_history(file_hash)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_import_history_book_id
+            ON import_history(book_id)
+        """)
+
         conn.commit()
         conn.close()
         print(f"✅ Folio database initialized at {db_path}")
@@ -421,6 +452,151 @@ def get_folio_db_connection(readonly=False):
 
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def compute_file_hash(filepath):
+    """Compute MD5 hash of a file"""
+    try:
+        hash_md5 = hashlib.md5()
+        with open(filepath, "rb") as f:
+            # Read file in chunks to handle large files efficiently
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest()
+    except Exception as e:
+        print(f"⚠️  Failed to compute hash for {filepath}: {e}")
+        return None
+
+
+def is_file_imported(filepath):
+    """Check if a file has been imported by path or hash.
+    Returns (is_imported, existing_record) tuple.
+    """
+    try:
+        conn = get_folio_db_connection(readonly=True)
+        cursor = conn.cursor()
+        
+        # Check by file path first
+        cursor.execute("SELECT * FROM import_history WHERE file_path = ?", (filepath,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return (True, dict(row))
+        
+        # Check by file hash if file exists
+        if os.path.exists(filepath):
+            file_hash = compute_file_hash(filepath)
+            if file_hash:
+                conn = get_folio_db_connection(readonly=True)
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM import_history WHERE file_hash = ?", (file_hash,))
+                row = cursor.fetchone()
+                conn.close()
+                
+                if row:
+                    return (True, dict(row))
+        
+        return (False, None)
+    except Exception as e:
+        print(f"⚠️  Error checking import history: {e}")
+        return (False, None)
+
+
+def record_imported_file(filepath, file_hash=None, file_size=None, book_id=None):
+    """Record an imported file in the database"""
+    try:
+        if file_hash is None and os.path.exists(filepath):
+            file_hash = compute_file_hash(filepath)
+        
+        if file_size is None and os.path.exists(filepath):
+            file_size = os.path.getsize(filepath)
+        
+        conn = get_folio_db_connection(readonly=False)
+        cursor = conn.cursor()
+        
+        # Use INSERT OR IGNORE to handle duplicates gracefully
+        cursor.execute("""
+            INSERT OR IGNORE INTO import_history (file_path, file_hash, file_size, book_id)
+            VALUES (?, ?, ?, ?)
+        """, (filepath, file_hash, file_size, book_id))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️  Failed to record imported file: {e}")
+        return False
+
+
+def migrate_import_history_from_json():
+    """Migrate imported_files.json data to folio.db import_history table"""
+    if not os.path.exists(IMPORTED_FILES_FILE):
+        return 0
+    
+    try:
+        # Load existing JSON data
+        with open(IMPORTED_FILES_FILE, 'r') as f:
+            data = json.load(f)
+            files = data.get('files', [])
+        
+        if not files:
+            return 0
+        
+        # Migrate to database
+        migrated = 0
+        conn = get_folio_db_connection(readonly=False)
+        cursor = conn.cursor()
+        
+        for filepath in files:
+            if os.path.exists(filepath):
+                file_hash = compute_file_hash(filepath)
+                file_size = os.path.getsize(filepath)
+                
+                # Try to find book_id if this book exists in Calibre
+                book_id = None
+                try:
+                    calibre_conn = get_db_connection(readonly=True)
+                    calibre_cursor = calibre_conn.cursor()
+                    # This is a best-effort attempt - we don't have a reliable way to match
+                    # files to book_ids from just the filepath, so we'll leave book_id as NULL
+                    calibre_conn.close()
+                except:
+                    pass
+                
+                try:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO import_history (file_path, file_hash, file_size, book_id)
+                        VALUES (?, ?, ?, ?)
+                    """, (filepath, file_hash, file_size, book_id))
+                    migrated += 1
+                except:
+                    pass  # Skip duplicates
+        
+        conn.commit()
+        conn.close()
+        
+        if migrated > 0:
+            print(f"📦 Migrated {migrated} imported files from JSON to database")
+        
+        return migrated
+    except Exception as e:
+        print(f"⚠️  Failed to migrate import history: {e}")
+        return 0
+
+
+def get_import_history_count():
+    """Get the count of files in import history"""
+    try:
+        conn = get_folio_db_connection(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM import_history")
+        row = cursor.fetchone()
+        conn.close()
+        return row['count'] if row else 0
+    except Exception as e:
+        print(f"⚠️  Failed to get import history count: {e}")
+        return 0
 
 
 def get_user_from_headers(headers):
@@ -2056,16 +2232,21 @@ def import_books_from_folder():
     # Find all ebook files
     files = scan_import_folder()
 
-    # Filter out already imported files (thread-safe)
-    with import_state_lock:
-        already_imported = set(import_state.get('imported_files', []))
-    new_files = [f for f in files if f not in already_imported]
+    # Filter out already imported files (check database)
+    new_files = []
+    skipped_count = 0
+    for f in files:
+        is_imported, existing_record = is_file_imported(f)
+        if not is_imported:
+            new_files.append(f)
+        else:
+            skipped_count += 1
 
     if not new_files:
         with import_state_lock:
             import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
-        if len(already_imported) > 0:
-            print(f"   ℹ️  All {len(files)} file(s) already imported previously")
+        if skipped_count > 0:
+            print(f"   ℹ️  All {len(files)} file(s) already imported previously (checked via database)")
         return {'success': True, 'imported': 0, 'message': 'No new files to import'}
 
     print(f"\n📥 Found {len(new_files)} new file(s) to process:")
@@ -2119,12 +2300,7 @@ def import_books_from_folder():
 
             if result['success']:
                 imported_count += 1
-                # Mark all files in this group as imported (thread-safe)
-                with import_state_lock:
-                    for filepath in filepaths:
-                        import_state['imported_files'].append(filepath)
-                save_imported_files()  # Persist to disk immediately
-
+                
                 print(f"   ✅ Successfully imported to Calibre: {os.path.basename(file_to_import)}")
 
                 # Get the book ID from the calibredb output for post-processing
@@ -2138,6 +2314,10 @@ def import_books_from_folder():
                         fetch_and_apply_itunes_metadata(book_id)
                     except Exception as e:
                         print(f"   ⚠️ iTunes metadata fetch failed: {e}")
+                
+                # Record all files in this group as imported in database
+                for filepath in filepaths:
+                    record_imported_file(filepath, book_id=book_id)
 
                 # Handle file cleanup - delete all original files after successful import
                 delete_after = config.get('import_delete', False)
@@ -3388,7 +3568,6 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     'last_import': import_state.get('last_import'),
                     'last_imported_count': import_state.get('last_imported_count', 0),
                     'total_imported': import_state.get('total_imported', 0),
-                    'imported_files_count': len(import_state.get('imported_files', [])),
                     'errors': list(import_state.get('errors', [])),
                     'kepub_converting': import_state.get('kepub_converting'),
                     'kepub_convert_start': import_state.get('kepub_convert_start'),
@@ -3396,6 +3575,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     'kepub_last_success': import_state.get('kepub_last_success'),
                     'kepub_last_log': import_state.get('kepub_last_log'),
                 }
+            # Get import history count from database
+            imported_files_count = get_import_history_count()
             # Check if watcher thread is actually alive
             thread_alive = _import_watcher_thread is not None and _import_watcher_thread.is_alive()
             status = {
@@ -3410,7 +3591,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 'last_import': state_snapshot['last_import'],
                 'last_imported_count': state_snapshot['last_imported_count'],
                 'total_imported': state_snapshot['total_imported'],
-                'pending_files': len(scan_import_folder()) - state_snapshot['imported_files_count'],
+                'imported_files_count': imported_files_count,
+                'pending_files': len(scan_import_folder()) - imported_files_count,
                 'errors': state_snapshot['errors'],
                 # KEPUB conversion status (for debugging - can be removed later)
                 'kepub': {
@@ -3932,6 +4114,140 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests"""
+        # API: Upload books
+        if self.path == '/api/upload-books':
+            import_folder = config.get('import_folder', '')
+            if not import_folder:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Import folder not configured'})
+                self.wfile.write(response.encode('utf-8'))
+                return
+            
+            if not os.path.isdir(import_folder):
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': 'Import folder does not exist'})
+                self.wfile.write(response.encode('utf-8'))
+                return
+            
+            try:
+                # Parse Content-Type header
+                content_type = self.headers.get('Content-Type', '')
+                if not content_type.startswith('multipart/form-data'):
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'success': False, 'error': 'Invalid content type'})
+                    self.wfile.write(response.encode('utf-8'))
+                    return
+                
+                # Extract boundary
+                boundary = content_type.split('boundary=')[1].encode('utf-8')
+                
+                # Read request body
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length)
+                
+                # Parse multipart data
+                files_uploaded = []
+                errors = []
+                
+                # Simple multipart parser - split by boundary
+                boundary_marker = b'--' + boundary
+                parts = body.split(boundary_marker)
+                
+                for part in parts[1:-1]:  # Skip first (before boundary) and last (after final boundary)
+                    part = part.lstrip(b'\r\n')  # Remove leading CRLF
+                    if not part.strip():
+                        continue
+                    
+                    # Split headers and body
+                    if b'\r\n\r\n' in part:
+                        headers_raw, file_data = part.split(b'\r\n\r\n', 1)
+                    elif b'\n\n' in part:
+                        headers_raw, file_data = part.split(b'\n\n', 1)
+                    else:
+                        continue
+                    
+                    # Parse headers to get filename
+                    headers = {}
+                    for line in headers_raw.decode('utf-8', errors='ignore').split('\r\n'):
+                        if ':' in line:
+                            key, value = line.split(':', 1)
+                            headers[key.strip().lower()] = value.strip()
+                    
+                    # Extract filename from Content-Disposition
+                    content_disposition = headers.get('content-disposition', '')
+                    filename = None
+                    if 'filename=' in content_disposition:
+                        filename = content_disposition.split('filename=')[1]
+                        # Handle quoted filenames
+                        if filename.startswith('"') and filename.endswith('"'):
+                            filename = filename[1:-1]
+                        elif filename.startswith("'") and filename.endswith("'"):
+                            filename = filename[1:-1]
+                        filename = filename.strip()
+                    
+                    if not filename:
+                        continue
+                    
+                    # Save file to import folder
+                    try:
+                        filepath = os.path.join(import_folder, filename)
+                        # Handle filename conflicts
+                        counter = 1
+                        base, ext = os.path.splitext(filename)
+                        while os.path.exists(filepath):
+                            new_filename = f"{base}_{counter}{ext}"
+                            filepath = os.path.join(import_folder, new_filename)
+                            counter += 1
+                        
+                        # Remove trailing CRLF before next boundary
+                        file_data = file_data.rstrip(b'\r\n')
+                        
+                        with open(filepath, 'wb') as f:
+                            f.write(file_data)
+                        
+                        files_uploaded.append(os.path.basename(filepath))
+                        print(f"✅ Uploaded file: {os.path.basename(filepath)}")
+                    except Exception as e:
+                        errors.append(f"{filename}: {str(e)}")
+                        print(f"❌ Failed to upload {filename}: {e}")
+                
+                if files_uploaded:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': True, 
+                        'files_uploaded': files_uploaded,
+                        'errors': errors
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                else:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({
+                        'success': False, 
+                        'error': 'No files uploaded',
+                        'errors': errors
+                    })
+                    self.wfile.write(response.encode('utf-8'))
+                return
+            
+            except Exception as e:
+                print(f"❌ Upload error: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({'success': False, 'error': str(e)})
+                self.wfile.write(response.encode('utf-8'))
+                return
+        
         # API: Trigger manual import scan
         if self.path == '/api/import/scan':
             if not config.get('import_folder'):
@@ -5007,11 +5323,11 @@ if __name__ == "__main__":
     # Load config on startup
     load_config()
 
-    # Load previously imported files (survives restarts)
-    load_imported_files()
-
     # Initialize folio database for multi-user reading lists
     init_folio_db()
+    
+    # Migrate import history from JSON to database (one-time migration)
+    migrate_import_history_from_json()
 
     # Pre-load cover cache asynchronously (don't block server startup)
     def preload_cover_cache():
