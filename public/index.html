@@ -990,7 +990,7 @@
         </div>
         
         <!-- Spacer for fixed header -->
-        <div class="h-[120px]"></div>
+        <div class="h-[160px]"></div>
         
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto safe-area-bottom">
@@ -1083,8 +1083,8 @@
                     </button>
                 </div>
 
-                    <!-- Bulk Action Toolbar -->
-                    <div x-show="selectionMode && selectedBookIds.length > 0" class="flex items-center justify-between gap-2 p-3 bg-primary-50 border border-primary-200 rounded-lg mt-2 mb-2">
+                <!-- Bulk Action Toolbar -->
+                <div x-show="selectionMode && selectedBookIds.length > 0" class="flex items-center justify-between gap-2 p-3 bg-primary-50 border border-primary-200 rounded-lg mx-3 mb-2">
                         <div class="flex items-center gap-2">
                             <span class="text-sm font-medium text-ink-900">
                                 <span x-text="selectedBookIds.length"></span> selected
@@ -1129,7 +1129,7 @@
                     </div>
 
                     <!-- Sorting Options and View Toggle -->
-                    <div class="flex items-center justify-between gap-3 mt-2">
+                    <div class="flex items-center justify-between gap-3 px-3">
                         <select x-model="sortBy" @change="sortBooks()" class="sort-select flex-1">
                             <option value="recent">Date Added</option>
                             <option value="title">Title A-Z</option>
@@ -1155,10 +1155,9 @@
                                 title="Grid View"
                             >
                                 <i class="bi bi-grid-3x3-gap"></i>
-                        </button>
+                            </button>
                         </div>
                     </div>
-                </div>
 
                 <!-- List View -->
                 <div x-show="libraryView === 'list'" class="px-3">
@@ -1232,10 +1231,10 @@
                                 >
                                     <i :class="isInReadingList(book.id) ? 'bi bi-bookmark-fill' : 'bi bi-bookmark-plus'"></i>
                                 </button>
-                        </div>
+                            </div>
                         </template>
-                                        </div>
-                                    </div>
+                    </div>
+                </div>
                 
                 <!-- Grid View (Swipeable Pages) -->
                 <div x-show="libraryView === 'grid'">
@@ -1850,7 +1849,7 @@
             </div>
 
     <!-- Requests View (List format) -->
-    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[120px] overflow-y-auto">
+    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[160px] overflow-y-auto">
         <!-- Requests List -->
         <div class="p-3 pb-16">
             <!-- Empty State -->
@@ -1907,7 +1906,7 @@
     </div>
 
     <!-- Bookshelf View (Full page grid of books) -->
-    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[120px] overflow-y-auto">
+    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[160px] overflow-y-auto">
         <!-- View Toggle -->
         <div class="bg-white border-b border-ink-200 px-3 py-2">
             <div class="flex items-center justify-between">
