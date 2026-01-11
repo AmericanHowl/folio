@@ -425,26 +425,30 @@ def get_folio_db_connection(readonly=False):
 
 def get_user_from_headers(headers):
     """
-    Extract username from authentik proxy headers.
+    Extract username from Cloudflare Access or proxy headers.
     Returns 'default' if no user header is found (backward compatible).
 
-    Authentik typically sends these headers:
-    - X-authentik-username
-    - Remote-User
-    - X-Forwarded-User
+    Cloudflare Access sends:
+    - Cf-Access-Authenticated-User-Email (user's email)
+    - Cf-Access-JWT-Assertion (JWT with claims)
     """
-    # Check common authentik/proxy headers in order of preference
-    user_headers = [
+    # Check Cloudflare Access header first (primary auth method)
+    cf_email = headers.get('Cf-Access-Authenticated-User-Email')
+    if cf_email:
+        # Use email as username (lowercase, strip whitespace)
+        return cf_email.strip().lower()
+
+    # Fallback to other common proxy headers
+    fallback_headers = [
         'X-authentik-username',
         'Remote-User',
         'X-Forwarded-User',
         'X-Auth-Request-User',
     ]
 
-    for header in user_headers:
+    for header in fallback_headers:
         user = headers.get(header)
         if user:
-            # Sanitize username (lowercase, strip whitespace)
             return user.strip().lower()
 
     return 'default'
