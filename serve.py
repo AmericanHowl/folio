@@ -1483,10 +1483,16 @@ def fetch_and_apply_itunes_metadata(book_id):
             result = run_calibredb(metadata_args, suppress_errors=True)
             if result['success']:
                 print(f"✅ Applied iTunes metadata for book {book_id}")
-                return True
             else:
                 print(f"⚠️ Failed to apply metadata: {result.get('error', 'Unknown')}")
                 return False
+
+        # Embed metadata into the actual ebook files (so Kobo/other readers see it)
+        embed_result = run_calibredb(['embed_metadata', str(book_id)], suppress_errors=True)
+        if embed_result['success']:
+            print(f"✅ Embedded metadata into ebook files for book {book_id}")
+        else:
+            print(f"⚠️ Failed to embed metadata: {embed_result.get('error', 'Unknown')}")
 
         return True
 
@@ -4591,6 +4597,13 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 errors.append(f'Failed to process cover: {str(e)}')
                 print(f"❌ Cover update error: {e}")
+
+        # Embed metadata into the actual ebook files (so Kobo/other readers see it)
+        embed_result = run_calibredb(['embed_metadata', book_id], suppress_errors=True)
+        if embed_result['success']:
+            print(f"✅ Embedded metadata into ebook files for book {book_id}")
+        else:
+            print(f"⚠️ Failed to embed metadata into files: {embed_result.get('error', 'Unknown')}")
 
         # Send response
         # Treat cover issues as non-fatal: metadata changes should still be considered success
