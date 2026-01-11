@@ -12,6 +12,7 @@ from urllib.parse import urlparse, parse_qs
 import json
 import subprocess
 import os
+import sys
 import base64
 import tempfile
 import re
