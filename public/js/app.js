@@ -201,6 +201,7 @@ function folioApp() {
         // Navigation state for browser history
         currentView: 'library', // 'library' | 'bookshelf' | 'requests'
         navigationLocked: false, // Prevent navigation loops
+        headerCompact: false, // Whether the header title should be compact (on scroll)
 
         /**
          * Initialize the application
@@ -212,9 +213,10 @@ function folioApp() {
             this.calculateBooksPerPage();
             window.addEventListener('resize', () => this.calculateBooksPerPage());
 
-            // Back-to-top visibility and infinite scroll
+            // Back-to-top visibility, header compact state, and infinite scroll
             window.addEventListener('scroll', () => {
                 this.showBackToTop = window.scrollY > 400;
+                this.headerCompact = window.scrollY > 50;
 
                 // Infinite scroll for search results
                 if (this.searchQuery && this.searchQuery.trim() && !this.loadingSearchiTunes && this.searchiTunesHasMore) {
@@ -2273,6 +2275,40 @@ function folioApp() {
             if (!timestamp) return 'Unknown date';
             const date = new Date(timestamp * 1000);
             return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        },
+
+        /**
+         * Get the current section title based on view state
+         */
+        getSectionTitle() {
+            if (this.searchQuery && this.searchQuery.trim()) {
+                return 'Search Results';
+            }
+            if (this.showRequests) {
+                return 'Book Requests';
+            }
+            if (this.showBookshelf) {
+                return this.bookshelfTitle || 'Books';
+            }
+            return 'Your Library';
+        },
+
+        /**
+         * Check if back button should be shown
+         */
+        showBackButton() {
+            return this.showRequests || this.showBookshelf;
+        },
+
+        /**
+         * Handle back button click
+         */
+        handleBackButton() {
+            if (this.showRequests) {
+                this.closeRequests();
+            } else if (this.showBookshelf) {
+                this.closeBookshelf();
+            }
         },
 
         /**
