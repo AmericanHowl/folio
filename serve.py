@@ -1230,34 +1230,39 @@ def convert_book_to_kepub(book_id):
             print(f"⚠️ No EPUB found for book {book_id} - skipping KEPUB conversion")
             return False
 
-        # Create output filename
-        kepub_file = epub_file.replace('.epub', '.kepub.epub')
+        # Create output filename in a temp directory (not in library)
+        temp_dir = tempfile.mkdtemp(prefix='kepub_convert_')
+        epub_basename = os.path.basename(epub_file)
+        kepub_basename = epub_basename.replace('.epub', '.kepub.epub').replace('.EPUB', '.kepub.epub')
+        kepub_file = os.path.join(temp_dir, kepub_basename)
 
-        # Run kepubify
-        result = subprocess.run(
-            [kepubify_path, '-o', kepub_file, epub_file],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
+        try:
+            # Run kepubify
+            result = subprocess.run(
+                [kepubify_path, '-o', kepub_file, epub_file],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
 
-        if result.returncode == 0 and os.path.exists(kepub_file):
-            # Add the KEPUB format to the book in Calibre
-            add_result = run_calibredb(['add_format', str(book_id), kepub_file], suppress_errors=True)
-            if add_result['success']:
-                print(f"✅ Converted and added KEPUB for book {book_id}")
-                # Remove the temporary kepub file since it's now in the library
-                try:
-                    os.remove(kepub_file)
-                except:
-                    pass
-                return True
+            if result.returncode == 0 and os.path.exists(kepub_file):
+                # Add the KEPUB format to the book in Calibre
+                add_result = run_calibredb(['add_format', str(book_id), kepub_file], suppress_errors=True)
+                if add_result['success']:
+                    print(f"✅ Converted and added KEPUB for book {book_id}")
+                    return True
+                else:
+                    print(f"❌ Failed to add KEPUB format: {add_result.get('error', 'Unknown error')}")
+                    return False
             else:
-                print(f"❌ Failed to add KEPUB format: {add_result.get('error', 'Unknown error')}")
+                print(f"❌ kepubify failed: {result.stderr}")
                 return False
-        else:
-            print(f"❌ kepubify failed: {result.stderr}")
-            return False
+        finally:
+            # Always clean up temp directory
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
 
     except Exception as e:
         print(f"❌ KEPUB conversion error: {e}")
@@ -1429,8 +1434,19 @@ def fetch_and_apply_itunes_metadata(book_id):
 
         # Apply description/comments if available
         if best_match.get('description'):
-            # Strip HTML tags for Calibre comments
-            description = re.sub(r'<[^>]+>', '', best_match['description'])
+            # Convert HTML to plain text while preserving paragraph structure
+            description = best_match['description']
+            # Convert <br> tags to newlines
+            description = re.sub(r'<br\s*/?>', '\n', description, flags=re.IGNORECASE)
+            # Convert </p> and <p> tags to double newlines for paragraph breaks
+            description = re.sub(r'</p>\s*<p[^>]*>', '\n\n', description, flags=re.IGNORECASE)
+            description = re.sub(r'</?p[^>]*>', '\n', description, flags=re.IGNORECASE)
+            # Strip remaining HTML tags
+            description = re.sub(r'<[^>]+>', '', description)
+            # Clean up excessive whitespace while preserving intentional newlines
+            description = re.sub(r'[^\S\n]+', ' ', description)  # Collapse spaces/tabs but not newlines
+            description = re.sub(r'\n{3,}', '\n\n', description)  # Max 2 consecutive newlines
+            description = description.strip()
             metadata_args.extend(['--field', f'comments:{description}'])
 
         # Apply cover if available
@@ -1748,16 +1764,10 @@ def import_books_from_folder():
                     except Exception as e:
                         print(f"   ⚠️ iTunes metadata fetch failed: {e}")
 
-                # Handle file cleanup
-                # IMPORTANT: Keep EPUB files for seeding (torrents), only delete non-EPUB formats
+                # Handle file cleanup - delete all original files after successful import
                 delete_after = config.get('import_delete', False)
-                for filepath in filepaths:
-                    is_epub = filepath.lower().endswith('.epub')
-                    if is_epub:
-                        # Always keep EPUBs for seeding
-                        print(f"📁 Kept for seeding: {os.path.basename(filepath)}")
-                    elif delete_after:
-                        # Delete non-EPUB formats if configured
+                if delete_after:
+                    for filepath in filepaths:
                         try:
                             if os.path.exists(filepath):
                                 os.remove(filepath)
