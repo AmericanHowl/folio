@@ -839,24 +839,6 @@
             <header>
                 <div class="max-w-7xl mx-auto px-3">
                     <div class="flex items-center justify-between h-14">
-                        <!-- Back Button + Logo -->
-                        <div class="flex items-center">
-                            <!-- Back button (only visible in sub-views) -->
-                            <button 
-                                x-show="showBackButton()"
-                                @click="handleBackButton()"
-                                class="p-2 -ml-1 text-ink-600 hover:text-ink-800 hover:bg-ink-100 rounded-lg transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-                            >
-                                <i class="bi bi-arrow-left text-lg"></i>
-                            </button>
-                            <!-- Spacer when no back button (keeps logo position consistent) -->
-                            <div x-show="!showBackButton()" class="w-[44px]"></div>
-                            <!-- Logo -->
-                            <a @click.prevent="searchQuery = ''; navigateToLibrary(); pushHistoryState('library'); window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center cursor-pointer hover:opacity-80 transition-opacity">
-                                <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
-                            </a>
-                        </div>
-
                         <!-- Actions -->
                         <div class="flex items-center gap-1">
                             <button 
@@ -892,18 +874,18 @@
                                         <span>Import Books</span>
                                         <input type="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.fb2,.lit,.prc,.txt,.rtf,.djvu,.cbz,.cbr" multiple @change="handleBookUpload($event)" class="hidden">
                                     </label>
-                                    <button @click="menuOpen = false; openRequests()" class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <i class="bi bi-inbox-fill text-ink-400 text-sm"></i>
+                                    <button @click="menuOpen = false; openRequests()" class="w-full flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
                                         <span>Requests</span>
+                                        <i class="bi bi-inbox-fill text-ink-400 text-sm"></i>
                                     </button>
-                                    <button @click="menuOpen = false; toggleSelectionMode()" class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <i class="bi bi-check-square text-ink-400 text-sm"></i>
+                                    <button @click="menuOpen = false; toggleSelectionMode()" class="w-full flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
                                         <span>Select Books</span>
+                                        <i class="bi bi-check-square text-ink-400 text-sm"></i>
                                     </button>
                                     <div class="border-t border-ink-200 my-1"></div>
-                                    <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <i class="bi bi-gear text-ink-400 text-sm"></i>
+                                    <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
                                         <span>Settings</span>
+                                        <i class="bi bi-gear text-ink-400 text-sm"></i>
                                     </button>
                                 </div>
                             </div>
@@ -944,6 +926,16 @@
             <!-- Section Title Bar -->
             <div class="px-4 pb-3" :class="headerCompact ? 'pt-2' : 'pt-1'">
                 <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <!-- Back button (only visible in sub-views) -->
+                                                <button 
+                                                x-show="showBackButton()"
+                                                @click="handleBackButton()"
+                                                class="p-2 -ml-1 text-ink-600 hover:text-ink-800 hover:bg-ink-100 rounded-lg transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                                            >
+                                                <i class="bi chevron-left text-lg"></i>
+                                            </button>
+                                            <!-- Spacer when no back button (keeps logo position consistent) -->
+                                            <div x-show="!showBackButton()" class="w-[44px]"></div>
                     <h1 class="font-display font-bold text-ink-900 transition-all duration-200"
                         :class="headerCompact ? 'text-base' : 'text-xl'"
                         x-text="getSectionTitle()">
