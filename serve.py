@@ -219,6 +219,12 @@ import_state = {
     'kepub_last_log': None,  # Full log output from last kepubify run
 }
 
+# Threading lock to protect import_state from concurrent access
+import_state_lock = threading.Lock()
+
+# Track watcher thread to prevent duplicates
+_import_watcher_thread = None
+
 
 def sanitize_token(token):
     """Sanitize API token by removing whitespace, newlines, and 'Bearer ' prefix."""
@@ -289,29 +295,55 @@ def save_config():
 
 
 def load_imported_files():
-    """Load list of already-imported files from disk (survives restarts)."""
+    """Load list of already-imported files from disk (survives restarts).
+
+    Thread-safe via import_state_lock.
+    """
     global import_state
     if os.path.exists(IMPORTED_FILES_FILE):
         try:
             with open(IMPORTED_FILES_FILE, 'r') as f:
                 data = json.load(f)
-                import_state['imported_files'] = data.get('files', [])
+                with import_state_lock:
+                    import_state['imported_files'] = data.get('files', [])
                 print(f"📂 Loaded {len(import_state['imported_files'])} previously imported files")
         except Exception as e:
             print(f"⚠️  Failed to load imported files list: {e}")
-            import_state['imported_files'] = []
+            with import_state_lock:
+                import_state['imported_files'] = []
     else:
-        import_state['imported_files'] = []
+        with import_state_lock:
+            import_state['imported_files'] = []
 
 
 def save_imported_files():
-    """Save list of imported files to disk for persistence across restarts."""
+    """Save list of imported files to disk for persistence across restarts.
+
+    Uses atomic write (temp file + rename) to prevent corruption.
+    Thread-safe via import_state_lock.
+    """
     try:
-        with open(IMPORTED_FILES_FILE, 'w') as f:
-            json.dump({'files': import_state.get('imported_files', [])}, f, indent=2)
+        with import_state_lock:
+            files_to_save = list(import_state.get('imported_files', []))
+
+        # Write to temp file first, then atomically rename
+        temp_file = IMPORTED_FILES_FILE + '.tmp'
+        with open(temp_file, 'w') as f:
+            json.dump({'files': files_to_save}, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())  # Ensure data is written to disk
+
+        # Atomic rename (on POSIX systems)
+        os.replace(temp_file, IMPORTED_FILES_FILE)
         return True
     except Exception as e:
         print(f"⚠️  Failed to save imported files list: {e}")
+        # Clean up temp file if it exists
+        try:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+        except Exception:
+            pass
         return False
 
 
@@ -1521,15 +1553,32 @@ def run_calibredb(args, suppress_errors=False):
 # Supported ebook formats for import
 EBOOK_EXTENSIONS = {'.epub', '.pdf', '.mobi', '.azw', '.azw3', '.fb2', '.lit', '.prc', '.txt', '.rtf', '.djvu', '.cbz', '.cbr'}
 
+# Minimum file age in seconds before processing (to avoid partially downloaded files)
+FILE_MATURITY_SECONDS = 5
+
+
+def is_file_mature(filepath):
+    """Check if file has not been modified recently (not still downloading)."""
+    try:
+        mtime = os.path.getmtime(filepath)
+        age = time.time() - mtime
+        return age >= FILE_MATURITY_SECONDS
+    except OSError:
+        return False  # File doesn't exist or can't be accessed
+
 
 def scan_import_folder():
-    """Scan the import folder for ebook files."""
+    """Scan the import folder for ebook files.
+
+    Skips files that are still being written (modified within last 5 seconds).
+    """
     import_folder = config.get('import_folder', '')
     if not import_folder or not os.path.isdir(import_folder):
         return []
 
     recursive = config.get('import_recursive', True)
     files = []
+    skipped_immature = 0
 
     print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})")
 
@@ -1540,6 +1589,12 @@ def scan_import_folder():
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EBOOK_EXTENSIONS:
                     filepath = os.path.join(root, filename)
+                    # Skip files still being written
+                    if not is_file_mature(filepath):
+                        skipped_immature += 1
+                        rel_path = os.path.relpath(filepath, import_folder)
+                        print(f"   ⏳ Skipping (still downloading): {rel_path}")
+                        continue
                     files.append(filepath)
                     # Show relative path for better readability
                     rel_path = os.path.relpath(filepath, import_folder)
@@ -1551,9 +1606,16 @@ def scan_import_folder():
             if os.path.isfile(filepath):
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EBOOK_EXTENSIONS:
+                    # Skip files still being written
+                    if not is_file_mature(filepath):
+                        skipped_immature += 1
+                        print(f"   ⏳ Skipping (still downloading): {filename}")
+                        continue
                     files.append(filepath)
                     print(f"   📖 Found: {filename}")
 
+    if skipped_immature > 0:
+        print(f"   ℹ️  Skipped {skipped_immature} file(s) still being written")
     print(f"🔍 Scan complete: found {len(files)} ebook file(s)")
     return files
 
@@ -1582,12 +1644,14 @@ def import_books_from_folder():
     # Find all ebook files
     files = scan_import_folder()
 
-    # Filter out already imported files
-    already_imported = set(import_state.get('imported_files', []))
+    # Filter out already imported files (thread-safe)
+    with import_state_lock:
+        already_imported = set(import_state.get('imported_files', []))
     new_files = [f for f in files if f not in already_imported]
 
     if not new_files:
-        import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        with import_state_lock:
+            import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
         if len(already_imported) > 0:
             print(f"   ℹ️  All {len(files)} file(s) already imported previously")
         return {'success': True, 'imported': 0, 'message': 'No new files to import'}
@@ -1643,9 +1707,10 @@ def import_books_from_folder():
 
             if result['success']:
                 imported_count += 1
-                # Mark all files in this group as imported
-                for filepath in filepaths:
-                    import_state['imported_files'].append(filepath)
+                # Mark all files in this group as imported (thread-safe)
+                with import_state_lock:
+                    for filepath in filepaths:
+                        import_state['imported_files'].append(filepath)
                 save_imported_files()  # Persist to disk immediately
 
                 print(f"   ✅ Successfully imported to Calibre: {os.path.basename(file_to_import)}")
@@ -1697,16 +1762,18 @@ def import_books_from_folder():
                 except Exception as e:
                     print(f"⚠️ Failed to cleanup temp dir: {e}")
 
-    # Update state
-    import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
-    import_state['last_imported_count'] = imported_count
-    import_state['total_imported'] += imported_count
+    # Update state (thread-safe)
+    with import_state_lock:
+        import_state['last_scan'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        import_state['last_imported_count'] = imported_count
+        import_state['total_imported'] += imported_count
+        if imported_count > 0:
+            import_state['last_import'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        if errors:
+            import_state['errors'] = errors[-10:]  # Keep last 10 errors
     if imported_count > 0:
-        import_state['last_import'] = time.strftime('%Y-%m-%d %H:%M:%S')
         # Invalidate cover cache so new books are picked up
         cover_cache.invalidate()
-    if errors:
-        import_state['errors'] = errors[-10:]  # Keep last 10 errors
 
     message = f'Imported {imported_count} book(s)'
     if skipped_duplicates > 0:
@@ -1722,15 +1789,24 @@ def import_books_from_folder():
 
 
 def import_watcher_thread():
-    """Background thread that periodically scans the import folder."""
+    """Background thread that periodically scans the import folder.
+
+    Thread-safe via import_state_lock for state access.
+    """
     global import_state
 
-    import_state['running'] = True
+    with import_state_lock:
+        import_state['running'] = True
     interval = config.get('import_interval', 60)
 
     print(f"📂 Import watcher started (interval: {interval}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})")
 
-    while import_state['running']:
+    while True:
+        # Check running state with lock
+        with import_state_lock:
+            if not import_state['running']:
+                break
+
         try:
             print(f"\n⏰ Starting scheduled import scan at {time.strftime('%Y-%m-%d %H:%M:%S')}")
             result = import_books_from_folder()
@@ -1740,19 +1816,31 @@ def import_watcher_thread():
                 print(f"📚 Import scan complete: {result.get('message', 'No new books found')}")
         except Exception as e:
             print(f"❌ Import watcher error: {e}")
-            import_state['errors'].append(str(e))
+            import traceback
+            traceback.print_exc()
+            with import_state_lock:
+                import_state['errors'].append(str(e))
+                # Limit error list to 10 entries
+                if len(import_state['errors']) > 10:
+                    import_state['errors'] = import_state['errors'][-10:]
 
         # Sleep in small increments so we can stop quickly
         for _ in range(interval):
-            if not import_state['running']:
-                break
+            with import_state_lock:
+                if not import_state['running']:
+                    break
             time.sleep(1)
 
     print("📂 Import watcher stopped")
 
 
 def start_import_watcher():
-    """Start the import watcher background thread if configured."""
+    """Start the import watcher background thread if configured.
+
+    Prevents duplicate watchers from starting.
+    """
+    global _import_watcher_thread
+
     import_folder = config.get('import_folder', '')
 
     if not import_folder:
@@ -1763,16 +1851,22 @@ def start_import_watcher():
         print(f"⚠️  Import folder does not exist: {import_folder}")
         return False
 
+    # Prevent duplicate watcher threads
+    if _import_watcher_thread is not None and _import_watcher_thread.is_alive():
+        print("📂 Import watcher already running - skipping duplicate start")
+        return True
+
     # Start background thread
-    thread = threading.Thread(target=import_watcher_thread, daemon=True)
-    thread.start()
+    _import_watcher_thread = threading.Thread(target=import_watcher_thread, daemon=True)
+    _import_watcher_thread.start()
     return True
 
 
 def stop_import_watcher():
     """Stop the import watcher background thread."""
     global import_state
-    import_state['running'] = False
+    with import_state_lock:
+        import_state['running'] = False
 
 
 def get_reading_list_column_id():
@@ -2872,26 +2966,42 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
+            # Get import state snapshot with lock for thread safety
+            with import_state_lock:
+                state_snapshot = {
+                    'running': import_state.get('running', False),
+                    'last_scan': import_state.get('last_scan'),
+                    'last_import': import_state.get('last_import'),
+                    'last_imported_count': import_state.get('last_imported_count', 0),
+                    'total_imported': import_state.get('total_imported', 0),
+                    'imported_files_count': len(import_state.get('imported_files', [])),
+                    'errors': list(import_state.get('errors', [])),
+                    'kepub_converting': import_state.get('kepub_converting'),
+                    'kepub_convert_start': import_state.get('kepub_convert_start'),
+                    'kepub_last_file': import_state.get('kepub_last_file'),
+                    'kepub_last_success': import_state.get('kepub_last_success'),
+                    'kepub_last_log': import_state.get('kepub_last_log'),
+                }
             status = {
                 'enabled': bool(config.get('import_folder')),
-                'running': import_state.get('running', False),
+                'running': state_snapshot['running'],
                 'folder': config.get('import_folder', ''),
                 'interval': config.get('import_interval', 60),
                 'recursive': config.get('import_recursive', True),
                 'delete_after_import': config.get('import_delete', False),
-                'last_scan': import_state.get('last_scan'),
-                'last_import': import_state.get('last_import'),
-                'last_imported_count': import_state.get('last_imported_count', 0),
-                'total_imported': import_state.get('total_imported', 0),
-                'pending_files': len(scan_import_folder()) - len(import_state.get('imported_files', [])),
-                'errors': import_state.get('errors', []),
+                'last_scan': state_snapshot['last_scan'],
+                'last_import': state_snapshot['last_import'],
+                'last_imported_count': state_snapshot['last_imported_count'],
+                'total_imported': state_snapshot['total_imported'],
+                'pending_files': len(scan_import_folder()) - state_snapshot['imported_files_count'],
+                'errors': state_snapshot['errors'],
                 # KEPUB conversion status (for debugging - can be removed later)
                 'kepub': {
-                    'converting': import_state.get('kepub_converting'),
-                    'convert_start': import_state.get('kepub_convert_start'),
-                    'last_file': import_state.get('kepub_last_file'),
-                    'last_success': import_state.get('kepub_last_success'),
-                    'last_log': import_state.get('kepub_last_log'),
+                    'converting': state_snapshot['kepub_converting'],
+                    'convert_start': state_snapshot['kepub_convert_start'],
+                    'last_file': state_snapshot['kepub_last_file'],
+                    'last_success': state_snapshot['kepub_last_success'],
+                    'last_log': state_snapshot['kepub_last_log'],
                 }
             }
             response = json.dumps(status)
