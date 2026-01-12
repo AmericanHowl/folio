@@ -4243,8 +4243,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
+                    self.send_header('x-kobo-apitoken', 'e30=')
                     self.end_headers()
-                    self.wfile.write(json.dumps(kobo_book['BookMetadata']).encode('utf-8'))
+                    self.wfile.write(json.dumps([kobo_book['BookMetadata']]).encode('utf-8'))
                     return
 
                 except Exception as e:
@@ -4302,41 +4303,112 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             # Handle: GET /kobo/<token>/v1/initialization - Device initialization
             if kobo_path == '/v1/initialization':
                 print(f"🔧 Kobo initialization request from user '{user}'", flush=True)
-                # Return initialization response with resource URLs
-                # The Kobo uses these to know where to find various endpoints
-                init_response = {
-                    "Resources": {
-                        # Image URLs
-                        "image_host": base_url,
-                        "image_url_quality_template": f"{base_url}/kobo/{user_token}/{{ImageId}}/{{Width}}/{{Height}}/{{Quality}}/{{IsGreyscale}}/image.jpg",
-                        "image_url_template": f"{base_url}/kobo/{user_token}/{{ImageId}}/{{Width}}/{{Height}}/false/image.jpg",
+                # Return initialization response with complete resource URLs
+                # The Kobo device needs these to know where to find various endpoints
+                # This comprehensive list is based on calibre-web's kobo.py implementation
+                kobo_resources = {
+                    # Critical image URLs for covers
+                    "image_host": base_url,
+                    "image_url_quality_template": f"{base_url}/kobo/{user_token}/{{ImageId}}/{{Width}}/{{Height}}/{{Quality}}/{{IsGreyscale}}/image.jpg",
+                    "image_url_template": f"{base_url}/kobo/{user_token}/{{ImageId}}/{{Width}}/{{Height}}/false/image.jpg",
 
-                        # Library sync endpoint - this is the key one!
-                        "library_sync": f"{base_url}/kobo/{user_token}/v1/library/sync",
+                    # Auth endpoints - critical for device authentication
+                    "device_auth": f"{base_url}/kobo/{user_token}/v1/auth/device",
+                    "device_refresh": f"{base_url}/kobo/{user_token}/v1/auth/refresh",
 
-                        # Book endpoints
-                        "library_items": f"{base_url}/kobo/{user_token}/v1/library/{{LibraryItemId}}",
-                        "content_access_book": f"{base_url}/kobo/{user_token}/v1/library/{{BookId}}/content",
+                    # Library sync endpoint - the most important one
+                    "library_sync": f"{base_url}/kobo/{user_token}/v1/library/sync",
 
-                        # Metadata
-                        "book": f"{base_url}/kobo/{user_token}/v1/library/{{BookId}}/metadata",
+                    # Reading state - for tracking progress
+                    "reading_state": f"{base_url}/kobo/{user_token}/v1/library/{{Ids}}/state",
 
-                        # Tags/shelves
-                        "tags": f"{base_url}/kobo/{user_token}/v1/library/tags",
+                    # Library metadata
+                    "library_metadata": f"{base_url}/kobo/{user_token}/v1/library/{{Ids}}/metadata",
 
-                        # User endpoints
-                        "user_profile": f"{base_url}/kobo/{user_token}/v1/user/profile",
-                        "user_wishlist": f"{base_url}/kobo/{user_token}/v1/user/wishlist",
-                        "user_recommendations": f"{base_url}/kobo/{user_token}/v1/user/recommendations",
+                    # Book endpoints
+                    "library_items": f"{base_url}/kobo/{user_token}/v1/user/library",
+                    "library_book": f"{base_url}/kobo/{user_token}/v1/user/library/books/{{LibraryItemId}}",
+                    "content_access_book": f"{base_url}/kobo/{user_token}/v1/products/books/{{ProductId}}/access",
+                    "book": f"{base_url}/kobo/{user_token}/v1/products/books/{{ProductId}}",
 
-                        # Other endpoints
-                        "affiliate": f"{base_url}/kobo/{user_token}/v1/affiliate",
-                        "deals": f"{base_url}/kobo/{user_token}/v1/deals",
-                        "products": f"{base_url}/kobo/{user_token}/v1/products"
-                    }
+                    # Tags/shelves
+                    "tags": f"{base_url}/kobo/{user_token}/v1/library/tags",
+                    "tag_items": f"{base_url}/kobo/{user_token}/v1/library/tags/{{TagId}}/Items",
+                    "delete_tag": f"{base_url}/kobo/{user_token}/v1/library/tags/{{TagId}}",
+                    "delete_tag_items": f"{base_url}/kobo/{user_token}/v1/library/tags/{{TagId}}/items/delete",
+                    "rename_tag": f"{base_url}/kobo/{user_token}/v1/library/tags/{{TagId}}",
+
+                    # User endpoints
+                    "user_profile": f"{base_url}/kobo/{user_token}/v1/user/profile",
+                    "user_wishlist": f"{base_url}/kobo/{user_token}/v1/user/wishlist",
+                    "user_recommendations": f"{base_url}/kobo/{user_token}/v1/user/recommendations",
+                    "user_loyalty_benefits": f"{base_url}/kobo/{user_token}/v1/user/loyalty/benefits",
+                    "user_platform": f"{base_url}/kobo/{user_token}/v1/user/platform",
+                    "user_ratings": f"{base_url}/kobo/{user_token}/v1/user/ratings",
+                    "user_reviews": f"{base_url}/kobo/{user_token}/v1/user/reviews",
+
+                    # Download endpoints
+                    "get_download_keys": f"{base_url}/kobo/{user_token}/v1/library/downloadkeys",
+                    "get_download_link": f"{base_url}/kobo/{user_token}/v1/library/downloadlink",
+                    "add_entitlement": f"{base_url}/kobo/{user_token}/v1/library/{{RevisionIds}}",
+                    "delete_entitlement": f"{base_url}/kobo/{user_token}/v1/library/{{Ids}}",
+
+                    # Products/store endpoints (proxied to Kobo Store)
+                    "affiliate": f"{base_url}/kobo/{user_token}/v1/affiliate",
+                    "affiliaterequest": f"{base_url}/kobo/{user_token}/v1/affiliate",
+                    "deals": f"{base_url}/kobo/{user_token}/v1/deals",
+                    "products": f"{base_url}/kobo/{user_token}/v1/products",
+                    "daily_deal": f"{base_url}/kobo/{user_token}/v1/products/dailydeal",
+                    "categories": f"{base_url}/kobo/{user_token}/v1/categories",
+                    "category": f"{base_url}/kobo/{user_token}/v1/categories/{{CategoryId}}",
+                    "category_products": f"{base_url}/kobo/{user_token}/v1/categories/{{CategoryId}}/products",
+                    "featured_list": f"{base_url}/kobo/{user_token}/v1/products/featured/{{FeaturedListId}}",
+                    "featured_lists": f"{base_url}/kobo/{user_token}/v1/products/featured",
+                    "product_nextread": f"{base_url}/kobo/{user_token}/v1/products/{{ProductIds}}/nextread",
+                    "product_prices": f"{base_url}/kobo/{user_token}/v1/products/{{ProductIds}}/prices",
+                    "product_recommendations": f"{base_url}/kobo/{user_token}/v1/products/{{ProductId}}/recommendations",
+                    "product_reviews": f"{base_url}/kobo/{user_token}/v1/products/{{ProductIds}}/reviews",
+
+                    # Analytics endpoints (we stub these)
+                    "post_analytics_event": f"{base_url}/kobo/{user_token}/v1/analytics/event",
+                    "get_tests_request": f"{base_url}/kobo/{user_token}/v1/analytics/gettests",
+
+                    # Configuration
+                    "configuration_data": f"{base_url}/kobo/{user_token}/v1/configuration",
+                    "assets": f"{base_url}/kobo/{user_token}/v1/assets",
+
+                    # External hosts (use official Kobo values for functionality)
+                    "dictionary_host": "https://ereaderfiles.kobo.com",
+                    "discovery_host": "https://discovery.kobobooks.com",
+                    "oauth_host": "https://oauth.kobo.com",
+                    "reading_services_host": "https://readingservices.kobo.com",
+                    "social_host": "https://social.kobobooks.com",
+                    "userguide_host": "https://ereaderfiles.kobo.com",
+                    "store_host": "www.kobo.com",
+                    "store_home": "www.kobo.com/{region}/{language}",
+
+                    # Feature flags
+                    "kobo_audiobooks_enabled": "False",
+                    "kobo_display_price": "True",
+                    "kobo_nativeborrow_enabled": "False",
+                    "kobo_onestorelibrary_enabled": "False",
+                    "kobo_redeem_enabled": "False",
+                    "kobo_shelfie_enabled": "False",
+                    "kobo_subscriptions_enabled": "False",
+                    "kobo_superpoints_enabled": "False",
+                    "kobo_wishlist_enabled": "True",
+                    "use_one_store": "False",
+
+                    # Help/account pages
+                    "account_page": "https://www.kobo.com/account/settings",
+                    "help_page": "https://www.kobo.com/help",
+                    "privacy_page": "https://www.kobo.com/privacypolicy",
+                    "eula_page": "https://www.kobo.com/termsofuse",
                 }
+                init_response = {"Resources": kobo_resources}
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
                 self.end_headers()
                 self.wfile.write(json.dumps(init_response).encode('utf-8'))
                 return
@@ -4346,6 +4418,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"📚 Kobo tags/shelves request from user '{user}'", flush=True)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
                 self.end_headers()
                 self.wfile.write(json.dumps([]).encode('utf-8'))
                 return
@@ -4357,6 +4430,91 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"📦 Kobo affiliate request (stub response)", flush=True)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                self.wfile.write(json.dumps({}).encode('utf-8'))
+                return
+
+            # Handle: GET /kobo/<token>/v1/user/loyalty/benefits - Loyalty benefits stub
+            if kobo_path == '/v1/user/loyalty/benefits':
+                print(f"🎁 Kobo loyalty benefits request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                self.wfile.write(json.dumps({"Benefits": {}}).encode('utf-8'))
+                return
+
+            # Handle: GET /kobo/<token>/v1/analytics/gettests - Analytics tests stub
+            if kobo_path == '/v1/analytics/gettests':
+                print(f"📊 Kobo analytics gettests request (stub response)", flush=True)
+                testkey = self.headers.get('X-Kobo-userkey', '')
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                self.wfile.write(json.dumps({"Result": "Success", "TestKey": testkey, "Tests": {}}).encode('utf-8'))
+                return
+
+            # Handle: GET /kobo/<token>/v1/library/<book_uuid>/state - Reading state
+            state_match = re.match(r'^/v1/library/(folio-\d+)/state$', kobo_path)
+            if state_match:
+                try:
+                    book_uuid = state_match.group(1)
+                    book_id = int(book_uuid.replace('folio-', ''))
+                    print(f"📖 Kobo reading state GET request for book {book_id}", flush=True)
+
+                    book = get_book_for_kobo_sync(book_id)
+                    if not book:
+                        self.send_response(404)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': 'Book not found'}).encode('utf-8'))
+                        return
+
+                    # Return reading state - basic structure
+                    timestamp = book.get('timestamp') or '2000-01-01T00:00:00Z'
+                    if timestamp and 'T' not in str(timestamp):
+                        timestamp = f"{timestamp}T00:00:00Z"
+
+                    reading_state = {
+                        "EntitlementId": book_uuid,
+                        "Created": timestamp,
+                        "LastModified": timestamp,
+                        "PriorityTimestamp": timestamp,
+                        "StatusInfo": {
+                            "LastModified": timestamp,
+                            "Status": "ReadyToRead",
+                            "TimesStartedReading": 0
+                        },
+                        "Statistics": {
+                            "LastModified": timestamp
+                        },
+                        "CurrentBookmark": {
+                            "LastModified": timestamp
+                        }
+                    }
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('x-kobo-apitoken', 'e30=')
+                    self.end_headers()
+                    self.wfile.write(json.dumps([reading_state]).encode('utf-8'))
+                    return
+                except Exception as e:
+                    print(f"❌ Kobo reading state error: {e}", flush=True)
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
+                    return
+
+            # Handle: GET /kobo/<token>/v1/user/* - User profile stubs
+            if kobo_path.startswith('/v1/user/'):
+                print(f"👤 Kobo user request (stub response): {kobo_path}", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
                 self.end_headers()
                 self.wfile.write(json.dumps({}).encode('utf-8'))
                 return
@@ -5154,15 +5312,72 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length) if content_length > 0 else b''
 
-            # Handle: POST /kobo/<token>/v1/library/<book_uuid>/state - Reading state
-            state_match = re.match(r'^/v1/library/(folio-\d+)/state$', kobo_path)
-            if state_match:
-                # Accept reading state updates (position, progress) but don't store them yet
-                print(f"📖 Kobo reading state update from user '{user}'", flush=True)
+            # Handle: POST /kobo/<token>/v1/auth/device - Device authentication
+            # Handle: POST /kobo/<token>/v1/auth/refresh - Token refresh
+            if kobo_path in ('/v1/auth/device', '/v1/auth/refresh'):
+                print(f"🔐 Kobo auth request: {kobo_path} from user '{user}'", flush=True)
+                # Return dummy tokens - we authenticate via the URL token instead
+                import base64
+                access_token = base64.b64encode(os.urandom(24)).decode('utf-8')
+                refresh_token = base64.b64encode(os.urandom(24)).decode('utf-8')
+
+                # Parse request body to get UserKey
+                user_key = ""
+                try:
+                    if body:
+                        request_data = json.loads(body.decode('utf-8'))
+                        user_key = request_data.get('UserKey', '')
+                except:
+                    pass
+
+                auth_response = {
+                    "AccessToken": access_token,
+                    "RefreshToken": refresh_token,
+                    "TokenType": "Bearer",
+                    "TrackingId": str(uuid.uuid4()),
+                    "UserKey": user_key
+                }
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
                 self.end_headers()
-                self.wfile.write(json.dumps({'success': True}).encode('utf-8'))
+                self.wfile.write(json.dumps(auth_response).encode('utf-8'))
+                return
+
+            # Handle: PUT /kobo/<token>/v1/library/<book_uuid>/state - Reading state update
+            # Handle: POST /kobo/<token>/v1/library/<book_uuid>/state - Reading state update
+            state_match = re.match(r'^/v1/library/(folio-\d+)/state$', kobo_path)
+            if state_match:
+                book_uuid = state_match.group(1)
+                print(f"📖 Kobo reading state update for {book_uuid} from user '{user}'", flush=True)
+
+                # Parse the reading state update (we accept but don't persist for now)
+                update_results = {"EntitlementId": book_uuid}
+                try:
+                    if body:
+                        request_data = json.loads(body.decode('utf-8'))
+                        reading_states = request_data.get('ReadingStates', [])
+                        if reading_states:
+                            state = reading_states[0]
+                            if state.get('CurrentBookmark'):
+                                update_results["CurrentBookmarkResult"] = {"Result": "Success"}
+                            if state.get('Statistics'):
+                                update_results["StatisticsResult"] = {"Result": "Success"}
+                            if state.get('StatusInfo'):
+                                update_results["StatusInfoResult"] = {"Result": "Success"}
+                except Exception as e:
+                    print(f"⚠️ Error parsing reading state: {e}", flush=True)
+
+                # Return proper Kobo response format
+                response = {
+                    "RequestResult": "Success",
+                    "UpdateResults": [update_results]
+                }
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode('utf-8'))
                 return
 
             # Handle: POST /kobo/<token>/v1/analytics/event - Analytics events
@@ -5170,8 +5385,21 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 # Silently accept analytics but don't forward
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
                 self.end_headers()
                 self.wfile.write(json.dumps({}).encode('utf-8'))
+                return
+
+            # Handle: POST /kobo/<token>/v1/library/tags - Create shelf/tag
+            if kobo_path == '/v1/library/tags':
+                print(f"📚 Kobo tag create request from user '{user}'", flush=True)
+                # Stub response - accept but don't persist
+                tag_uuid = str(uuid.uuid4())
+                self.send_response(201)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                self.wfile.write(json.dumps(tag_uuid).encode('utf-8'))
                 return
 
             # For any other Kobo API paths, proxy to the official Kobo Store
@@ -6235,6 +6463,66 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_DELETE(self):
         """Handle DELETE requests"""
+        # Parse URL for path matching
+        parsed_url = urlparse(self.path)
+        path = parsed_url.path
+
+        # =======================================================================
+        # Kobo Sync Protocol DELETE Endpoints (archive book, delete tag)
+        # =======================================================================
+        kobo_sync_match = re.match(r'^/kobo/([a-f0-9-]{36})(/.*)?$', path)
+        if kobo_sync_match:
+            user_token = kobo_sync_match.group(1)
+            kobo_path = kobo_sync_match.group(2) or '/'
+
+            # Validate the token and get the user
+            user = get_user_from_kobo_token(user_token)
+            if not user:
+                print(f"⚠️ Invalid Kobo sync token: {user_token}", flush=True)
+                self.send_response(401)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'Invalid or expired token'}).encode('utf-8'))
+                return
+
+            # Handle: DELETE /kobo/<token>/v1/library/<book_uuid> - Archive/remove book
+            book_match = re.match(r'^/v1/library/(folio-\d+)$', kobo_path)
+            if book_match:
+                book_uuid = book_match.group(1)
+                book_id = int(book_uuid.replace('folio-', ''))
+                print(f"🗑️ Kobo book archive request for {book_uuid} from user '{user}'", flush=True)
+
+                # Mark as archived in sync state
+                update_kobo_sync_state(user, book_id, is_archived=True)
+
+                self.send_response(204)
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                return
+
+            # Handle: DELETE /kobo/<token>/v1/library/tags/<tag_id> - Delete tag
+            tag_match = re.match(r'^/v1/library/tags/([a-f0-9-]+)$', kobo_path)
+            if tag_match:
+                print(f"📚 Kobo tag delete request from user '{user}'", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                self.wfile.write(b' ')
+                return
+
+            # Proxy other DELETE requests
+            print(f"📡 Proxying Kobo DELETE request: {kobo_path}", flush=True)
+            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'DELETE', self.headers)
+            self.send_response(status)
+            skip_headers = {'transfer-encoding', 'connection', 'content-encoding'}
+            for key, value in resp_headers.items():
+                if key.lower() not in skip_headers:
+                    self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(resp_body)
+            return
+
         # API: Remove book request (from persistent database)
         match = re.match(r'/api/requests/(.+)', self.path)
         if match:
@@ -6281,6 +6569,90 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_PUT(self):
         """Handle metadata update requests"""
+        # Parse URL for path matching
+        parsed_url = urlparse(self.path)
+        path = parsed_url.path
+
+        # =======================================================================
+        # Kobo Sync Protocol PUT Endpoints (reading state)
+        # =======================================================================
+        kobo_sync_match = re.match(r'^/kobo/([a-f0-9-]{36})(/.*)?$', path)
+        if kobo_sync_match:
+            user_token = kobo_sync_match.group(1)
+            kobo_path = kobo_sync_match.group(2) or '/'
+
+            # Validate the token and get the user
+            user = get_user_from_kobo_token(user_token)
+            if not user:
+                print(f"⚠️ Invalid Kobo sync token: {user_token}", flush=True)
+                self.send_response(401)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'Invalid or expired token'}).encode('utf-8'))
+                return
+
+            # Read request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length) if content_length > 0 else b''
+
+            # Handle: PUT /kobo/<token>/v1/library/<book_uuid>/state - Reading state update
+            state_match = re.match(r'^/v1/library/(folio-\d+)/state$', kobo_path)
+            if state_match:
+                book_uuid = state_match.group(1)
+                print(f"📖 Kobo reading state PUT for {book_uuid} from user '{user}'", flush=True)
+
+                # Parse the reading state update (we accept but don't persist for now)
+                update_results = {"EntitlementId": book_uuid}
+                try:
+                    if body:
+                        request_data = json.loads(body.decode('utf-8'))
+                        reading_states = request_data.get('ReadingStates', [])
+                        if reading_states:
+                            state = reading_states[0]
+                            if state.get('CurrentBookmark'):
+                                update_results["CurrentBookmarkResult"] = {"Result": "Success"}
+                            if state.get('Statistics'):
+                                update_results["StatisticsResult"] = {"Result": "Success"}
+                            if state.get('StatusInfo'):
+                                update_results["StatusInfoResult"] = {"Result": "Success"}
+                except Exception as e:
+                    print(f"⚠️ Error parsing reading state: {e}", flush=True)
+
+                # Return proper Kobo response format
+                response = {
+                    "RequestResult": "Success",
+                    "UpdateResults": [update_results]
+                }
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                return
+
+            # Handle: PUT /kobo/<token>/v1/library/tags/<tag_id> - Update tag
+            tag_match = re.match(r'^/v1/library/tags/([a-f0-9-]+)$', kobo_path)
+            if tag_match:
+                print(f"📚 Kobo tag update request from user '{user}'", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('x-kobo-apitoken', 'e30=')
+                self.end_headers()
+                self.wfile.write(b' ')
+                return
+
+            # Proxy other PUT requests
+            print(f"📡 Proxying Kobo PUT request: {kobo_path}", flush=True)
+            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'PUT', self.headers, body)
+            self.send_response(status)
+            skip_headers = {'transfer-encoding', 'connection', 'content-encoding'}
+            for key, value in resp_headers.items():
+                if key.lower() not in skip_headers:
+                    self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(resp_body)
+            return
+
         # Match /api/metadata-and-cover/{book_id}
         match = re.match(r'/api/metadata-and-cover/(\d+)', self.path)
         if not match:
