@@ -4119,6 +4119,10 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # Routes: /kobo/<user_token>/...
         # =======================================================================
 
+        # Debug: Log any request starting with /kobo/
+        if path.startswith('/kobo/'):
+            print(f"📱 Kobo request received: {path}", flush=True)
+
         # Check if this is a Kobo sync API request
         kobo_sync_match = re.match(r'^/kobo/([a-f0-9-]{36})(/.*)?$', path)
         if kobo_sync_match:
