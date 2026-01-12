@@ -822,8 +822,13 @@ def proxy_to_kobo_store(path, method, headers, body=None):
     import urllib.request
     import urllib.error
 
-    url = f"{KOBO_STOREAPI_URL}{path}"
-    print(f"📡 Proxying {method} request to Kobo Store: {path}")
+    query_string = request.query_string.decode('utf-8')
+    full_path = f"/{path}"
+    if query_string:
+        full_path += f"?{query_string}"
+
+    url = f"{KOBO_STOREAPI_URL}{full_path}"
+    print(f"📡 Proxying {method} request to Kobo Store: {full_path}")
 
     try:
         # Build the request
