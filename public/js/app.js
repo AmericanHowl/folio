@@ -209,6 +209,12 @@ function folioApp() {
         headerHidden: false, // Whether the header is hidden (scroll down = hide, scroll up = show)
         lastScrollY: 0, // Track last scroll position for direction detection
 
+        // Kobo Sync state
+        koboToken: null,
+        koboApiEndpoint: '',
+        loadingKoboToken: false,
+        koboEndpointCopied: false,
+
         /**
          * Initialize the application
          */
@@ -691,6 +697,86 @@ function folioApp() {
         skipProwlarr() {
             this.showSetup = false;
             this.loadApp();
+        },
+
+        /**
+         * Get Kobo sync token for current user
+         */
+        async getKoboToken() {
+            this.loadingKoboToken = true;
+            try {
+                const response = await fetch('/api/kobo/token');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Failed to get Kobo token:', data.error);
+                    return;
+                }
+
+                this.koboToken = data.token;
+                this.koboApiEndpoint = data.api_endpoint;
+                console.log('📱 Kobo sync token retrieved');
+            } catch (error) {
+                console.error('Failed to get Kobo token:', error);
+            } finally {
+                this.loadingKoboToken = false;
+            }
+        },
+
+        /**
+         * Regenerate Kobo sync token
+         */
+        async regenerateKoboToken() {
+            if (!confirm('Are you sure you want to regenerate your Kobo sync token? Your current token will be invalidated and you will need to update your Kobo device.')) {
+                return;
+            }
+
+            this.loadingKoboToken = true;
+            try {
+                const response = await fetch('/api/kobo/token/regenerate', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Failed to regenerate Kobo token:', data.error);
+                    return;
+                }
+
+                this.koboToken = data.token;
+                this.koboApiEndpoint = data.api_endpoint;
+                console.log('📱 Kobo sync token regenerated');
+            } catch (error) {
+                console.error('Failed to regenerate Kobo token:', error);
+            } finally {
+                this.loadingKoboToken = false;
+            }
+        },
+
+        /**
+         * Copy Kobo API endpoint to clipboard
+         */
+        async copyKoboEndpoint() {
+            try {
+                await navigator.clipboard.writeText(this.koboApiEndpoint);
+                this.koboEndpointCopied = true;
+                setTimeout(() => {
+                    this.koboEndpointCopied = false;
+                }, 2000);
+            } catch (error) {
+                console.error('Failed to copy to clipboard:', error);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = this.koboApiEndpoint;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                this.koboEndpointCopied = true;
+                setTimeout(() => {
+                    this.koboEndpointCopied = false;
+                }, 2000);
+            }
         },
 
         /**

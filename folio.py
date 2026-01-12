@@ -25,6 +25,7 @@ import threading
 import glob as glob_module
 from functools import wraps
 import hashlib
+import uuid
 from email.parser import BytesParser
 from email import message_from_bytes
 
@@ -190,6 +191,7 @@ CACHE_TTL_ITUNES_SEARCH = 1800      # 30 minutes
 CONFIG_FILE = "config.json"
 IMPORTED_FILES_FILE = "imported_files.json"  # Persists list of already-imported files
 HARDCOVER_API_URL = "https://api.hardcover.app/v1/graphql"
+KOBO_STOREAPI_URL = "https://storeapi.kobo.com"  # Official Kobo Store API for proxying
 
 # Folio database for multi-user data (stored in calibre library for persistence)
 FOLIO_DB_FILE = "folio.db"
@@ -432,6 +434,42 @@ def init_folio_db():
             ON import_history(book_id)
         """)
 
+        # Create kobo_tokens table for Kobo sync authentication
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS kobo_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user TEXT NOT NULL UNIQUE,
+                auth_token TEXT NOT NULL UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_used TIMESTAMP
+            )
+        """)
+
+        # Create index for fast token lookups
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_kobo_tokens_auth_token
+            ON kobo_tokens(auth_token)
+        """)
+
+        # Create kobo_sync_state table for tracking sync progress
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS kobo_sync_state (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user TEXT NOT NULL,
+                book_id INTEGER NOT NULL,
+                synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_modified TIMESTAMP,
+                is_archived INTEGER DEFAULT 0,
+                UNIQUE(user, book_id)
+            )
+        """)
+
+        # Create index for fast sync state lookups
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_kobo_sync_state_user
+            ON kobo_sync_state(user)
+        """)
+
         conn.commit()
         conn.close()
         print(f"✅ Folio database initialized at {db_path}")
@@ -452,6 +490,368 @@ def get_folio_db_connection(readonly=False):
 
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# ============================================================================
+# Kobo Sync Token Management Functions
+# ============================================================================
+
+def generate_kobo_token():
+    """Generate a new unique Kobo sync token (UUID4)"""
+    return str(uuid.uuid4())
+
+
+def get_kobo_token_for_user(user):
+    """
+    Get the Kobo sync token for a user, creating one if it doesn't exist.
+    Returns the token string.
+    """
+    try:
+        conn = get_folio_db_connection(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute("SELECT auth_token FROM kobo_tokens WHERE user = ?", (user,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return row['auth_token']
+
+        # No token exists, create one
+        token = generate_kobo_token()
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO kobo_tokens (user, auth_token) VALUES (?, ?)",
+            (user, token)
+        )
+        conn.commit()
+        conn.close()
+        print(f"🔑 Created new Kobo sync token for user '{user}'")
+        return token
+    except Exception as e:
+        print(f"❌ Failed to get/create Kobo token for user {user}: {e}")
+        return None
+
+
+def get_user_from_kobo_token(token):
+    """
+    Get the user associated with a Kobo sync token.
+    Updates last_used timestamp on successful lookup.
+    Returns username or None if token is invalid.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT user FROM kobo_tokens WHERE auth_token = ?", (token,))
+        row = cursor.fetchone()
+
+        if row:
+            # Update last_used timestamp
+            cursor.execute(
+                "UPDATE kobo_tokens SET last_used = CURRENT_TIMESTAMP WHERE auth_token = ?",
+                (token,)
+            )
+            conn.commit()
+            conn.close()
+            return row['user']
+
+        conn.close()
+        return None
+    except Exception as e:
+        print(f"❌ Failed to validate Kobo token: {e}")
+        return None
+
+
+def regenerate_kobo_token_for_user(user):
+    """
+    Regenerate the Kobo sync token for a user.
+    Returns the new token string.
+    """
+    try:
+        token = generate_kobo_token()
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+
+        # Use INSERT OR REPLACE to handle both new and existing users
+        cursor.execute(
+            "INSERT OR REPLACE INTO kobo_tokens (user, auth_token, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+            (user, token)
+        )
+        conn.commit()
+        conn.close()
+        print(f"🔑 Regenerated Kobo sync token for user '{user}'")
+        return token
+    except Exception as e:
+        print(f"❌ Failed to regenerate Kobo token for user {user}: {e}")
+        return None
+
+
+def get_kobo_sync_state(user):
+    """
+    Get the sync state for a user's books.
+    Returns dict mapping book_id to sync info.
+    """
+    try:
+        conn = get_folio_db_connection(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT book_id, synced_at, last_modified, is_archived FROM kobo_sync_state WHERE user = ?",
+            (user,)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        return {
+            row['book_id']: {
+                'synced_at': row['synced_at'],
+                'last_modified': row['last_modified'],
+                'is_archived': bool(row['is_archived'])
+            }
+            for row in rows
+        }
+    except Exception as e:
+        print(f"❌ Failed to get Kobo sync state for user {user}: {e}")
+        return {}
+
+
+def update_kobo_sync_state(user, book_id, is_archived=False):
+    """
+    Update the sync state for a book.
+    """
+    try:
+        conn = get_folio_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO kobo_sync_state (user, book_id, last_modified, is_archived)
+            VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+            ON CONFLICT(user, book_id) DO UPDATE SET
+                last_modified = CURRENT_TIMESTAMP,
+                is_archived = excluded.is_archived
+        """, (user, book_id, 1 if is_archived else 0))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Failed to update Kobo sync state: {e}")
+        return False
+
+
+def get_book_for_kobo_sync(book_id, user=None):
+    """
+    Get a single book's details formatted for Kobo sync.
+    Returns a dict with the book's metadata or None if not found.
+    """
+    try:
+        conn = get_db_connection(readonly=True)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                b.id,
+                b.title,
+                b.sort,
+                b.timestamp,
+                b.pubdate,
+                b.path,
+                b.has_cover,
+                GROUP_CONCAT(DISTINCT a.name, ' & ') as authors,
+                p.name as publisher,
+                s.name as series,
+                bsl.series_index as series_index,
+                c.text as description,
+                l.lang_code as language
+            FROM books b
+            LEFT JOIN books_authors_link bal ON b.id = bal.book
+            LEFT JOIN authors a ON bal.author = a.id
+            LEFT JOIN books_publishers_link bpl ON b.id = bpl.book
+            LEFT JOIN publishers p ON bpl.publisher = p.id
+            LEFT JOIN books_series_link bsl ON b.id = bsl.book
+            LEFT JOIN series s ON bsl.series = s.id
+            LEFT JOIN comments c ON b.id = c.book
+            LEFT JOIN books_languages_link bll ON b.id = bll.book
+            LEFT JOIN languages l ON bll.lang_code = l.id
+            WHERE b.id = ?
+            GROUP BY b.id
+        """, (book_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            conn.close()
+            return None
+
+        # Get formats
+        cursor.execute("SELECT format, uncompressed_size FROM data WHERE book = ?", (book_id,))
+        formats = [{'format': f['format'].upper(), 'size': f['uncompressed_size'] or 0} for f in cursor.fetchall()]
+        conn.close()
+
+        # Normalize author names
+        authors_list = []
+        if row['authors']:
+            for author in row['authors'].split(' & '):
+                author = author.strip()
+                if ', ' in author:
+                    parts = author.split(', ', 1)
+                    author = f"{parts[1]} {parts[0]}"
+                elif '|' in author:
+                    parts = author.split('|', 1)
+                    author = f"{parts[1].strip()} {parts[0].strip()}"
+                authors_list.append(author)
+
+        return {
+            'id': row['id'],
+            'title': row['title'],
+            'authors': authors_list if authors_list else ['Unknown Author'],
+            'publisher': row['publisher'],
+            'series': row['series'],
+            'series_index': row['series_index'],
+            'description': row['description'],
+            'language': row['language'] or 'en',
+            'timestamp': row['timestamp'],
+            'pubdate': row['pubdate'],
+            'has_cover': bool(row['has_cover']),
+            'formats': formats,
+            'path': row['path']
+        }
+    except Exception as e:
+        print(f"❌ Error getting book {book_id} for Kobo sync: {e}")
+        return None
+
+
+def format_book_for_kobo(book, base_url, user_token):
+    """
+    Format a book dict into Kobo sync protocol format.
+    Returns the BookEntitlement and BookMetadata structure.
+    """
+    book_id = book['id']
+    # Use book_id as the UUID for consistency
+    book_uuid = f"folio-{book_id}"
+
+    # Build download URLs - prefer KEPUB, fall back to EPUB
+    download_urls = []
+    has_kepub = any(f['format'] == 'KEPUB' for f in book.get('formats', []))
+    has_epub = any(f['format'] == 'EPUB' for f in book.get('formats', []))
+
+    # Always offer KEPUB (will convert on-the-fly if needed)
+    if has_kepub or has_epub:
+        download_urls.append({
+            "Format": "KEPUB",
+            "Size": next((f['size'] for f in book.get('formats', []) if f['format'] == 'KEPUB'), 0),
+            "Url": f"{base_url}/kobo/{user_token}/download/{book_id}/KEPUB",
+            "Platform": "Generic"
+        })
+
+    # Build series info
+    series_info = None
+    if book.get('series'):
+        series_info = {
+            "Name": book['series'],
+            "Number": int(book['series_index']) if book.get('series_index') else 1,
+            "NumberFloat": float(book['series_index']) if book.get('series_index') else 1.0,
+            "Id": f"folio-series-{hash(book['series']) % 100000}"
+        }
+
+    # Build contributors list
+    contributors = []
+    for author in book.get('authors', []):
+        contributors.append({
+            "Name": author,
+            "Role": "Author"
+        })
+
+    # Parse publication date
+    pub_date = book.get('pubdate') or book.get('timestamp') or '2000-01-01T00:00:00Z'
+    if pub_date and 'T' not in str(pub_date):
+        pub_date = f"{pub_date}T00:00:00Z"
+
+    # Build the Kobo metadata structure
+    metadata = {
+        "Categories": ["00000000-0000-0000-0000-000000000001"],  # Generic category
+        "Contributors": contributors,
+        "CoverImageId": book_uuid if book.get('has_cover') else None,
+        "CrossRevisionId": book_uuid,
+        "CurrentDisplayPrice": {"CurrencyCode": "USD", "TotalAmount": 0},
+        "CurrentLoveDisplayPrice": {"TotalAmount": 0},
+        "Description": book.get('description') or '',
+        "DownloadUrls": download_urls,
+        "EntitlementId": book_uuid,
+        "ExternalIds": [],
+        "Genre": "00000000-0000-0000-0000-000000000001",
+        "IsEligibleForKoboLove": False,
+        "IsInternetArchive": False,
+        "IsPreOrder": False,
+        "IsSocialEnabled": True,
+        "Language": book.get('language', 'en'),
+        "PhoneticPronunciations": {},
+        "PublicationDate": pub_date,
+        "Publisher": {"Name": book.get('publisher') or 'Unknown'},
+        "RevisionId": book_uuid,
+        "Title": book['title'],
+        "WorkId": book_uuid
+    }
+
+    if series_info:
+        metadata["Series"] = series_info
+
+    # Build the entitlement
+    entitlement = {
+        "Accessibility": "Full",
+        "ActivePeriod": {"From": pub_date},
+        "Created": book.get('timestamp') or pub_date,
+        "CrossRevisionId": book_uuid,
+        "Id": book_uuid,
+        "IsHiddenFromArchive": False,
+        "IsLocked": False,
+        "IsRemoved": False,
+        "LastModified": book.get('timestamp') or pub_date,
+        "OriginCategory": "Imported",
+        "RevisionId": book_uuid,
+        "Status": "Active"
+    }
+
+    return {
+        "BookEntitlement": entitlement,
+        "BookMetadata": metadata
+    }
+
+
+def proxy_to_kobo_store(path, method, headers, body=None):
+    """
+    Proxy a request to the official Kobo Store API.
+    Returns (status_code, response_headers, response_body).
+    """
+    import urllib.request
+    import urllib.error
+
+    url = f"{KOBO_STOREAPI_URL}{path}"
+    print(f"📡 Proxying {method} request to Kobo Store: {path}")
+
+    try:
+        # Build the request
+        req = urllib.request.Request(url, method=method)
+
+        # Copy relevant headers (exclude host-specific headers)
+        skip_headers = {'host', 'content-length', 'transfer-encoding', 'connection'}
+        for key, value in headers.items():
+            if key.lower() not in skip_headers:
+                req.add_header(key, value)
+
+        # Add body if present
+        if body and method in ('POST', 'PUT', 'PATCH'):
+            req.data = body
+
+        # Make the request
+        with urllib.request.urlopen(req, timeout=30) as response:
+            response_body = response.read()
+            response_headers = dict(response.headers)
+            return (response.status, response_headers, response_body)
+
+    except urllib.error.HTTPError as e:
+        response_body = e.read() if hasattr(e, 'read') else b''
+        response_headers = dict(e.headers) if hasattr(e, 'headers') else {}
+        return (e.code, response_headers, response_body)
+    except Exception as e:
+        print(f"❌ Kobo proxy error: {e}")
+        return (502, {}, json.dumps({'error': f'Proxy error: {str(e)}'}).encode('utf-8'))
 
 
 def compute_file_hash(filepath):
@@ -3712,7 +4112,260 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"❌ Kobo page error: {e}")
                 self.send_error(500, f"Error rendering Kobo page: {str(e)}")
                 return
-        
+
+        # =======================================================================
+        # Kobo Sync Protocol Endpoints
+        # Routes: /kobo/<user_token>/...
+        # =======================================================================
+
+        # Check if this is a Kobo sync API request
+        kobo_sync_match = re.match(r'^/kobo/([a-f0-9-]{36})(/.*)?$', path)
+        if kobo_sync_match:
+            user_token = kobo_sync_match.group(1)
+            kobo_path = kobo_sync_match.group(2) or '/'
+
+            # Validate the token and get the user
+            user = get_user_from_kobo_token(user_token)
+            if not user:
+                print(f"⚠️ Invalid Kobo sync token: {user_token}")
+                self.send_response(401)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'Invalid or expired token'}).encode('utf-8'))
+                return
+
+            # Get base URL for download links
+            host = self.headers.get('Host', 'localhost:9099')
+            protocol = 'https' if self.headers.get('X-Forwarded-Proto') == 'https' else 'http'
+            base_url = f"{protocol}://{host}"
+
+            # Handle: GET /kobo/<token>/v1/library/sync - Main sync endpoint
+            if kobo_path == '/v1/library/sync':
+                try:
+                    print(f"📚 Kobo sync request from user '{user}'")
+
+                    # Get the user's reading list
+                    reading_list_ids = get_reading_list_ids_for_user(user)
+                    sync_state = get_kobo_sync_state(user)
+
+                    # Parse sync token from header (tracks which books already synced)
+                    sync_token = self.headers.get('x-kobo-synctoken', '')
+
+                    # Build sync response - list of entitlements
+                    sync_results = []
+                    synced_ids = set()
+
+                    for book_id in reading_list_ids:
+                        book = get_book_for_kobo_sync(book_id)
+                        if not book:
+                            continue
+
+                        # Check if book needs to be synced
+                        book_state = sync_state.get(book_id, {})
+                        is_new = book_id not in sync_state
+
+                        # Format book for Kobo
+                        kobo_book = format_book_for_kobo(book, base_url, user_token)
+
+                        if is_new:
+                            sync_results.append({"NewEntitlement": kobo_book})
+                        else:
+                            sync_results.append({"ChangedEntitlement": kobo_book})
+
+                        synced_ids.add(book_id)
+                        update_kobo_sync_state(user, book_id)
+
+                    # Check for removed books (in sync state but not in reading list)
+                    for book_id in sync_state.keys():
+                        if book_id not in reading_list_ids:
+                            # Book was removed from reading list
+                            book_uuid = f"folio-{book_id}"
+                            sync_results.append({
+                                "DeletedEntitlement": {
+                                    "RevisionId": book_uuid
+                                }
+                            })
+                            update_kobo_sync_state(user, book_id, is_archived=True)
+
+                    # Generate new sync token (timestamp-based)
+                    new_sync_token = str(int(time.time()))
+
+                    print(f"📚 Kobo sync: {len(sync_results)} items for user '{user}'")
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('x-kobo-sync', 'done')
+                    self.send_header('x-kobo-synctoken', new_sync_token)
+                    self.send_header('x-kobo-apitoken', 'e30=')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(sync_results).encode('utf-8'))
+                    return
+
+                except Exception as e:
+                    print(f"❌ Kobo sync error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
+                    return
+
+            # Handle: GET /kobo/<token>/v1/library/<book_uuid>/metadata - Book metadata
+            metadata_match = re.match(r'^/v1/library/(folio-\d+)/metadata$', kobo_path)
+            if metadata_match:
+                try:
+                    book_uuid = metadata_match.group(1)
+                    book_id = int(book_uuid.replace('folio-', ''))
+
+                    print(f"📖 Kobo metadata request for book {book_id}")
+
+                    book = get_book_for_kobo_sync(book_id)
+                    if not book:
+                        self.send_response(404)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': 'Book not found'}).encode('utf-8'))
+                        return
+
+                    kobo_book = format_book_for_kobo(book, base_url, user_token)
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(kobo_book['BookMetadata']).encode('utf-8'))
+                    return
+
+                except Exception as e:
+                    print(f"❌ Kobo metadata error: {e}")
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
+                    return
+
+            # Handle: GET /kobo/<token>/download/<book_id>/KEPUB - Download book
+            download_match = re.match(r'^/download/(\d+)/(\w+)$', kobo_path)
+            if download_match:
+                book_id = int(download_match.group(1))
+                format_type = download_match.group(2).upper()
+
+                print(f"📥 Kobo download request: book {book_id}, format {format_type}")
+
+                # Redirect to the main download endpoint (which handles KEPUB conversion)
+                self.send_response(302)
+                self.send_header('Location', f'/api/download/{book_id}/{format_type}')
+                self.end_headers()
+                return
+
+            # Handle: GET /kobo/<token>/<book_uuid>/<w>/<h>/<greyscale>/image.jpg - Cover image
+            # Also handle: GET /kobo/<token>/<book_uuid>/image.jpg
+            image_match = re.match(r'^/(folio-\d+)(?:/(\d+)/(\d+)/(\w+))?/image\.jpg$', kobo_path)
+            if image_match:
+                try:
+                    book_uuid = image_match.group(1)
+                    book_id = int(book_uuid.replace('folio-', ''))
+
+                    print(f"🖼️ Kobo cover request for book {book_id}")
+
+                    cover_data = get_book_cover(book_id)
+                    if cover_data:
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'image/jpeg')
+                        self.send_header('Cache-Control', 'public, max-age=86400')
+                        self.end_headers()
+                        self.wfile.write(cover_data)
+                    else:
+                        self.send_response(404)
+                        self.send_header('Content-Type', 'text/plain')
+                        self.end_headers()
+                        self.wfile.write(b'Cover not found')
+                    return
+
+                except Exception as e:
+                    print(f"❌ Kobo cover error: {e}")
+                    self.send_response(500)
+                    self.end_headers()
+                    return
+
+            # Handle: GET /kobo/<token>/v1/initialization - Device initialization
+            if kobo_path == '/v1/initialization':
+                print(f"🔧 Kobo initialization request from user '{user}'")
+                # Return minimal initialization response
+                init_response = {
+                    "Resources": {
+                        "image_host": base_url,
+                        "image_url_quality_template": "{ImageId}/{Width}/{Height}/false/image.jpg",
+                        "image_url_template": "{ImageId}/{Width}/{Height}/{Quality}/{IsGreyscale}/image.jpg"
+                    }
+                }
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(init_response).encode('utf-8'))
+                return
+
+            # Handle: GET /kobo/<token>/v1/library/tags - Shelves (empty for now)
+            if kobo_path == '/v1/library/tags':
+                print(f"📚 Kobo tags/shelves request from user '{user}'")
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps([]).encode('utf-8'))
+                return
+
+            # For any other Kobo API paths, proxy to the official Kobo Store
+            # This maintains access to Kobo Store and Overdrive functionality
+            print(f"📡 Proxying Kobo request: {kobo_path}")
+            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'GET', self.headers)
+
+            self.send_response(status)
+            # Copy response headers (filter some that shouldn't be forwarded)
+            skip_headers = {'transfer-encoding', 'connection', 'content-encoding'}
+            for key, value in resp_headers.items():
+                if key.lower() not in skip_headers:
+                    self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(resp_body)
+            return
+
+        # API: Get Kobo sync token for current user
+        if path == '/api/kobo/token':
+            try:
+                user = get_user_from_headers(self.headers)
+                token = get_kobo_token_for_user(user)
+
+                if not token:
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': 'Failed to generate token'}).encode('utf-8'))
+                    return
+
+                # Get base URL for the API endpoint
+                host = self.headers.get('Host', 'localhost:9099')
+                protocol = 'https' if self.headers.get('X-Forwarded-Proto') == 'https' else 'http'
+                base_url = f"{protocol}://{host}"
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({
+                    'token': token,
+                    'user': user,
+                    'api_endpoint': f"{base_url}/kobo/{token}",
+                    'instructions': f"Set api_endpoint={base_url}/kobo/{token} in your Kobo's .kobo/Kobo/Kobo eReader.conf file"
+                })
+                self.wfile.write(response.encode('utf-8'))
+                return
+            except Exception as e:
+                print(f"❌ Kobo token error: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
+                return
+
         # API: Get import status
         if path == '/api/import/status':
             self.send_response(200)
@@ -4420,6 +5073,104 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests"""
+        # Parse URL for path matching
+        parsed_url = urlparse(self.path)
+        path = parsed_url.path
+
+        # =======================================================================
+        # Kobo Sync Protocol POST Endpoints
+        # =======================================================================
+
+        # Check if this is a Kobo sync API POST request
+        kobo_sync_match = re.match(r'^/kobo/([a-f0-9-]{36})(/.*)?$', path)
+        if kobo_sync_match:
+            user_token = kobo_sync_match.group(1)
+            kobo_path = kobo_sync_match.group(2) or '/'
+
+            # Validate the token and get the user
+            user = get_user_from_kobo_token(user_token)
+            if not user:
+                print(f"⚠️ Invalid Kobo sync token: {user_token}")
+                self.send_response(401)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'Invalid or expired token'}).encode('utf-8'))
+                return
+
+            # Read request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length) if content_length > 0 else b''
+
+            # Handle: POST /kobo/<token>/v1/library/<book_uuid>/state - Reading state
+            state_match = re.match(r'^/v1/library/(folio-\d+)/state$', kobo_path)
+            if state_match:
+                # Accept reading state updates (position, progress) but don't store them yet
+                print(f"📖 Kobo reading state update from user '{user}'")
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'success': True}).encode('utf-8'))
+                return
+
+            # Handle: POST /kobo/<token>/v1/analytics/event - Analytics events
+            if kobo_path.startswith('/v1/analytics'):
+                # Silently accept analytics but don't forward
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({}).encode('utf-8'))
+                return
+
+            # For any other Kobo API paths, proxy to the official Kobo Store
+            print(f"📡 Proxying Kobo POST request: {kobo_path}")
+            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'POST', self.headers, body)
+
+            self.send_response(status)
+            skip_headers = {'transfer-encoding', 'connection', 'content-encoding'}
+            for key, value in resp_headers.items():
+                if key.lower() not in skip_headers:
+                    self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(resp_body)
+            return
+
+        # API: Regenerate Kobo sync token
+        if path == '/api/kobo/token/regenerate':
+            try:
+                user = get_user_from_headers(self.headers)
+                token = regenerate_kobo_token_for_user(user)
+
+                if not token:
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': 'Failed to regenerate token'}).encode('utf-8'))
+                    return
+
+                # Get base URL for the API endpoint
+                host = self.headers.get('Host', 'localhost:9099')
+                protocol = 'https' if self.headers.get('X-Forwarded-Proto') == 'https' else 'http'
+                base_url = f"{protocol}://{host}"
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = json.dumps({
+                    'token': token,
+                    'user': user,
+                    'api_endpoint': f"{base_url}/kobo/{token}",
+                    'instructions': f"Set api_endpoint={base_url}/kobo/{token} in your Kobo's .kobo/Kobo/Kobo eReader.conf file"
+                })
+                self.wfile.write(response.encode('utf-8'))
+                return
+            except Exception as e:
+                print(f"❌ Kobo token regeneration error: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
+                return
+
         # API: Upload books
         if self.path == '/api/upload-books':
             import_folder = config.get('import_folder', '')
@@ -5678,7 +6429,11 @@ if __name__ == "__main__":
         print(f"\n   Import:")
         print(f"   /api/import/status → Import watcher status")
         print(f"   /api/import/scan → Trigger manual import (POST)")
+        print(f"\n   Kobo Sync:")
+        print(f"   /api/kobo/token → Get/create sync token")
+        print(f"   /kobo/<token>/v1/library/sync → Sync reading list to Kobo")
         print(f"\n   📱 E-ink interface: http://localhost:{PORT}/eink.html")
         print(f"   📖 Kobo interface: http://localhost:{PORT}/kobo")
+        print(f"   📲 Kobo Sync: Configure in Settings → Kobo Sync")
         print("\nPress Ctrl+C to stop")
         httpd.serve_forever()
