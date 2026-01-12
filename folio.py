@@ -4406,6 +4406,9 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     "eula_page": "https://www.kobo.com/termsofuse",
                 }
                 init_response = {"Resources": kobo_resources}
+                print(f"📋 Kobo init: base_url={base_url}", flush=True)
+                print(f"📋 Kobo init: library_sync={kobo_resources['library_sync']}", flush=True)
+                print(f"📋 Kobo init: device_auth={kobo_resources['device_auth']}", flush=True)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('x-kobo-apitoken', 'e30=')
@@ -5281,6 +5284,10 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         # Parse URL for path matching
         parsed_url = urlparse(self.path)
         path = parsed_url.path
+
+        # Debug: Log any POST request starting with /kobo/
+        if path.startswith('/kobo/'):
+            print(f"📱 Kobo POST request received: {path}", flush=True)
 
         # =======================================================================
         # Kobo Sync Protocol POST Endpoints
