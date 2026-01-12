@@ -2702,8 +2702,7 @@ def scan_import_folder():
     """
     import_folder = config.get('import_folder', '')
     if not import_folder or not os.path.isdir(import_folder):
-        print(f"⚠️  Import folder check failed: folder='{import_folder}', isdir={os.path.isdir(import_folder) if import_folder else 'N/A'}")
-        sys.stdout.flush()
+        print(f"⚠️  Import folder check failed: folder='{import_folder}', isdir={os.path.isdir(import_folder) if import_folder else 'N/A'}", flush=True)
         return []
 
     recursive = config.get('import_recursive', True)
@@ -2712,59 +2711,63 @@ def scan_import_folder():
     total_files_seen = 0
     skipped_wrong_ext = 0
 
-    print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})")
-    sys.stdout.flush()
+    print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})", flush=True)
 
-    if recursive:
-        # Walk through all subdirectories
-        for root, dirs, filenames in os.walk(import_folder):
-            print(f"   📁 Dir: {root} ({len(filenames)} files, {len(dirs)} subdirs)")
-            sys.stdout.flush()
-            for filename in filenames:
-                total_files_seen += 1
-                ext = os.path.splitext(filename)[1].lower()
-                if ext in EBOOK_EXTENSIONS:
-                    filepath = os.path.join(root, filename)
-                    # Skip files still being written
-                    if not is_file_mature(filepath):
-                        skipped_immature += 1
+    try:
+        if recursive:
+            # Walk through all subdirectories (followlinks=False prevents infinite loops from symlinks)
+            for root, dirs, filenames in os.walk(import_folder, followlinks=False):
+                print(f"   📁 Dir: {root} ({len(filenames)} files, {len(dirs)} subdirs)", flush=True)
+                for filename in filenames:
+                    total_files_seen += 1
+                    ext = os.path.splitext(filename)[1].lower()
+                    if ext in EBOOK_EXTENSIONS:
+                        filepath = os.path.join(root, filename)
+                        # Skip files still being written
+                        if not is_file_mature(filepath):
+                            skipped_immature += 1
+                            rel_path = os.path.relpath(filepath, import_folder)
+                            print(f"   ⏳ Skipping (still downloading): {rel_path}", flush=True)
+                            continue
+                        files.append(filepath)
+                        # Show relative path for better readability
                         rel_path = os.path.relpath(filepath, import_folder)
-                        print(f"   ⏳ Skipping (still downloading): {rel_path}")
-                        continue
-                    files.append(filepath)
-                    # Show relative path for better readability
-                    rel_path = os.path.relpath(filepath, import_folder)
-                    print(f"   📖 Found: {rel_path}")
-                else:
-                    skipped_wrong_ext += 1
-                    if total_files_seen <= 20:  # Only log first 20 to avoid spam
-                        print(f"   ⏭️  Skip (ext={ext}): {filename}")
-    else:
-        # Only scan top-level directory
-        for filename in os.listdir(import_folder):
-            filepath = os.path.join(import_folder, filename)
-            if os.path.isfile(filepath):
-                total_files_seen += 1
-                ext = os.path.splitext(filename)[1].lower()
-                if ext in EBOOK_EXTENSIONS:
-                    # Skip files still being written
-                    if not is_file_mature(filepath):
-                        skipped_immature += 1
-                        print(f"   ⏳ Skipping (still downloading): {filename}")
-                        continue
-                    files.append(filepath)
-                    print(f"   📖 Found: {filename}")
-                else:
-                    skipped_wrong_ext += 1
-                    if total_files_seen <= 20:
-                        print(f"   ⏭️  Skip (ext={ext}): {filename}")
+                        print(f"   📖 Found: {rel_path}", flush=True)
+                    else:
+                        skipped_wrong_ext += 1
+                        if total_files_seen <= 20:  # Only log first 20 to avoid spam
+                            print(f"   ⏭️  Skip (ext={ext}): {filename}", flush=True)
+        else:
+            # Only scan top-level directory
+            for filename in os.listdir(import_folder):
+                filepath = os.path.join(import_folder, filename)
+                if os.path.isfile(filepath):
+                    total_files_seen += 1
+                    ext = os.path.splitext(filename)[1].lower()
+                    if ext in EBOOK_EXTENSIONS:
+                        # Skip files still being written
+                        if not is_file_mature(filepath):
+                            skipped_immature += 1
+                            print(f"   ⏳ Skipping (still downloading): {filename}", flush=True)
+                            continue
+                        files.append(filepath)
+                        print(f"   📖 Found: {filename}", flush=True)
+                    else:
+                        skipped_wrong_ext += 1
+                        if total_files_seen <= 20:
+                            print(f"   ⏭️  Skip (ext={ext}): {filename}", flush=True)
+    except PermissionError as e:
+        print(f"❌ Permission error scanning import folder: {e}", flush=True)
+        return files
+    except OSError as e:
+        print(f"❌ OS error scanning import folder: {e}", flush=True)
+        return files
 
     if skipped_immature > 0:
-        print(f"   ℹ️  Skipped {skipped_immature} file(s) still being written")
+        print(f"   ℹ️  Skipped {skipped_immature} file(s) still being written", flush=True)
     if skipped_wrong_ext > 0:
-        print(f"   ℹ️  Skipped {skipped_wrong_ext} file(s) with non-ebook extensions")
-    print(f"🔍 Scan complete: {total_files_seen} total files, {len(files)} ebook file(s)")
-    sys.stdout.flush()
+        print(f"   ℹ️  Skipped {skipped_wrong_ext} file(s) with non-ebook extensions", flush=True)
+    print(f"🔍 Scan complete: {total_files_seen} total files, {len(files)} ebook file(s)", flush=True)
     return files
 
 
@@ -2945,8 +2948,7 @@ def import_watcher_thread():
         import_state['running'] = True
     interval = config.get('import_interval', 60)
 
-    print(f"📂 Import watcher started (interval: {interval}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})")
-    sys.stdout.flush()
+    print(f"📂 Import watcher started (interval: {interval}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})", flush=True)
 
     scan_count = 0
     while True:
@@ -2957,16 +2959,14 @@ def import_watcher_thread():
 
         scan_count += 1
         try:
-            print(f"\n⏰ Starting scheduled import scan #{scan_count} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-            sys.stdout.flush()
+            print(f"\n⏰ Starting scheduled import scan #{scan_count} at {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
             result = import_books_from_folder()
             if result.get('imported', 0) > 0:
-                print(f"📚 Import scan complete: {result.get('message', '')}")
+                print(f"📚 Import scan complete: {result.get('message', '')}", flush=True)
             else:
-                print(f"📚 Import scan complete: {result.get('message', 'No new books found')}")
-            sys.stdout.flush()
+                print(f"📚 Import scan complete: {result.get('message', 'No new books found')}", flush=True)
         except Exception as e:
-            print(f"❌ Import watcher error: {e}")
+            print(f"❌ Import watcher error: {e}", flush=True)
             import traceback
             traceback.print_exc()
             sys.stdout.flush()
@@ -2983,8 +2983,7 @@ def import_watcher_thread():
                     break
             time.sleep(1)
 
-    print("📂 Import watcher stopped")
-    sys.stdout.flush()
+    print("📂 Import watcher stopped", flush=True)
 
 
 def start_import_watcher():
