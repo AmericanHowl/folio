@@ -818,17 +818,14 @@ def proxy_to_kobo_store(path, method, headers, body=None):
     """
     Proxy a request to the official Kobo Store API.
     Returns (status_code, response_headers, response_body).
+
+    Note: path should include query string if needed (e.g., "/v1/affiliate?PlatformID=...")
     """
     import urllib.request
     import urllib.error
 
-    query_string = request.query_string.decode('utf-8')
-    full_path = f"/{path}"
-    if query_string:
-        full_path += f"?{query_string}"
-
-    url = f"{KOBO_STOREAPI_URL}{full_path}"
-    print(f"📡 Proxying {method} request to Kobo Store: {full_path}")
+    url = f"{KOBO_STOREAPI_URL}{path}"
+    print(f"📡 Proxying {method} request to Kobo Store: {path}", flush=True)
 
     try:
         # Build the request
@@ -855,7 +852,7 @@ def proxy_to_kobo_store(path, method, headers, body=None):
         response_headers = dict(e.headers) if hasattr(e, 'headers') else {}
         return (e.code, response_headers, response_body)
     except Exception as e:
-        print(f"❌ Kobo proxy error: {e}")
+        print(f"❌ Kobo proxy error: {e}", flush=True)
         return (502, {}, json.dumps({'error': f'Proxy error: {str(e)}'}).encode('utf-8'))
 
 
@@ -2705,8 +2702,7 @@ def scan_import_folder():
     """
     import_folder = config.get('import_folder', '')
     if not import_folder or not os.path.isdir(import_folder):
-        print(f"⚠️  Import folder check failed: folder='{import_folder}', isdir={os.path.isdir(import_folder) if import_folder else 'N/A'}")
-        sys.stdout.flush()
+        print(f"⚠️  Import folder check failed: folder='{import_folder}', isdir={os.path.isdir(import_folder) if import_folder else 'N/A'}", flush=True)
         return []
 
     recursive = config.get('import_recursive', True)
@@ -2715,59 +2711,63 @@ def scan_import_folder():
     total_files_seen = 0
     skipped_wrong_ext = 0
 
-    print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})")
-    sys.stdout.flush()
+    print(f"🔍 Scanning import folder: {import_folder} (recursive: {recursive})", flush=True)
 
-    if recursive:
-        # Walk through all subdirectories
-        for root, dirs, filenames in os.walk(import_folder):
-            print(f"   📁 Dir: {root} ({len(filenames)} files, {len(dirs)} subdirs)")
-            sys.stdout.flush()
-            for filename in filenames:
-                total_files_seen += 1
-                ext = os.path.splitext(filename)[1].lower()
-                if ext in EBOOK_EXTENSIONS:
-                    filepath = os.path.join(root, filename)
-                    # Skip files still being written
-                    if not is_file_mature(filepath):
-                        skipped_immature += 1
+    try:
+        if recursive:
+            # Walk through all subdirectories (followlinks=False prevents infinite loops from symlinks)
+            for root, dirs, filenames in os.walk(import_folder, followlinks=False):
+                print(f"   📁 Dir: {root} ({len(filenames)} files, {len(dirs)} subdirs)", flush=True)
+                for filename in filenames:
+                    total_files_seen += 1
+                    ext = os.path.splitext(filename)[1].lower()
+                    if ext in EBOOK_EXTENSIONS:
+                        filepath = os.path.join(root, filename)
+                        # Skip files still being written
+                        if not is_file_mature(filepath):
+                            skipped_immature += 1
+                            rel_path = os.path.relpath(filepath, import_folder)
+                            print(f"   ⏳ Skipping (still downloading): {rel_path}", flush=True)
+                            continue
+                        files.append(filepath)
+                        # Show relative path for better readability
                         rel_path = os.path.relpath(filepath, import_folder)
-                        print(f"   ⏳ Skipping (still downloading): {rel_path}")
-                        continue
-                    files.append(filepath)
-                    # Show relative path for better readability
-                    rel_path = os.path.relpath(filepath, import_folder)
-                    print(f"   📖 Found: {rel_path}")
-                else:
-                    skipped_wrong_ext += 1
-                    if total_files_seen <= 20:  # Only log first 20 to avoid spam
-                        print(f"   ⏭️  Skip (ext={ext}): {filename}")
-    else:
-        # Only scan top-level directory
-        for filename in os.listdir(import_folder):
-            filepath = os.path.join(import_folder, filename)
-            if os.path.isfile(filepath):
-                total_files_seen += 1
-                ext = os.path.splitext(filename)[1].lower()
-                if ext in EBOOK_EXTENSIONS:
-                    # Skip files still being written
-                    if not is_file_mature(filepath):
-                        skipped_immature += 1
-                        print(f"   ⏳ Skipping (still downloading): {filename}")
-                        continue
-                    files.append(filepath)
-                    print(f"   📖 Found: {filename}")
-                else:
-                    skipped_wrong_ext += 1
-                    if total_files_seen <= 20:
-                        print(f"   ⏭️  Skip (ext={ext}): {filename}")
+                        print(f"   📖 Found: {rel_path}", flush=True)
+                    else:
+                        skipped_wrong_ext += 1
+                        if total_files_seen <= 20:  # Only log first 20 to avoid spam
+                            print(f"   ⏭️  Skip (ext={ext}): {filename}", flush=True)
+        else:
+            # Only scan top-level directory
+            for filename in os.listdir(import_folder):
+                filepath = os.path.join(import_folder, filename)
+                if os.path.isfile(filepath):
+                    total_files_seen += 1
+                    ext = os.path.splitext(filename)[1].lower()
+                    if ext in EBOOK_EXTENSIONS:
+                        # Skip files still being written
+                        if not is_file_mature(filepath):
+                            skipped_immature += 1
+                            print(f"   ⏳ Skipping (still downloading): {filename}", flush=True)
+                            continue
+                        files.append(filepath)
+                        print(f"   📖 Found: {filename}", flush=True)
+                    else:
+                        skipped_wrong_ext += 1
+                        if total_files_seen <= 20:
+                            print(f"   ⏭️  Skip (ext={ext}): {filename}", flush=True)
+    except PermissionError as e:
+        print(f"❌ Permission error scanning import folder: {e}", flush=True)
+        return files
+    except OSError as e:
+        print(f"❌ OS error scanning import folder: {e}", flush=True)
+        return files
 
     if skipped_immature > 0:
-        print(f"   ℹ️  Skipped {skipped_immature} file(s) still being written")
+        print(f"   ℹ️  Skipped {skipped_immature} file(s) still being written", flush=True)
     if skipped_wrong_ext > 0:
-        print(f"   ℹ️  Skipped {skipped_wrong_ext} file(s) with non-ebook extensions")
-    print(f"🔍 Scan complete: {total_files_seen} total files, {len(files)} ebook file(s)")
-    sys.stdout.flush()
+        print(f"   ℹ️  Skipped {skipped_wrong_ext} file(s) with non-ebook extensions", flush=True)
+    print(f"🔍 Scan complete: {total_files_seen} total files, {len(files)} ebook file(s)", flush=True)
     return files
 
 
@@ -2948,8 +2948,7 @@ def import_watcher_thread():
         import_state['running'] = True
     interval = config.get('import_interval', 60)
 
-    print(f"📂 Import watcher started (interval: {interval}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})")
-    sys.stdout.flush()
+    print(f"📂 Import watcher started (interval: {interval}s, recursive: {config.get('import_recursive', True)}, delete: {config.get('import_delete', False)})", flush=True)
 
     scan_count = 0
     while True:
@@ -2960,16 +2959,14 @@ def import_watcher_thread():
 
         scan_count += 1
         try:
-            print(f"\n⏰ Starting scheduled import scan #{scan_count} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-            sys.stdout.flush()
+            print(f"\n⏰ Starting scheduled import scan #{scan_count} at {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
             result = import_books_from_folder()
             if result.get('imported', 0) > 0:
-                print(f"📚 Import scan complete: {result.get('message', '')}")
+                print(f"📚 Import scan complete: {result.get('message', '')}", flush=True)
             else:
-                print(f"📚 Import scan complete: {result.get('message', 'No new books found')}")
-            sys.stdout.flush()
+                print(f"📚 Import scan complete: {result.get('message', 'No new books found')}", flush=True)
         except Exception as e:
-            print(f"❌ Import watcher error: {e}")
+            print(f"❌ Import watcher error: {e}", flush=True)
             import traceback
             traceback.print_exc()
             sys.stdout.flush()
@@ -2986,8 +2983,7 @@ def import_watcher_thread():
                     break
             time.sleep(1)
 
-    print("📂 Import watcher stopped")
-    sys.stdout.flush()
+    print("📂 Import watcher stopped", flush=True)
 
 
 def start_import_watcher():
@@ -4129,10 +4125,16 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             user_token = kobo_sync_match.group(1)
             kobo_path = kobo_sync_match.group(2) or '/'
 
+            # Include query string for proxying to Kobo Store
+            if parsed_url.query:
+                kobo_path_with_query = f"{kobo_path}?{parsed_url.query}"
+            else:
+                kobo_path_with_query = kobo_path
+
             # Validate the token and get the user
             user = get_user_from_kobo_token(user_token)
             if not user:
-                print(f"⚠️ Invalid Kobo sync token: {user_token}")
+                print(f"⚠️ Invalid Kobo sync token: {user_token}", flush=True)
                 self.send_response(401)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -4147,7 +4149,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             # Handle: GET /kobo/<token>/v1/library/sync - Main sync endpoint
             if kobo_path == '/v1/library/sync':
                 try:
-                    print(f"📚 Kobo sync request from user '{user}'")
+                    print(f"📚 Kobo sync request from user '{user}'", flush=True)
 
                     # Get the user's reading list
                     reading_list_ids = get_reading_list_ids_for_user(user)
@@ -4195,7 +4197,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     # Generate new sync token (timestamp-based)
                     new_sync_token = str(int(time.time()))
 
-                    print(f"📚 Kobo sync: {len(sync_results)} items for user '{user}'")
+                    print(f"📚 Kobo sync: {len(sync_results)} items for user '{user}'", flush=True)
 
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
@@ -4207,7 +4209,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 except Exception as e:
-                    print(f"❌ Kobo sync error: {e}")
+                    print(f"❌ Kobo sync error: {e}", flush=True)
                     import traceback
                     traceback.print_exc()
                     self.send_response(500)
@@ -4223,7 +4225,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     book_uuid = metadata_match.group(1)
                     book_id = int(book_uuid.replace('folio-', ''))
 
-                    print(f"📖 Kobo metadata request for book {book_id}")
+                    print(f"📖 Kobo metadata request for book {book_id}", flush=True)
 
                     book = get_book_for_kobo_sync(book_id)
                     if not book:
@@ -4242,7 +4244,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 except Exception as e:
-                    print(f"❌ Kobo metadata error: {e}")
+                    print(f"❌ Kobo metadata error: {e}", flush=True)
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
@@ -4271,7 +4273,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     book_uuid = image_match.group(1)
                     book_id = int(book_uuid.replace('folio-', ''))
 
-                    print(f"🖼️ Kobo cover request for book {book_id}")
+                    print(f"🖼️ Kobo cover request for book {book_id}", flush=True)
 
                     cover_data = get_book_cover(book_id)
                     if cover_data:
@@ -4288,14 +4290,14 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 except Exception as e:
-                    print(f"❌ Kobo cover error: {e}")
+                    print(f"❌ Kobo cover error: {e}", flush=True)
                     self.send_response(500)
                     self.end_headers()
                     return
 
             # Handle: GET /kobo/<token>/v1/initialization - Device initialization
             if kobo_path == '/v1/initialization':
-                print(f"🔧 Kobo initialization request from user '{user}'")
+                print(f"🔧 Kobo initialization request from user '{user}'", flush=True)
                 # Return minimal initialization response
                 init_response = {
                     "Resources": {
@@ -4312,7 +4314,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
             # Handle: GET /kobo/<token>/v1/library/tags - Shelves (empty for now)
             if kobo_path == '/v1/library/tags':
-                print(f"📚 Kobo tags/shelves request from user '{user}'")
+                print(f"📚 Kobo tags/shelves request from user '{user}'", flush=True)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -4321,8 +4323,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
             # For any other Kobo API paths, proxy to the official Kobo Store
             # This maintains access to Kobo Store and Overdrive functionality
-            print(f"📡 Proxying Kobo request: {kobo_path}")
-            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'GET', self.headers)
+            print(f"📡 Proxying Kobo GET request: {kobo_path_with_query}", flush=True)
+            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path_with_query, 'GET', self.headers)
 
             self.send_response(status)
             # Copy response headers (filter some that shouldn't be forwarded)
@@ -4364,7 +4366,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
                 return
             except Exception as e:
-                print(f"❌ Kobo token error: {e}")
+                print(f"❌ Kobo token error: {e}", flush=True)
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -5092,10 +5094,16 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             user_token = kobo_sync_match.group(1)
             kobo_path = kobo_sync_match.group(2) or '/'
 
+            # Include query string for proxying to Kobo Store
+            if parsed_url.query:
+                kobo_path_with_query = f"{kobo_path}?{parsed_url.query}"
+            else:
+                kobo_path_with_query = kobo_path
+
             # Validate the token and get the user
             user = get_user_from_kobo_token(user_token)
             if not user:
-                print(f"⚠️ Invalid Kobo sync token: {user_token}")
+                print(f"⚠️ Invalid Kobo sync token: {user_token}", flush=True)
                 self.send_response(401)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -5110,7 +5118,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             state_match = re.match(r'^/v1/library/(folio-\d+)/state$', kobo_path)
             if state_match:
                 # Accept reading state updates (position, progress) but don't store them yet
-                print(f"📖 Kobo reading state update from user '{user}'")
+                print(f"📖 Kobo reading state update from user '{user}'", flush=True)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -5127,8 +5135,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             # For any other Kobo API paths, proxy to the official Kobo Store
-            print(f"📡 Proxying Kobo POST request: {kobo_path}")
-            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'POST', self.headers, body)
+            print(f"📡 Proxying Kobo POST request: {kobo_path_with_query}", flush=True)
+            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path_with_query, 'POST', self.headers, body)
 
             self.send_response(status)
             skip_headers = {'transfer-encoding', 'connection', 'content-encoding'}
@@ -5169,7 +5177,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
                 return
             except Exception as e:
-                print(f"❌ Kobo token regeneration error: {e}")
+                print(f"❌ Kobo token regeneration error: {e}", flush=True)
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
