@@ -223,23 +223,23 @@ function folioApp() {
             window.addEventListener('scroll', () => {
                 const currentScrollY = window.scrollY;
                 this.showBackToTop = currentScrollY > 400;
-                this.headerCompact = currentScrollY > 50;
 
-                // Detect scroll direction for header visibility
-                // Only hide/show after scrolling past threshold (50px) to avoid jitter
+                // Detect scroll direction for header compact state
+                // When scrolling down: hide search bar, show icons in section header
+                // When scrolling up: show full header with search bar
                 if (currentScrollY > 50) {
                     const scrollDiff = currentScrollY - this.lastScrollY;
                     // Only trigger if scrolled more than 5px to avoid micro-movements
                     if (scrollDiff > 5) {
-                        // Scrolling down - hide header
-                        this.headerHidden = true;
+                        // Scrolling down - compact header (hide search bar)
+                        this.headerCompact = true;
                     } else if (scrollDiff < -5) {
-                        // Scrolling up - show header
-                        this.headerHidden = false;
+                        // Scrolling up - expand header (show search bar)
+                        this.headerCompact = false;
                     }
                 } else {
-                    // At top of page - always show header
-                    this.headerHidden = false;
+                    // At top of page - always show full header
+                    this.headerCompact = false;
                 }
                 this.lastScrollY = currentScrollY;
 
