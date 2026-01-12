@@ -818,17 +818,14 @@ def proxy_to_kobo_store(path, method, headers, body=None):
     """
     Proxy a request to the official Kobo Store API.
     Returns (status_code, response_headers, response_body).
+
+    Note: path should include query string if needed (e.g., "/v1/affiliate?PlatformID=...")
     """
     import urllib.request
     import urllib.error
 
-    query_string = request.query_string.decode('utf-8')
-    full_path = f"/{path}"
-    if query_string:
-        full_path += f"?{query_string}"
-
-    url = f"{KOBO_STOREAPI_URL}{full_path}"
-    print(f"📡 Proxying {method} request to Kobo Store: {full_path}")
+    url = f"{KOBO_STOREAPI_URL}{path}"
+    print(f"📡 Proxying {method} request to Kobo Store: {path}", flush=True)
 
     try:
         # Build the request
@@ -855,7 +852,7 @@ def proxy_to_kobo_store(path, method, headers, body=None):
         response_headers = dict(e.headers) if hasattr(e, 'headers') else {}
         return (e.code, response_headers, response_body)
     except Exception as e:
-        print(f"❌ Kobo proxy error: {e}")
+        print(f"❌ Kobo proxy error: {e}", flush=True)
         return (502, {}, json.dumps({'error': f'Proxy error: {str(e)}'}).encode('utf-8'))
 
 
@@ -4129,10 +4126,16 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             user_token = kobo_sync_match.group(1)
             kobo_path = kobo_sync_match.group(2) or '/'
 
+            # Include query string for proxying to Kobo Store
+            if parsed_url.query:
+                kobo_path_with_query = f"{kobo_path}?{parsed_url.query}"
+            else:
+                kobo_path_with_query = kobo_path
+
             # Validate the token and get the user
             user = get_user_from_kobo_token(user_token)
             if not user:
-                print(f"⚠️ Invalid Kobo sync token: {user_token}")
+                print(f"⚠️ Invalid Kobo sync token: {user_token}", flush=True)
                 self.send_response(401)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -4147,7 +4150,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             # Handle: GET /kobo/<token>/v1/library/sync - Main sync endpoint
             if kobo_path == '/v1/library/sync':
                 try:
-                    print(f"📚 Kobo sync request from user '{user}'")
+                    print(f"📚 Kobo sync request from user '{user}'", flush=True)
 
                     # Get the user's reading list
                     reading_list_ids = get_reading_list_ids_for_user(user)
@@ -4195,7 +4198,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     # Generate new sync token (timestamp-based)
                     new_sync_token = str(int(time.time()))
 
-                    print(f"📚 Kobo sync: {len(sync_results)} items for user '{user}'")
+                    print(f"📚 Kobo sync: {len(sync_results)} items for user '{user}'", flush=True)
 
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
@@ -4207,7 +4210,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 except Exception as e:
-                    print(f"❌ Kobo sync error: {e}")
+                    print(f"❌ Kobo sync error: {e}", flush=True)
                     import traceback
                     traceback.print_exc()
                     self.send_response(500)
@@ -4223,7 +4226,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     book_uuid = metadata_match.group(1)
                     book_id = int(book_uuid.replace('folio-', ''))
 
-                    print(f"📖 Kobo metadata request for book {book_id}")
+                    print(f"📖 Kobo metadata request for book {book_id}", flush=True)
 
                     book = get_book_for_kobo_sync(book_id)
                     if not book:
@@ -4242,7 +4245,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 except Exception as e:
-                    print(f"❌ Kobo metadata error: {e}")
+                    print(f"❌ Kobo metadata error: {e}", flush=True)
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
@@ -4271,7 +4274,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     book_uuid = image_match.group(1)
                     book_id = int(book_uuid.replace('folio-', ''))
 
-                    print(f"🖼️ Kobo cover request for book {book_id}")
+                    print(f"🖼️ Kobo cover request for book {book_id}", flush=True)
 
                     cover_data = get_book_cover(book_id)
                     if cover_data:
@@ -4288,14 +4291,14 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 except Exception as e:
-                    print(f"❌ Kobo cover error: {e}")
+                    print(f"❌ Kobo cover error: {e}", flush=True)
                     self.send_response(500)
                     self.end_headers()
                     return
 
             # Handle: GET /kobo/<token>/v1/initialization - Device initialization
             if kobo_path == '/v1/initialization':
-                print(f"🔧 Kobo initialization request from user '{user}'")
+                print(f"🔧 Kobo initialization request from user '{user}'", flush=True)
                 # Return minimal initialization response
                 init_response = {
                     "Resources": {
@@ -4312,7 +4315,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
             # Handle: GET /kobo/<token>/v1/library/tags - Shelves (empty for now)
             if kobo_path == '/v1/library/tags':
-                print(f"📚 Kobo tags/shelves request from user '{user}'")
+                print(f"📚 Kobo tags/shelves request from user '{user}'", flush=True)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -4321,8 +4324,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
 
             # For any other Kobo API paths, proxy to the official Kobo Store
             # This maintains access to Kobo Store and Overdrive functionality
-            print(f"📡 Proxying Kobo request: {kobo_path}")
-            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'GET', self.headers)
+            print(f"📡 Proxying Kobo GET request: {kobo_path_with_query}", flush=True)
+            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path_with_query, 'GET', self.headers)
 
             self.send_response(status)
             # Copy response headers (filter some that shouldn't be forwarded)
@@ -4364,7 +4367,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
                 return
             except Exception as e:
-                print(f"❌ Kobo token error: {e}")
+                print(f"❌ Kobo token error: {e}", flush=True)
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -5092,10 +5095,16 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             user_token = kobo_sync_match.group(1)
             kobo_path = kobo_sync_match.group(2) or '/'
 
+            # Include query string for proxying to Kobo Store
+            if parsed_url.query:
+                kobo_path_with_query = f"{kobo_path}?{parsed_url.query}"
+            else:
+                kobo_path_with_query = kobo_path
+
             # Validate the token and get the user
             user = get_user_from_kobo_token(user_token)
             if not user:
-                print(f"⚠️ Invalid Kobo sync token: {user_token}")
+                print(f"⚠️ Invalid Kobo sync token: {user_token}", flush=True)
                 self.send_response(401)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -5110,7 +5119,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             state_match = re.match(r'^/v1/library/(folio-\d+)/state$', kobo_path)
             if state_match:
                 # Accept reading state updates (position, progress) but don't store them yet
-                print(f"📖 Kobo reading state update from user '{user}'")
+                print(f"📖 Kobo reading state update from user '{user}'", flush=True)
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -5127,8 +5136,8 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             # For any other Kobo API paths, proxy to the official Kobo Store
-            print(f"📡 Proxying Kobo POST request: {kobo_path}")
-            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'POST', self.headers, body)
+            print(f"📡 Proxying Kobo POST request: {kobo_path_with_query}", flush=True)
+            status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path_with_query, 'POST', self.headers, body)
 
             self.send_response(status)
             skip_headers = {'transfer-encoding', 'connection', 'content-encoding'}
@@ -5169,7 +5178,7 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response.encode('utf-8'))
                 return
             except Exception as e:
-                print(f"❌ Kobo token regeneration error: {e}")
+                print(f"❌ Kobo token regeneration error: {e}", flush=True)
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
