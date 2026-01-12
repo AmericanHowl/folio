@@ -4321,6 +4321,73 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps([]).encode('utf-8'))
                 return
 
+            # Handle Kobo Store-specific endpoints with stub responses
+            # These endpoints are for Kobo Store features we don't support
+            # Returning stubs prevents 401 errors and allows sync to proceed
+
+            # Affiliate/partner info - return empty
+            if kobo_path.startswith('/v1/affiliate'):
+                print(f"📦 Kobo affiliate request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({}).encode('utf-8'))
+                return
+
+            # Deals - return empty array
+            if kobo_path.startswith('/v1/deals'):
+                print(f"📦 Kobo deals request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps([]).encode('utf-8'))
+                return
+
+            # User wishlist - return empty
+            if kobo_path.startswith('/v1/user/wishlist'):
+                print(f"📦 Kobo wishlist request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"Items": []}).encode('utf-8'))
+                return
+
+            # User recommendations - return empty
+            if kobo_path.startswith('/v1/user/recommendations'):
+                print(f"📦 Kobo recommendations request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"Items": []}).encode('utf-8'))
+                return
+
+            # Products/store catalog - return empty
+            if kobo_path.startswith('/v1/products'):
+                print(f"📦 Kobo products request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps([]).encode('utf-8'))
+                return
+
+            # User profile - return minimal stub
+            if kobo_path.startswith('/v1/user/profile'):
+                print(f"📦 Kobo user profile request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({}).encode('utf-8'))
+                return
+
+            # Benefits/subscriptions - return empty
+            if kobo_path.startswith('/v1/user/loyalty'):
+                print(f"📦 Kobo loyalty request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"Benefits": {}}).encode('utf-8'))
+                return
+
             # For any other Kobo API paths, proxy to the official Kobo Store
             # This maintains access to Kobo Store and Overdrive functionality
             print(f"📡 Proxying Kobo GET request: {kobo_path_with_query}", flush=True)
