@@ -4302,12 +4302,37 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
             # Handle: GET /kobo/<token>/v1/initialization - Device initialization
             if kobo_path == '/v1/initialization':
                 print(f"🔧 Kobo initialization request from user '{user}'", flush=True)
-                # Return minimal initialization response
+                # Return initialization response with resource URLs
+                # The Kobo uses these to know where to find various endpoints
                 init_response = {
                     "Resources": {
+                        # Image URLs
                         "image_host": base_url,
-                        "image_url_quality_template": "{ImageId}/{Width}/{Height}/false/image.jpg",
-                        "image_url_template": "{ImageId}/{Width}/{Height}/{Quality}/{IsGreyscale}/image.jpg"
+                        "image_url_quality_template": f"{base_url}/kobo/{user_token}/{{ImageId}}/{{Width}}/{{Height}}/{{Quality}}/{{IsGreyscale}}/image.jpg",
+                        "image_url_template": f"{base_url}/kobo/{user_token}/{{ImageId}}/{{Width}}/{{Height}}/false/image.jpg",
+
+                        # Library sync endpoint - this is the key one!
+                        "library_sync": f"{base_url}/kobo/{user_token}/v1/library/sync",
+
+                        # Book endpoints
+                        "library_items": f"{base_url}/kobo/{user_token}/v1/library/{{LibraryItemId}}",
+                        "content_access_book": f"{base_url}/kobo/{user_token}/v1/library/{{BookId}}/content",
+
+                        # Metadata
+                        "book": f"{base_url}/kobo/{user_token}/v1/library/{{BookId}}/metadata",
+
+                        # Tags/shelves
+                        "tags": f"{base_url}/kobo/{user_token}/v1/library/tags",
+
+                        # User endpoints
+                        "user_profile": f"{base_url}/kobo/{user_token}/v1/user/profile",
+                        "user_wishlist": f"{base_url}/kobo/{user_token}/v1/user/wishlist",
+                        "user_recommendations": f"{base_url}/kobo/{user_token}/v1/user/recommendations",
+
+                        # Other endpoints
+                        "affiliate": f"{base_url}/kobo/{user_token}/v1/affiliate",
+                        "deals": f"{base_url}/kobo/{user_token}/v1/deals",
+                        "products": f"{base_url}/kobo/{user_token}/v1/products"
                     }
                 }
                 self.send_response(200)
