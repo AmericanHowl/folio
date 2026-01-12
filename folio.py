@@ -4321,6 +4321,17 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps([]).encode('utf-8'))
                 return
 
+            # Stub /v1/affiliate endpoint to prevent 401 errors during sync
+            # This endpoint requires Kobo account auth which we don't have
+            # Other endpoints are proxied to maintain Overdrive compatibility
+            if kobo_path.startswith('/v1/affiliate'):
+                print(f"📦 Kobo affiliate request (stub response)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({}).encode('utf-8'))
+                return
+
             # For any other Kobo API paths, proxy to the official Kobo Store
             # This maintains access to Kobo Store and Overdrive functionality
             print(f"📡 Proxying Kobo GET request: {kobo_path_with_query}", flush=True)
