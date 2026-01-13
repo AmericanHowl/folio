@@ -4177,14 +4177,10 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                     # Get the user's reading list
                     reading_list_ids = get_reading_list_ids_for_user(user)
                     print(f"📚 Reading list IDs for '{user}': {reading_list_ids}", flush=True)
-                    sync_state = get_kobo_sync_state(user)
-
-                    # Parse sync token from header (tracks which books already synced)
-                    sync_token = self.headers.get('x-kobo-synctoken', '')
 
                     # Build sync response - list of entitlements
+                    # Always return all books in reading list - Kobo handles duplicates
                     sync_results = []
-                    synced_ids = set()
 
                     for book_id in reading_list_ids:
                         book = get_book_for_kobo_sync(book_id)
@@ -4192,50 +4188,15 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                             print(f"⚠️ Book {book_id} not found in Calibre library", flush=True)
                             continue
 
-                        # Check if book needs to be synced
-                        book_state = sync_state.get(book_id, {})
-                        is_new = book_id not in sync_state
-
-                        # Skip already-synced books that haven't changed
-                        # (Only return NewEntitlement for new books, not ChangedEntitlement for existing)
-                        if not is_new and not book_state.get('is_archived'):
-                            # Book already synced and not archived - skip it
-                            synced_ids.add(book_id)
-                            continue
-
                         # Format book for Kobo
                         kobo_book = format_book_for_kobo(book, base_url, user_token)
-
-                        if is_new:
-                            sync_results.append({"NewEntitlement": kobo_book})
-                            print(f"📚 New entitlement for book {book_id}: {book['title']}", flush=True)
-                        else:
-                            # Book was archived but is back - treat as changed
-                            sync_results.append({"ChangedEntitlement": kobo_book})
-                            print(f"📚 Changed entitlement for book {book_id}: {book['title']}", flush=True)
-
-                        synced_ids.add(book_id)
-                        update_kobo_sync_state(user, book_id)
-
-                    # Check for removed books (in sync state but not in reading list)
-                    for book_id in sync_state.keys():
-                        if book_id not in reading_list_ids:
-                            # Book was removed from reading list
-                            book_uuid = f"folio-{book_id}"
-                            sync_results.append({
-                                "DeletedEntitlement": {
-                                    "RevisionId": book_uuid
-                                }
-                            })
-                            update_kobo_sync_state(user, book_id, is_archived=True)
+                        sync_results.append({"NewEntitlement": kobo_book})
+                        print(f"📚 Sync entitlement for book {book_id}: {book['title']}", flush=True)
 
                     # Generate new sync token (timestamp-based)
                     new_sync_token = str(int(time.time()))
 
-                    if len(sync_results) == 0:
-                        print(f"📚 Kobo sync: No changes for user '{user}' (all {len(reading_list_ids)} books already synced)", flush=True)
-                    else:
-                        print(f"📚 Kobo sync: {len(sync_results)} items for user '{user}'", flush=True)
+                    print(f"📚 Kobo sync: {len(sync_results)} items for user '{user}'", flush=True)
 
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
