@@ -937,9 +937,11 @@ def proxy_to_kobo_store(path, method, headers, body=None):
     Returns (status_code, response_headers, response_body).
 
     Note: path should include query string if needed (e.g., "/v1/affiliate?PlatformID=...")
+    Response body is automatically decompressed if gzip-encoded.
     """
     import urllib.request
     import urllib.error
+    import gzip
 
     url = f"{KOBO_STOREAPI_URL}{path}"
     print(f"📡 Proxying {method} request to Kobo Store: {path}", flush=True)
@@ -962,11 +964,34 @@ def proxy_to_kobo_store(path, method, headers, body=None):
         with urllib.request.urlopen(req, timeout=30) as response:
             response_body = response.read()
             response_headers = dict(response.headers)
+
+            # Decompress gzip if needed
+            content_encoding = response_headers.get('Content-Encoding', '').lower()
+            if content_encoding == 'gzip' or (response_body[:2] == b'\x1f\x8b'):
+                try:
+                    response_body = gzip.decompress(response_body)
+                    # Remove Content-Encoding header since we decompressed
+                    response_headers.pop('Content-Encoding', None)
+                    response_headers.pop('content-encoding', None)
+                except Exception as decompress_error:
+                    print(f"⚠️ Gzip decompress failed: {decompress_error}", flush=True)
+
             return (response.status, response_headers, response_body)
 
     except urllib.error.HTTPError as e:
         response_body = e.read() if hasattr(e, 'read') else b''
         response_headers = dict(e.headers) if hasattr(e, 'headers') else {}
+
+        # Decompress error response if gzip
+        content_encoding = response_headers.get('Content-Encoding', '').lower()
+        if content_encoding == 'gzip' or (response_body[:2] == b'\x1f\x8b'):
+            try:
+                response_body = gzip.decompress(response_body)
+                response_headers.pop('Content-Encoding', None)
+                response_headers.pop('content-encoding', None)
+            except:
+                pass
+
         return (e.code, response_headers, response_body)
     except Exception as e:
         print(f"❌ Kobo proxy error: {e}", flush=True)
