@@ -812,6 +812,125 @@ def format_book_for_kobo(book, base_url, user_token):
     }
 
 
+def get_book_file_for_download(book_id, format_type):
+    """
+    Get a book file for download, converting to KEPUB if necessary.
+    Returns (file_data, filename, mime_type, error) tuple.
+    On error, file_data is None and error contains the message.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT b.path, b.title FROM books b WHERE b.id = ?", (book_id,))
+        book_row = cursor.fetchone()
+
+        if not book_row:
+            conn.close()
+            return None, None, None, f"Book {book_id} not found"
+
+        library_path = get_calibre_library()
+        book_dir = os.path.join(library_path, book_row['path'])
+        book_title = book_row['title']
+        book_file_path = None
+        temp_file_to_cleanup = None
+
+        if format_type == 'KEPUB':
+            # Check if KEPUB exists
+            if os.path.isdir(book_dir):
+                for f in os.listdir(book_dir):
+                    if f.lower().endswith('.kepub') or f.lower().endswith('.kepub.epub'):
+                        book_file_path = os.path.join(book_dir, f)
+                        break
+
+            # Convert from EPUB if needed
+            if not book_file_path:
+                kepubify_path = find_kepubify()
+                if not kepubify_path:
+                    conn.close()
+                    return None, None, None, "kepubify not installed"
+
+                # Find EPUB source
+                epub_file = None
+                for f in os.listdir(book_dir):
+                    if f.lower().endswith('.epub') and not f.lower().endswith('.kepub.epub'):
+                        epub_file = os.path.join(book_dir, f)
+                        break
+
+                if not epub_file:
+                    conn.close()
+                    return None, None, None, "No EPUB source for KEPUB conversion"
+
+                # Convert to KEPUB
+                temp_dir = tempfile.mkdtemp(prefix='kepub_')
+                temp_file_to_cleanup = temp_dir
+                epub_basename = os.path.splitext(os.path.basename(epub_file))[0]
+                temp_kepub = os.path.join(temp_dir, f"{epub_basename}.kepub.epub")
+
+                print(f"🔄 Converting to KEPUB: {epub_basename}", flush=True)
+                result = subprocess.run(
+                    [kepubify_path, '-o', temp_kepub, epub_file],
+                    capture_output=True, text=True, timeout=120
+                )
+
+                if result.returncode != 0 or not os.path.exists(temp_kepub):
+                    shutil.rmtree(temp_dir)
+                    conn.close()
+                    return None, None, None, f"KEPUB conversion failed: {result.stderr}"
+
+                book_file_path = temp_kepub
+                print(f"✅ KEPUB conversion complete", flush=True)
+
+                # Cache for future
+                try:
+                    permanent_kepub = os.path.join(book_dir, f"{epub_basename}.kepub.epub")
+                    shutil.copy2(temp_kepub, permanent_kepub)
+                except:
+                    pass
+        else:
+            # Other formats
+            cursor.execute("SELECT name FROM data WHERE book = ? AND format = ?", (book_id, format_type))
+            format_row = cursor.fetchone()
+            if not format_row:
+                conn.close()
+                return None, None, None, f"Format {format_type} not found"
+            book_file_path = os.path.join(book_dir, f"{format_row['name']}.{format_type.lower()}")
+
+        conn.close()
+
+        if not os.path.exists(book_file_path):
+            if temp_file_to_cleanup:
+                shutil.rmtree(temp_file_to_cleanup)
+            return None, None, None, "Book file not found"
+
+        # Read file
+        with open(book_file_path, 'rb') as f:
+            file_data = f.read()
+
+        # Cleanup temp
+        if temp_file_to_cleanup:
+            shutil.rmtree(temp_file_to_cleanup)
+
+        # MIME types
+        mime_types = {
+            'EPUB': 'application/epub+zip',
+            'KEPUB': 'application/epub+zip',
+            'PDF': 'application/pdf',
+            'MOBI': 'application/x-mobipocket-ebook',
+        }
+        mime_type = mime_types.get(format_type, 'application/octet-stream')
+
+        # Filename
+        safe_title = book_title.replace('"', "'").replace('\n', ' ')
+        file_ext = 'kepub.epub' if format_type == 'KEPUB' else format_type.lower()
+        filename = f"{safe_title}.{file_ext}"
+
+        return file_data, filename, mime_type, None
+
+    except Exception as e:
+        return None, None, None, str(e)
+
+
 def proxy_to_kobo_store(path, method, headers, body=None):
     """
     Proxy a request to the official Kobo Store API.
@@ -4257,12 +4376,26 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                 book_id = int(download_match.group(1))
                 format_type = download_match.group(2).upper()
 
-                print(f"📥 Kobo download request: book {book_id}, format {format_type}")
+                print(f"📥 Kobo download request: book {book_id}, format {format_type}", flush=True)
 
-                # Redirect to the main download endpoint (which handles KEPUB conversion)
-                self.send_response(302)
-                self.send_header('Location', f'/api/download/{book_id}/{format_type}')
+                # Serve file directly (Kobo devices don't follow redirects well)
+                file_data, filename, mime_type, error = get_book_file_for_download(book_id, format_type)
+
+                if error:
+                    print(f"❌ Kobo download error: {error}", flush=True)
+                    self.send_response(404)
+                    self.send_header('Content-Type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(error.encode('utf-8'))
+                    return
+
+                print(f"📥 Serving to Kobo: {filename} ({len(file_data)} bytes)", flush=True)
+                self.send_response(200)
+                self.send_header('Content-Type', mime_type)
+                self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+                self.send_header('Content-Length', str(len(file_data)))
                 self.end_headers()
+                self.wfile.write(file_data)
                 return
 
             # Handle: GET /kobo/<token>/<book_uuid>/<w>/<h>/<greyscale>/image.jpg - Cover image
