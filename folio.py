@@ -4431,114 +4431,64 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
             # Handle: GET /kobo/<token>/v1/initialization - Device initialization
             if kobo_path == '/v1/initialization':
                 print(f"🔧 Kobo initialization request from user '{user}'", flush=True)
-                # Return initialization response with resource URLs
-                # LOCAL URLs: Library sync, covers, downloads (our books)
-                # KOBO URLs: Store, deals, Overdrive, auth (for store purchases and library borrowing)
+
+                # Use Kobo's native resources - only override image URLs for our covers
+                # The device will call our server for sync/auth because that's where it's configured
                 kobo_resources = {
-                    # === LOCAL: Cover images from our library ===
+                    # Override image URLs to serve our covers
                     "image_host": base_url,
                     "image_url_quality_template": f"{base_url}/kobo/{user_token}/{{ImageId}}/{{Width}}/{{Height}}/{{Quality}}/{{IsGreyscale}}/image.jpg",
                     "image_url_template": f"{base_url}/kobo/{user_token}/{{ImageId}}/{{Width}}/{{Height}}/false/image.jpg",
 
-                    # === LOCAL: Library sync for our Reading List ===
-                    "library_sync": f"{base_url}/kobo/{user_token}/v1/library/sync",
-
-                    # === LOCAL: Reading state tracking ===
-                    "reading_state": f"{base_url}/kobo/{user_token}/v1/library/{{Ids}}/state",
-
-                    # === LOCAL: Library metadata for our books ===
-                    "library_metadata": f"{base_url}/kobo/{user_token}/v1/library/{{Ids}}/metadata",
-
-                    # === LOCAL: Tags/shelves management ===
-                    "tags": f"{base_url}/kobo/{user_token}/v1/library/tags",
-                    "tag_items": f"{base_url}/kobo/{user_token}/v1/library/tags/{{TagId}}/Items",
-                    "delete_tag": f"{base_url}/kobo/{user_token}/v1/library/tags/{{TagId}}",
-                    "delete_tag_items": f"{base_url}/kobo/{user_token}/v1/library/tags/{{TagId}}/items/delete",
-                    "rename_tag": f"{base_url}/kobo/{user_token}/v1/library/tags/{{TagId}}",
-
-                    # === LOCAL: Download endpoints for our books ===
-                    "get_download_keys": f"{base_url}/kobo/{user_token}/v1/library/downloadkeys",
-                    "get_download_link": f"{base_url}/kobo/{user_token}/v1/library/downloadlink",
-                    "add_entitlement": f"{base_url}/kobo/{user_token}/v1/library/{{RevisionIds}}",
-                    "delete_entitlement": f"{base_url}/kobo/{user_token}/v1/library/{{Ids}}",
-
-                    # === LOCAL: Analytics (stub) ===
-                    "post_analytics_event": f"{base_url}/kobo/{user_token}/v1/analytics/event",
-                    "get_tests_request": f"{base_url}/kobo/{user_token}/v1/analytics/gettests",
-
-                    # === LOCAL: Auth (device must auth with us to sync) ===
-                    "device_auth": f"{base_url}/kobo/{user_token}/v1/auth/device",
-                    "device_refresh": f"{base_url}/kobo/{user_token}/v1/auth/refresh",
-                    "exchange_auth": f"{base_url}/kobo/{user_token}/v1/auth/exchange",
-
-                    # === KOBO DIRECT: Store and purchasing ===
-                    "affiliate": "https://storeapi.kobo.com/v1/affiliate",
+                    # Everything else uses Kobo's defaults - device ignores these anyway
+                    # and calls our server based on its configuration
+                    "account_page": "https://www.kobo.com/account/settings",
                     "affiliaterequest": "https://storeapi.kobo.com/v1/affiliate",
-                    "deals": "https://storeapi.kobo.com/v1/deals",
-                    "daily_deal": "https://storeapi.kobo.com/v1/products/dailydeal",
-                    "products": "https://storeapi.kobo.com/v1/products",
+                    "assets": "https://storeapi.kobo.com/v1/assets",
+                    "autocomplete": "https://storeapi.kobo.com/v1/products/autocomplete",
                     "book": "https://storeapi.kobo.com/v1/products/books/{ProductId}",
                     "categories": "https://storeapi.kobo.com/v1/categories",
-                    "category": "https://storeapi.kobo.com/v1/categories/{CategoryId}",
-                    "category_products": "https://storeapi.kobo.com/v1/categories/{CategoryId}/products",
-                    "category_featured_lists": "https://storeapi.kobo.com/v1/categories/{CategoryId}/featured",
-                    "featured_list": "https://storeapi.kobo.com/v1/products/featured/{FeaturedListId}",
-                    "featured_lists": "https://storeapi.kobo.com/v1/products/featured",
-                    "product_nextread": "https://storeapi.kobo.com/v1/products/{ProductIds}/nextread",
-                    "product_prices": "https://storeapi.kobo.com/v1/products/{ProductIds}/prices",
-                    "product_recommendations": "https://storeapi.kobo.com/v1/products/{ProductId}/recommendations",
-                    "product_reviews": "https://storeapi.kobo.com/v1/products/{ProductIds}/reviews",
-                    "autocomplete": "https://storeapi.kobo.com/v1/products/autocomplete",
-                    "content_access_book": "https://storeapi.kobo.com/v1/products/books/{ProductId}/access",
-
-                    # === KOBO DIRECT: User account (for store purchases) ===
-                    "user_profile": "https://storeapi.kobo.com/v1/user/profile",
-                    "user_wishlist": "https://storeapi.kobo.com/v1/user/wishlist",
-                    "user_recommendations": "https://storeapi.kobo.com/v1/user/recommendations",
-                    "user_loyalty_benefits": "https://storeapi.kobo.com/v1/user/loyalty/benefits",
-                    "user_platform": "https://storeapi.kobo.com/v1/user/platform",
-                    "user_ratings": "https://storeapi.kobo.com/v1/user/ratings",
-                    "user_reviews": "https://storeapi.kobo.com/v1/user/reviews",
-                    "browse_history": "https://storeapi.kobo.com/v1/user/browsehistory",
-
-                    # === KOBO DIRECT: Library management for Kobo purchases ===
-                    "library_items": "https://storeapi.kobo.com/v1/user/library",
-                    "library_book": "https://storeapi.kobo.com/v1/user/library/books/{LibraryItemId}",
-
-                    # === KOBO DIRECT: Overdrive/Library borrowing ===
-                    "checkout_borrowed_book": "https://storeapi.kobo.com/v1/library/borrow",
-
-                    # === KOBO DIRECT: Configuration ===
                     "configuration_data": "https://storeapi.kobo.com/v1/configuration",
-                    "assets": "https://storeapi.kobo.com/v1/assets",
-
-                    # === External hosts ===
+                    "content_access_book": "https://storeapi.kobo.com/v1/products/books/{ProductId}/access",
+                    "daily_deal": "https://storeapi.kobo.com/v1/products/dailydeal",
+                    "deals": "https://storeapi.kobo.com/v1/deals",
+                    "device_auth": "https://storeapi.kobo.com/v1/auth/device",
+                    "device_refresh": "https://storeapi.kobo.com/v1/auth/refresh",
                     "dictionary_host": "https://ereaderfiles.kobo.com",
                     "discovery_host": "https://discovery.kobobooks.com",
-                    "oauth_host": "https://oauth.kobo.com",
-                    "reading_services_host": "https://readingservices.kobo.com",
-                    "social_host": "https://social.kobobooks.com",
-                    "userguide_host": "https://ereaderfiles.kobo.com",
-                    "store_host": "www.kobo.com",
-                    "store_home": "www.kobo.com/{region}/{language}",
-
-                    # === Feature flags (enable store features) ===
+                    "eula_page": "https://www.kobo.com/termsofuse",
+                    "exchange_auth": "https://storeapi.kobo.com/v1/auth/exchange",
+                    "featured_list": "https://storeapi.kobo.com/v1/products/featured/{FeaturedListId}",
+                    "featured_lists": "https://storeapi.kobo.com/v1/products/featured",
+                    "get_tests_request": "https://storeapi.kobo.com/v1/analytics/gettests",
+                    "help_page": "https://www.kobo.com/help",
                     "kobo_audiobooks_enabled": "False",
                     "kobo_display_price": "True",
                     "kobo_nativeborrow_enabled": "True",
                     "kobo_onestorelibrary_enabled": "False",
                     "kobo_redeem_enabled": "True",
                     "kobo_shelfie_enabled": "False",
-                    "kobo_subscriptions_enabled": "True",
-                    "kobo_superpoints_enabled": "True",
+                    "kobo_subscriptions_enabled": "False",
+                    "kobo_superpoints_enabled": "False",
                     "kobo_wishlist_enabled": "True",
+                    "library_book": "https://storeapi.kobo.com/v1/user/library/books/{LibraryItemId}",
+                    "library_items": "https://storeapi.kobo.com/v1/user/library",
+                    "library_sync": "https://storeapi.kobo.com/v1/library/sync",
+                    "oauth_host": "https://oauth.kobo.com",
+                    "product_nextread": "https://storeapi.kobo.com/v1/products/{ProductIds}/nextread",
+                    "product_recommendations": "https://storeapi.kobo.com/v1/products/{ProductId}/recommendations",
+                    "products": "https://storeapi.kobo.com/v1/products",
+                    "reading_services_host": "https://readingservices.kobo.com",
+                    "social_host": "https://social.kobobooks.com",
+                    "storeHome": "www.kobo.com/{region}/{language}",
+                    "store_host": "www.kobo.com",
                     "use_one_store": "False",
-
-                    # === Help/account pages ===
-                    "account_page": "https://www.kobo.com/account/settings",
-                    "help_page": "https://www.kobo.com/help",
-                    "privacy_page": "https://www.kobo.com/privacypolicy",
-                    "eula_page": "https://www.kobo.com/termsofuse",
+                    "user_loyalty_benefits": "https://storeapi.kobo.com/v1/user/loyalty/benefits",
+                    "user_platform": "https://storeapi.kobo.com/v1/user/platform",
+                    "user_profile": "https://storeapi.kobo.com/v1/user/profile",
+                    "user_recommendations": "https://storeapi.kobo.com/v1/user/recommendations",
+                    "user_wishlist": "https://storeapi.kobo.com/v1/user/wishlist",
+                    "userguide_host": "https://ereaderfiles.kobo.com",
                 }
                 init_response = {"Resources": kobo_resources}
                 print(f"📋 Kobo init: base_url={base_url}", flush=True)
