@@ -4466,10 +4466,10 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                     "post_analytics_event": f"{base_url}/kobo/{user_token}/v1/analytics/event",
                     "get_tests_request": f"{base_url}/kobo/{user_token}/v1/analytics/gettests",
 
-                    # === KOBO DIRECT: Auth (needed for store purchases) ===
-                    "device_auth": "https://storeapi.kobo.com/v1/auth/device",
-                    "device_refresh": "https://storeapi.kobo.com/v1/auth/refresh",
-                    "exchange_auth": "https://storeapi.kobo.com/v1/auth/exchange",
+                    # === LOCAL: Auth (device must auth with us to sync) ===
+                    "device_auth": f"{base_url}/kobo/{user_token}/v1/auth/device",
+                    "device_refresh": f"{base_url}/kobo/{user_token}/v1/auth/refresh",
+                    "exchange_auth": f"{base_url}/kobo/{user_token}/v1/auth/exchange",
 
                     # === KOBO DIRECT: Store and purchasing ===
                     "affiliate": "https://storeapi.kobo.com/v1/affiliate",
