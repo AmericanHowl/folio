@@ -654,10 +654,10 @@ def get_book_for_kobo_sync(book_id, user=None):
                 b.pubdate,
                 b.path,
                 b.has_cover,
+                b.series_index,
                 GROUP_CONCAT(DISTINCT a.name, ' & ') as authors,
                 p.name as publisher,
                 s.name as series,
-                bsl.series_index as series_index,
                 c.text as description,
                 l.lang_code as language
             FROM books b
