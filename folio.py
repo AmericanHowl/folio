@@ -655,14 +655,12 @@ def get_book_for_kobo_sync(book_id, user=None):
                 b.path,
                 b.has_cover,
                 b.series_index,
-                GROUP_CONCAT(DISTINCT a.name, ' & ') as authors,
+                (SELECT GROUP_CONCAT(a2.name, ' & ') FROM books_authors_link bal2 JOIN authors a2 ON bal2.author = a2.id WHERE bal2.book = b.id) as authors,
                 p.name as publisher,
                 s.name as series,
                 c.text as description,
                 l.lang_code as language
             FROM books b
-            LEFT JOIN books_authors_link bal ON b.id = bal.book
-            LEFT JOIN authors a ON bal.author = a.id
             LEFT JOIN books_publishers_link bpl ON b.id = bpl.book
             LEFT JOIN publishers p ON bpl.publisher = p.id
             LEFT JOIN books_series_link bsl ON b.id = bsl.book
