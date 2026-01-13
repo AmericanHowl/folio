@@ -4175,6 +4175,7 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
 
                     # Get the user's reading list
                     reading_list_ids = get_reading_list_ids_for_user(user)
+                    print(f"📚 Reading list IDs for '{user}': {reading_list_ids}", flush=True)
                     sync_state = get_kobo_sync_state(user)
 
                     # Parse sync token from header (tracks which books already synced)
@@ -4187,6 +4188,7 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                     for book_id in reading_list_ids:
                         book = get_book_for_kobo_sync(book_id)
                         if not book:
+                            print(f"⚠️ Book {book_id} not found in Calibre library", flush=True)
                             continue
 
                         # Check if book needs to be synced
