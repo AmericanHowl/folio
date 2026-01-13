@@ -4163,6 +4163,9 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
 
             # Get base URL for download links
             host = self.headers.get('Host', 'localhost:9099')
+            # Ensure port is included if missing (Kobo may strip it)
+            if ':' not in host:
+                host = f"{host}:9099"
             protocol = 'https' if self.headers.get('X-Forwarded-Proto') == 'https' else 'http'
             base_url = f"{protocol}://{host}"
 
@@ -4476,14 +4479,18 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                 self.wfile.write(json.dumps({}).encode('utf-8'))
                 return
 
-            # Handle: GET /kobo/<token>/v1/user/loyalty/benefits - Loyalty benefits stub
+            # Handle: GET /kobo/<token>/v1/user/loyalty/benefits - Proxy to Kobo
             if kobo_path == '/v1/user/loyalty/benefits':
-                print(f"🎁 Kobo loyalty benefits request (stub response)", flush=True)
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
+                print(f"🎁 Kobo loyalty benefits request (proxying to Kobo)", flush=True)
+                status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path, 'GET', self.headers)
+                self.send_response(status)
+                skip_headers = {'transfer-encoding', 'connection', 'content-encoding'}
+                for key, value in resp_headers.items():
+                    if key.lower() not in skip_headers:
+                        self.send_header(key, value)
                 self.send_header('x-kobo-apitoken', 'e30=')
                 self.end_headers()
-                self.wfile.write(json.dumps({"Benefits": {}}).encode('utf-8'))
+                self.wfile.write(resp_body)
                 return
 
             # Handle: GET /kobo/<token>/v1/analytics/gettests - Analytics tests stub
@@ -4550,14 +4557,19 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                     self.wfile.write(json.dumps({'error': str(e)}).encode('utf-8'))
                     return
 
-            # Handle: GET /kobo/<token>/v1/user/* - User profile stubs
+            # Handle: GET /kobo/<token>/v1/user/* - Proxy to Kobo for store features
+            # The device may ignore init URLs and still send requests to our server
             if kobo_path.startswith('/v1/user/'):
-                print(f"👤 Kobo user request (stub response): {kobo_path}", flush=True)
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
+                print(f"👤 Kobo user request (proxying to Kobo): {kobo_path}", flush=True)
+                status, resp_headers, resp_body = proxy_to_kobo_store(kobo_path_with_query, 'GET', self.headers)
+                self.send_response(status)
+                skip_headers = {'transfer-encoding', 'connection', 'content-encoding'}
+                for key, value in resp_headers.items():
+                    if key.lower() not in skip_headers:
+                        self.send_header(key, value)
                 self.send_header('x-kobo-apitoken', 'e30=')
                 self.end_headers()
-                self.wfile.write(json.dumps({}).encode('utf-8'))
+                self.wfile.write(resp_body)
                 return
 
             # For any other Kobo API paths, proxy to the official Kobo Store
