@@ -4090,7 +4090,25 @@ class FolioHandler(http.server.SimpleHTTPRequestHandler):
         query_params = parse_qs(parsed_url.query)
         # Store parsed_url for use in handlers
         self.parsed_url = parsed_url
-        
+
+        # Block direct browser access to kobo.* subdomain (only allow /kobo/* API paths)
+        host = self.headers.get('Host', '').lower().split(':')[0]  # Remove port if present
+        if host.startswith('kobo.') and not path.startswith('/kobo/'):
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.end_headers()
+            html = '''<!DOCTYPE html>
+<html><head><title>Kobo Sync Endpoint</title>
+<style>body{font-family:system-ui,sans-serif;max-width:600px;margin:50px auto;padding:20px;text-align:center;}
+h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
+<body><h1>Kobo Sync Endpoint</h1>
+<p>This endpoint is for Kobo e-reader synchronization only.</p>
+<p>To access your library, please visit your main Folio instance.</p>
+<p><small>If you're setting up Kobo sync, configure your device with the API endpoint URL from Folio settings.</small></p>
+</body></html>'''
+            self.wfile.write(html.encode('utf-8'))
+            return
+
         # Kobo e-ink interface (server-rendered, no JavaScript)
         if path == '/kobo':
             try:
