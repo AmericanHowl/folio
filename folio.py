@@ -748,24 +748,24 @@ def format_book_for_kobo(book, base_url, user_token):
             "Id": f"folio-series-{hash(book['series']) % 100000}"
         }
 
-    # Build contributors list
+    # Build contributors list (match calibre-web format)
+    contributor_roles = []
     contributors = []
     for author in book.get('authors', []):
-        contributors.append({
-            "Name": author,
-            "Role": "Author"
-        })
+        contributor_roles.append({"Name": author})
+        contributors.append(author)
 
     # Parse publication date
     pub_date = book.get('pubdate') or book.get('timestamp') or '2000-01-01T00:00:00Z'
     if pub_date and 'T' not in str(pub_date):
         pub_date = f"{pub_date}T00:00:00Z"
 
-    # Build the Kobo metadata structure
+    # Build the Kobo metadata structure (match calibre-web format)
     metadata = {
         "Categories": ["00000000-0000-0000-0000-000000000001"],  # Generic category
+        "ContributorRoles": contributor_roles,
         "Contributors": contributors,
-        "CoverImageId": book_uuid if book.get('has_cover') else None,
+        "CoverImageId": book_uuid,  # Always set - Kobo will request if needed
         "CrossRevisionId": book_uuid,
         "CurrentDisplayPrice": {"CurrencyCode": "USD", "TotalAmount": 0},
         "CurrentLoveDisplayPrice": {"TotalAmount": 0},
@@ -781,7 +781,7 @@ def format_book_for_kobo(book, base_url, user_token):
         "Language": book.get('language', 'en'),
         "PhoneticPronunciations": {},
         "PublicationDate": pub_date,
-        "Publisher": {"Name": book.get('publisher') or 'Unknown'},
+        "Publisher": {"Imprint": "", "Name": book.get('publisher') or ''},
         "RevisionId": book_uuid,
         "Title": book['title'],
         "WorkId": book_uuid
@@ -867,9 +867,22 @@ def get_book_file_for_download(book_id, format_type):
                 epub_basename = os.path.splitext(os.path.basename(epub_file))[0]
                 temp_kepub = os.path.join(temp_dir, f"{epub_basename}.kepub.epub")
 
+                # Check if we have a cover.jpg to embed in the EPUB before conversion
+                cover_jpg = os.path.join(book_dir, 'cover.jpg')
+                epub_to_convert = epub_file
+                if os.path.exists(cover_jpg):
+                    # Copy EPUB to temp and update cover before kepubify
+                    temp_epub_with_cover = os.path.join(temp_dir, f"{epub_basename}_with_cover.epub")
+                    shutil.copy2(epub_file, temp_epub_with_cover)
+                    with open(cover_jpg, 'rb') as f:
+                        cover_data = f.read()
+                    if update_epub_cover(temp_epub_with_cover, cover_data):
+                        epub_to_convert = temp_epub_with_cover
+                        print(f"🖼️ Updated EPUB cover before KEPUB conversion", flush=True)
+
                 print(f"🔄 Converting to KEPUB: {epub_basename}", flush=True)
                 result = subprocess.run(
-                    [kepubify_path, '-o', temp_kepub, epub_file],
+                    [kepubify_path, '-o', temp_kepub, epub_to_convert],
                     capture_output=True, text=True, timeout=120
                 )
 
@@ -929,6 +942,69 @@ def get_book_file_for_download(book_id, format_type):
 
     except Exception as e:
         return None, None, None, str(e)
+
+
+def update_epub_cover(epub_path, cover_data, output_path=None):
+    """
+    Update the cover image inside an EPUB file with new cover data.
+    If output_path is None, modifies in place.
+    Returns True on success, False on failure.
+    """
+    import zipfile
+
+    if output_path is None:
+        output_path = epub_path
+
+    try:
+        # Read all files from the original EPUB
+        with zipfile.ZipFile(epub_path, 'r') as zf:
+            file_list = zf.namelist()
+            file_contents = {}
+            for name in file_list:
+                file_contents[name] = zf.read(name)
+
+        # Find cover image files (common names/patterns)
+        cover_patterns = ['cover.jpg', 'cover.jpeg', 'cover.png', 'Cover.jpg', 'Cover.jpeg', 'Cover.png']
+        cover_files = []
+
+        for name in file_list:
+            basename = os.path.basename(name).lower()
+            # Check for common cover filenames
+            if basename in [p.lower() for p in cover_patterns]:
+                cover_files.append(name)
+            # Also check for files with 'cover' in the name that are images
+            elif 'cover' in basename and basename.endswith(('.jpg', '.jpeg', '.png')):
+                cover_files.append(name)
+
+        if not cover_files:
+            print(f"⚠️ No cover image found in EPUB to replace", flush=True)
+            return False
+
+        # Determine if we need to convert cover format
+        # Most EPUBs use JPEG for covers
+        cover_is_jpeg = cover_data[:2] == b'\xff\xd8'
+        cover_is_png = cover_data[:8] == b'\x89PNG\r\n\x1a\n'
+
+        # Replace cover files with new cover data
+        for cover_file in cover_files:
+            is_jpeg_target = cover_file.lower().endswith(('.jpg', '.jpeg'))
+            is_png_target = cover_file.lower().endswith('.png')
+
+            # Use cover data as-is if formats match, otherwise we'd need conversion
+            # For simplicity, just replace with the data we have
+            file_contents[cover_file] = cover_data
+            print(f"🖼️ Replacing cover: {cover_file}", flush=True)
+
+        # Write updated EPUB
+        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for name, content in file_contents.items():
+                zf.writestr(name, content)
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Failed to update EPUB cover: {e}", flush=True)
+        return False
 
 
 def proxy_to_kobo_store(path, method, headers, body=None):
@@ -2408,10 +2484,22 @@ def convert_book_to_kepub(book_id):
                 
                 print(f"   ✅ Converted {source_format} to EPUB", flush=True)
                 epub_for_kepubify = temp_epub
-            
+
+            # Update EPUB cover with the book's cover.jpg before conversion
+            cover_jpg = os.path.join(book_dir, 'cover.jpg')
+            if os.path.exists(cover_jpg) and epub_for_kepubify:
+                with open(cover_jpg, 'rb') as f:
+                    cover_data = f.read()
+                # Make a copy to modify
+                temp_epub_with_cover = os.path.join(temp_dir, f"{base_name}_with_cover.epub")
+                shutil.copy2(epub_for_kepubify, temp_epub_with_cover)
+                if update_epub_cover(temp_epub_with_cover, cover_data):
+                    epub_for_kepubify = temp_epub_with_cover
+                    print(f"🖼️ Updated EPUB cover before KEPUB conversion", flush=True)
+
             # Now run kepubify on the EPUB
             temp_kepub = os.path.join(temp_dir, kepub_filename)
-            
+
             print(f"🔄 Running kepubify to convert book {book_id}...", flush=True)
             result = subprocess.run(
                 [kepubify_path, '-o', temp_kepub, epub_for_kepubify],
@@ -4423,29 +4511,45 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                 self.wfile.write(file_data)
                 return
 
-            # Handle: GET /kobo/<token>/<book_uuid>/<w>/<h>/<greyscale>/image.jpg - Cover image
-            # Also handle: GET /kobo/<token>/<book_uuid>/image.jpg
-            image_match = re.match(r'^/(folio-\d+)(?:/(\d+)/(\d+)/(\w+))?/image\.jpg$', kobo_path)
+            # Handle: GET /kobo/<token>/<book_uuid>/<w>/<h>/<quality>/<greyscale>/image.jpg - Cover image
+            # Also handle: GET /kobo/<token>/<book_uuid>/<w>/<h>/<greyscale>/image.jpg
+            # For local books (folio-*), serve our covers. For Kobo store books, redirect to Kobo CDN.
+            image_match = re.match(r'^/([^/]+)/(\d+)/(\d+)(?:/[^/]+)?/(\w+)/image\.jpg$', kobo_path)
+            if not image_match:
+                # Also try simpler pattern without quality
+                image_match = re.match(r'^/([^/]+)/(\d+)/(\d+)/(\w+)/image\.jpg$', kobo_path)
             if image_match:
                 try:
                     book_uuid = image_match.group(1)
-                    book_id = int(book_uuid.replace('folio-', ''))
+                    width = image_match.group(2)
+                    height = image_match.group(3)
 
-                    print(f"🖼️ Kobo cover request for book {book_id}", flush=True)
+                    # Check if this is one of our local books
+                    if book_uuid.startswith('folio-'):
+                        book_id = int(book_uuid.replace('folio-', ''))
+                        print(f"🖼️ Kobo cover request for local book {book_id}", flush=True)
 
-                    cover_data = get_book_cover(book_id)
-                    if cover_data:
-                        self.send_response(200)
-                        self.send_header('Content-Type', 'image/jpeg')
-                        self.send_header('Cache-Control', 'public, max-age=86400')
-                        self.end_headers()
-                        self.wfile.write(cover_data)
+                        cover_data = get_book_cover(book_id)
+                        if cover_data:
+                            self.send_response(200)
+                            self.send_header('Content-Type', 'image/jpeg')
+                            self.send_header('Cache-Control', 'public, max-age=86400')
+                            self.end_headers()
+                            self.wfile.write(cover_data)
+                        else:
+                            self.send_response(404)
+                            self.send_header('Content-Type', 'text/plain')
+                            self.end_headers()
+                            self.wfile.write(b'Cover not found')
+                        return
                     else:
-                        self.send_response(404)
-                        self.send_header('Content-Type', 'text/plain')
+                        # Kobo store book - redirect to Kobo's CDN
+                        kobo_cdn_url = f"https://cdn.kobo.com/book-images/{book_uuid}/{width}/{height}/false/image.jpg"
+                        print(f"🖼️ Redirecting Kobo store cover to CDN: {book_uuid}", flush=True)
+                        self.send_response(307)
+                        self.send_header('Location', kobo_cdn_url)
                         self.end_headers()
-                        self.wfile.write(b'Cover not found')
-                    return
+                        return
 
                 except Exception as e:
                     print(f"❌ Kobo cover error: {e}", flush=True)
@@ -5302,10 +5406,22 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                         # Now convert EPUB to KEPUB
                         epub_basename = os.path.splitext(os.path.basename(epub_file))[0]
                         temp_kepub = os.path.join(temp_dir, f"{epub_basename}.kepub")
-                        
+
+                        # Update EPUB cover with the book's cover.jpg before conversion
+                        epub_to_convert = epub_file
+                        cover_jpg = os.path.join(book_dir, 'cover.jpg')
+                        if os.path.exists(cover_jpg):
+                            with open(cover_jpg, 'rb') as f:
+                                cover_data = f.read()
+                            temp_epub_with_cover = os.path.join(temp_dir, f"{epub_basename}_with_cover.epub")
+                            shutil.copy2(epub_file, temp_epub_with_cover)
+                            if update_epub_cover(temp_epub_with_cover, cover_data):
+                                epub_to_convert = temp_epub_with_cover
+                                print(f"🖼️ Updated EPUB cover before KEPUB conversion")
+
                         print(f"🔄 Converting to KEPUB: {epub_basename}")
                         result = subprocess.run(
-                            [kepubify_path, '-o', temp_kepub, epub_file],
+                            [kepubify_path, '-o', temp_kepub, epub_to_convert],
                             capture_output=True,
                             text=True,
                             timeout=120
