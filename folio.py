@@ -748,24 +748,24 @@ def format_book_for_kobo(book, base_url, user_token):
             "Id": f"folio-series-{hash(book['series']) % 100000}"
         }
 
-    # Build contributors list
+    # Build contributors list (match calibre-web format)
+    contributor_roles = []
     contributors = []
     for author in book.get('authors', []):
-        contributors.append({
-            "Name": author,
-            "Role": "Author"
-        })
+        contributor_roles.append({"Name": author})
+        contributors.append(author)
 
     # Parse publication date
     pub_date = book.get('pubdate') or book.get('timestamp') or '2000-01-01T00:00:00Z'
     if pub_date and 'T' not in str(pub_date):
         pub_date = f"{pub_date}T00:00:00Z"
 
-    # Build the Kobo metadata structure
+    # Build the Kobo metadata structure (match calibre-web format)
     metadata = {
         "Categories": ["00000000-0000-0000-0000-000000000001"],  # Generic category
+        "ContributorRoles": contributor_roles,
         "Contributors": contributors,
-        "CoverImageId": book_uuid if book.get('has_cover') else None,
+        "CoverImageId": book_uuid,  # Always set - Kobo will request if needed
         "CrossRevisionId": book_uuid,
         "CurrentDisplayPrice": {"CurrencyCode": "USD", "TotalAmount": 0},
         "CurrentLoveDisplayPrice": {"TotalAmount": 0},
@@ -781,7 +781,7 @@ def format_book_for_kobo(book, base_url, user_token):
         "Language": book.get('language', 'en'),
         "PhoneticPronunciations": {},
         "PublicationDate": pub_date,
-        "Publisher": {"Name": book.get('publisher') or 'Unknown'},
+        "Publisher": {"Imprint": "", "Name": book.get('publisher') or ''},
         "RevisionId": book_uuid,
         "Title": book['title'],
         "WorkId": book_uuid
@@ -4423,29 +4423,45 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                 self.wfile.write(file_data)
                 return
 
-            # Handle: GET /kobo/<token>/<book_uuid>/<w>/<h>/<greyscale>/image.jpg - Cover image
-            # Also handle: GET /kobo/<token>/<book_uuid>/image.jpg
-            image_match = re.match(r'^/(folio-\d+)(?:/(\d+)/(\d+)/(\w+))?/image\.jpg$', kobo_path)
+            # Handle: GET /kobo/<token>/<book_uuid>/<w>/<h>/<quality>/<greyscale>/image.jpg - Cover image
+            # Also handle: GET /kobo/<token>/<book_uuid>/<w>/<h>/<greyscale>/image.jpg
+            # For local books (folio-*), serve our covers. For Kobo store books, redirect to Kobo CDN.
+            image_match = re.match(r'^/([^/]+)/(\d+)/(\d+)(?:/[^/]+)?/(\w+)/image\.jpg$', kobo_path)
+            if not image_match:
+                # Also try simpler pattern without quality
+                image_match = re.match(r'^/([^/]+)/(\d+)/(\d+)/(\w+)/image\.jpg$', kobo_path)
             if image_match:
                 try:
                     book_uuid = image_match.group(1)
-                    book_id = int(book_uuid.replace('folio-', ''))
+                    width = image_match.group(2)
+                    height = image_match.group(3)
 
-                    print(f"🖼️ Kobo cover request for book {book_id}", flush=True)
+                    # Check if this is one of our local books
+                    if book_uuid.startswith('folio-'):
+                        book_id = int(book_uuid.replace('folio-', ''))
+                        print(f"🖼️ Kobo cover request for local book {book_id}", flush=True)
 
-                    cover_data = get_book_cover(book_id)
-                    if cover_data:
-                        self.send_response(200)
-                        self.send_header('Content-Type', 'image/jpeg')
-                        self.send_header('Cache-Control', 'public, max-age=86400')
-                        self.end_headers()
-                        self.wfile.write(cover_data)
+                        cover_data = get_book_cover(book_id)
+                        if cover_data:
+                            self.send_response(200)
+                            self.send_header('Content-Type', 'image/jpeg')
+                            self.send_header('Cache-Control', 'public, max-age=86400')
+                            self.end_headers()
+                            self.wfile.write(cover_data)
+                        else:
+                            self.send_response(404)
+                            self.send_header('Content-Type', 'text/plain')
+                            self.end_headers()
+                            self.wfile.write(b'Cover not found')
+                        return
                     else:
-                        self.send_response(404)
-                        self.send_header('Content-Type', 'text/plain')
+                        # Kobo store book - redirect to Kobo's CDN
+                        kobo_cdn_url = f"https://cdn.kobo.com/book-images/{book_uuid}/{width}/{height}/false/image.jpg"
+                        print(f"🖼️ Redirecting Kobo store cover to CDN: {book_uuid}", flush=True)
+                        self.send_response(307)
+                        self.send_header('Location', kobo_cdn_url)
                         self.end_headers()
-                        self.wfile.write(b'Cover not found')
-                    return
+                        return
 
                 except Exception as e:
                     print(f"❌ Kobo cover error: {e}", flush=True)
