@@ -1,4 +1,8 @@
 """
+ORPHANED MODULE - This file is not used. See folio_app/__init__.py for details.
+Duplicate of configuration code in folio.py which is actually used.
+
+Original description:
 Configuration management for Folio.
 Handles loading, saving, and accessing configuration values.
 """

@@ -1,5 +1,6 @@
 """
-Database connection management for Folio.
+ORPHANED MODULE - This file is not used. See folio_app/__init__.py for details.
+Duplicate of database connection code in folio.py which is actually used.
 """
 import os
 import sqlite3

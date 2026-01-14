@@ -1,5 +1,6 @@
 """
-Kobo sync token management.
+ORPHANED MODULE - This file is not used. See folio_app/__init__.py for details.
+Duplicate of Kobo token management code in folio.py which is actually used.
 """
 import uuid
 

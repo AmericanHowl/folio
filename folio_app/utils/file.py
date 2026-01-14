@@ -1,5 +1,6 @@
 """
-File utility functions for Folio.
+ORPHANED MODULE - This file is not used. See folio_app/__init__.py for details.
+Duplicate of file utility functions in folio.py which are actually used.
 """
 import os
 import time

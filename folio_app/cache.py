@@ -1,4 +1,8 @@
 """
+ORPHANED MODULE - This file is not used. See folio_app/__init__.py for details.
+Duplicate of caching code in folio.py which is actually used.
+
+Original description:
 Caching infrastructure for Folio.
 Provides API response caching and cover metadata caching.
 """

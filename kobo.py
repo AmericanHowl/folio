@@ -109,8 +109,8 @@ def redirect_or_proxy_request(auth=False):
     if config.config_kobo_proxy:
         try:
             if request.method == "GET":
-                alfa = redirect(get_store_url_for_current_request(), 307)
-                return alfa
+                # CLEANED: Removed meaningless 'alfa' variable
+                return redirect(get_store_url_for_current_request(), 307)
             else:
                 # The Kobo device turns other request types into GET requests on redirects,
                 # so we instead proxy to the Kobo store ourselves.
@@ -140,7 +140,7 @@ def convert_to_kobo_timestamp_string(timestamp):
 
 @kobo.route("/v1/library/sync")
 @requires_kobo_auth
-# @download_required
+# ORPHANED: Removed commented-out @download_required decorator
 def HandleSyncRequest():
     if not current_user.role_download():
         log.info("Users need download permissions for syncing library to Kobo reader")
@@ -393,8 +393,9 @@ def create_book_entitlement(book, archived):
     }
 
 
-def current_time():
-    return strftime("%Y-%m-%dT%H:%M:%SZ", gmtime())
+# ORPHANED: current_time() is never called; use convert_to_kobo_timestamp_string() instead
+# def current_time():
+#     return strftime("%Y-%m-%dT%H:%M:%SZ", gmtime())
 
 
 def get_description(book):
@@ -499,7 +500,8 @@ def get_metadata(book):
                 "Id": str(uuid.uuid3(uuid.NAMESPACE_DNS, name)),
             }
         except Exception as e:
-            print(e)
+            # CLEANED: Use proper logging instead of bare print
+            log.error("Failed to add series metadata: {}".format(e))
     return metadata
 
 

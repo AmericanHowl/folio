@@ -22,12 +22,14 @@ import time
 import random
 import shutil
 import threading
-import glob as glob_module
+# ORPHANED: glob_module is never used in the codebase
+# import glob as glob_module
 from functools import wraps
 import hashlib
 import uuid
-from email.parser import BytesParser
-from email import message_from_bytes
+# ORPHANED: BytesParser and message_from_bytes are never used in the codebase
+# from email.parser import BytesParser
+# from email import message_from_bytes
 
 PORT = 9099
 

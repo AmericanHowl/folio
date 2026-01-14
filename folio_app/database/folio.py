@@ -1,5 +1,6 @@
 """
-Folio database schema and initialization.
+ORPHANED MODULE - This file is not used. See folio_app/__init__.py for details.
+Duplicate of database initialization code in folio.py which is actually used.
 """
 import sqlite3
 

@@ -1,6 +1,6 @@
 """
-Format utility functions for Folio.
-Handles author name normalization and file format detection.
+ORPHANED MODULE - This file is not used. See folio_app/__init__.py for details.
+Duplicate of format utility functions in folio.py which are actually used.
 """
 
 
