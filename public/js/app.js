@@ -169,7 +169,10 @@ function folioApp() {
         
         // Settings
         showSettings: false,
-        
+
+        // Search modal
+        showSearchModal: false,
+
         // Cache-buster for covers (persisted to localStorage to enable browser caching)
         coverVersion: parseInt(localStorage.getItem('coverVersion')) || 1,
         

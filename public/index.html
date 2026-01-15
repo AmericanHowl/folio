@@ -540,6 +540,11 @@
         .compact-header {
             height: 48px;
         }
+
+        /* Header scroll shadow effect */
+        .header-scrolled {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
         
         /* Divider with text */
         .divider-text {
@@ -838,61 +843,141 @@
     <!-- Main App -->
     <div x-show="!showSetup" x-cloak class="min-h-screen">
         
-        <!-- Compact Header -->
-        <header class="sticky top-0 z-40 glass border-b border-ink-200 safe-area-top">
-            <div class="max-w-7xl mx-auto px-3">
+        <!-- New Consistent Header -->
+        <header
+            class="sticky top-0 z-40 bg-white safe-area-top transition-shadow duration-200"
+            x-data="{ scrolled: false }"
+            @scroll.window="scrolled = window.scrollY > 10"
+            :class="{ 'header-scrolled': scrolled }"
+        >
+            <div class="max-w-7xl mx-auto px-4">
                 <div class="flex items-center justify-between compact-header">
                     <!-- Logo -->
-                    <a @click.prevent="showSetup = false; searchQuery = ''; selectedBook = null; selectedHardcoverBook = null; showSettings = false; showRequests = false; showProwlarrSearch = false; showReadingList = false; bookshelfView = false; window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                    <a @click.prevent="showSetup = false; searchQuery = ''; selectedBook = null; selectedHardcoverBook = null; showSettings = false; showRequests = false; showProwlarrSearch = false; showReadingList = false; bookshelfView = false; showSearchModal = false; window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                         <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
                     </a>
 
-                    <!-- Actions -->
+                    <!-- Action Buttons -->
                     <div class="flex items-center gap-2">
-                        <button 
-                            @click="openReadingList()" 
-                            class="px-4 py-3 text-base font-medium text-ink-700 hover:text-ink-900 hover:bg-ink-100 rounded-lg transition-colors flex items-center gap-2 min-h-[44px]"
+                        <!-- Search Button -->
+                        <button
+                            @click="showSearchModal = true; $nextTick(() => $refs.searchModalInput?.focus())"
+                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                            title="Search"
                         >
-                            <i class="bi bi-bookmark text-lg"></i>
-                            <span>Reading List</span>
+                            <i class="bi bi-search text-xl"></i>
                         </button>
-                        <button 
-                            @click="openRequests()" 
-                            class="p-3 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]" 
-                            title="Requests"
+
+                        <!-- Camera Button -->
+                        <button
+                            @click="openCameraCapture()"
+                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                            title="Scan book cover"
                         >
-                            <i class="bi bi-inbox-fill text-lg"></i>
+                            <i class="bi bi-camera text-xl"></i>
                         </button>
-                                </div>
-                                            </div>
-                                            </div>
-        </header>
-        
-        <!-- Search Bar - Moved up -->
-        <div class="px-4 py-3 bg-ink-50 border-b border-ink-200">
-            <div class="relative max-w-7xl mx-auto flex items-center gap-2">
-                <div class="relative flex-1">
-                    <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
-                    <input
-                        type="text"
-                        x-model="searchQuery"
-                        x-ref="searchInput"
-                        @input.debounce.300ms="searchBooks()"
-                        placeholder="Search for books"
-                        class="w-full pl-11 pr-4 py-3 bg-ink-100 border-0 rounded-lg text-base text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:bg-white transition-all min-h-[44px]"
-                    >
+
+                        <!-- Settings Button -->
+                        <button
+                            @click="showSettings = true; hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;"
+                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                            title="Settings"
+                        >
+                            <i class="bi bi-gear text-xl"></i>
+                        </button>
+                    </div>
                 </div>
-                <!-- Camera button for book cover scanning -->
-                <button
-                    @click="openCameraCapture()"
-                    class="flex-shrink-0 w-11 h-11 flex items-center justify-center bg-ocean-500 hover:bg-ocean-600 text-white rounded-lg transition-colors"
-                    title="Scan book cover"
-                >
-                    <i class="bi bi-camera text-lg"></i>
-                </button>
+            </div>
+        </header>
+
+        <!-- Search Modal -->
+        <div x-show="showSearchModal" x-cloak @click.self="showSearchModal = false"
+             class="fixed inset-0 z-[60] modal-overlay flex items-start justify-center pt-20">
+            <div x-show="showSearchModal" x-transition
+                 @keydown.escape.window="showSearchModal = false"
+                 class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+                <!-- Search Header -->
+                <div class="p-4 border-b border-ink-200">
+                    <div class="relative flex items-center gap-3">
+                        <i class="bi bi-search text-ink-400 text-xl"></i>
+                        <input
+                            type="text"
+                            x-model="searchQuery"
+                            x-ref="searchModalInput"
+                            @input.debounce.300ms="searchBooks()"
+                            placeholder="Search for books..."
+                            class="flex-1 bg-transparent border-none outline-none text-lg text-ink-900 placeholder-ink-400"
+                            @keydown.escape="showSearchModal = false"
+                        >
+                        <button
+                            @click="showSearchModal = false"
+                            class="p-2 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center"
+                            title="Close"
+                        >
+                            <i class="bi bi-x-lg text-ink-500"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Results Container -->
+                <div class="max-h-[60vh] overflow-y-auto p-4">
+                    <!-- Loading State -->
+                    <div x-show="loadingSearchiTunes && searchiTunesResults.length === 0" class="py-12 px-4 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                            <div class="spinner w-6 h-6"></div>
+                        </div>
+                        <h3 class="text-lg font-semibold text-ink-700 mb-2">Searching...</h3>
+                        <p class="text-ink-500 text-sm">Finding books for you</p>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div x-show="!searchQuery && !loadingSearchiTunes" class="py-12 px-4 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                            <i class="bi bi-search text-2xl text-ink-400"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-ink-700 mb-2">Search for books</h3>
+                        <p class="text-ink-500 text-sm">Start typing to find books in your library and beyond</p>
+                    </div>
+
+                    <!-- Search Results Grid -->
+                    <div x-show="searchQuery && searchiTunesResults.length > 0" class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-ink-700">Search Results</h3>
+                            <span class="text-ink-500 text-sm" x-text="`${searchiTunesResults.length} books`"></span>
+                        </div>
+                        <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
+                            <template x-for="book in searchiTunesResults" :key="book.id">
+                                <div @click="openHardcoverModal(book); showSearchModal = false" class="book-card cursor-pointer">
+                                    <div class="book-cover relative">
+                                        <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                             @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                        <!-- Overlay badge for library -->
+                                        <span x-show="book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                            <i class="bi bi-check-lg text-white text-xs"></i>
+                                        </span>
+                                        <!-- Overlay badge for requested -->
+                                        <span x-show="book.requested && !book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                            <i class="bi bi-download text-white text-xs"></i>
+                                        </span>
+                                    </div>
+                                    <h3 class="mt-1.5 text-xs font-semibold text-ink-900 line-clamp-2 leading-tight" x-text="book.title"></h3>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- No Results -->
+                    <div x-show="searchQuery && !loadingSearchiTunes && searchiTunesResults.length === 0" class="py-12 px-4 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                            <i class="bi bi-search text-2xl text-ink-400"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-ink-700 mb-2">No results found</h3>
+                        <p class="text-ink-500 text-sm">Try a different search term</p>
+                    </div>
+                </div>
             </div>
         </div>
-        
+
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto safe-area-bottom">
             
