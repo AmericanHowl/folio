@@ -24,6 +24,7 @@ import shutil
 import threading
 import glob as glob_module
 from functools import wraps
+from contextlib import contextmanager
 import hashlib
 import uuid
 from email.parser import BytesParser
@@ -642,74 +643,72 @@ def get_book_for_kobo_sync(book_id, user=None):
     Returns a dict with the book's metadata or None if not found.
     """
     try:
-        conn = get_db_connection(readonly=True)
-        cursor = conn.cursor()
+        with get_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("""
-            SELECT
-                b.id,
-                b.title,
-                b.sort,
-                b.timestamp,
-                b.pubdate,
-                b.path,
-                b.has_cover,
-                b.series_index,
-                (SELECT GROUP_CONCAT(a2.name, ' & ') FROM books_authors_link bal2 JOIN authors a2 ON bal2.author = a2.id WHERE bal2.book = b.id) as authors,
-                p.name as publisher,
-                s.name as series,
-                c.text as description,
-                l.lang_code as language
-            FROM books b
-            LEFT JOIN books_publishers_link bpl ON b.id = bpl.book
-            LEFT JOIN publishers p ON bpl.publisher = p.id
-            LEFT JOIN books_series_link bsl ON b.id = bsl.book
-            LEFT JOIN series s ON bsl.series = s.id
-            LEFT JOIN comments c ON b.id = c.book
-            LEFT JOIN books_languages_link bll ON b.id = bll.book
-            LEFT JOIN languages l ON bll.lang_code = l.id
-            WHERE b.id = ?
-            GROUP BY b.id
-        """, (book_id,))
-        row = cursor.fetchone()
+            cursor.execute("""
+                SELECT
+                    b.id,
+                    b.title,
+                    b.sort,
+                    b.timestamp,
+                    b.pubdate,
+                    b.path,
+                    b.has_cover,
+                    b.series_index,
+                    (SELECT GROUP_CONCAT(a2.name, ' & ') FROM books_authors_link bal2 JOIN authors a2 ON bal2.author = a2.id WHERE bal2.book = b.id) as authors,
+                    p.name as publisher,
+                    s.name as series,
+                    c.text as description,
+                    l.lang_code as language
+                FROM books b
+                LEFT JOIN books_publishers_link bpl ON b.id = bpl.book
+                LEFT JOIN publishers p ON bpl.publisher = p.id
+                LEFT JOIN books_series_link bsl ON b.id = bsl.book
+                LEFT JOIN series s ON bsl.series = s.id
+                LEFT JOIN comments c ON b.id = c.book
+                LEFT JOIN books_languages_link bll ON b.id = bll.book
+                LEFT JOIN languages l ON bll.lang_code = l.id
+                WHERE b.id = ?
+                GROUP BY b.id
+            """, (book_id,))
+            row = cursor.fetchone()
 
-        if not row:
-            conn.close()
-            return None
+            if not row:
+                return None
 
-        # Get formats
-        cursor.execute("SELECT format, uncompressed_size FROM data WHERE book = ?", (book_id,))
-        formats = [{'format': f['format'].upper(), 'size': f['uncompressed_size'] or 0} for f in cursor.fetchall()]
-        conn.close()
+            # Get formats
+            cursor.execute("SELECT format, uncompressed_size FROM data WHERE book = ?", (book_id,))
+            formats = [{'format': f['format'].upper(), 'size': f['uncompressed_size'] or 0} for f in cursor.fetchall()]
 
-        # Normalize author names
-        authors_list = []
-        if row['authors']:
-            for author in row['authors'].split(' & '):
-                author = author.strip()
-                if ', ' in author:
-                    parts = author.split(', ', 1)
-                    author = f"{parts[1]} {parts[0]}"
-                elif '|' in author:
-                    parts = author.split('|', 1)
-                    author = f"{parts[1].strip()} {parts[0].strip()}"
-                authors_list.append(author)
+            # Normalize author names
+            authors_list = []
+            if row['authors']:
+                for author in row['authors'].split(' & '):
+                    author = author.strip()
+                    if ', ' in author:
+                        parts = author.split(', ', 1)
+                        author = f"{parts[1]} {parts[0]}"
+                    elif '|' in author:
+                        parts = author.split('|', 1)
+                        author = f"{parts[1].strip()} {parts[0].strip()}"
+                    authors_list.append(author)
 
-        return {
-            'id': row['id'],
-            'title': row['title'],
-            'authors': authors_list if authors_list else ['Unknown Author'],
-            'publisher': row['publisher'],
-            'series': row['series'],
-            'series_index': row['series_index'],
-            'description': row['description'],
-            'language': row['language'] or 'en',
-            'timestamp': row['timestamp'],
-            'pubdate': row['pubdate'],
-            'has_cover': bool(row['has_cover']),
-            'formats': formats,
-            'path': row['path']
-        }
+            return {
+                'id': row['id'],
+                'title': row['title'],
+                'authors': authors_list if authors_list else ['Unknown Author'],
+                'publisher': row['publisher'],
+                'series': row['series'],
+                'series_index': row['series_index'],
+                'description': row['description'],
+                'language': row['language'] or 'en',
+                'timestamp': row['timestamp'],
+                'pubdate': row['pubdate'],
+                'has_cover': bool(row['has_cover']),
+                'formats': formats,
+                'path': row['path']
+            }
     except Exception as e:
         print(f"❌ Error getting book {book_id} for Kobo sync: {e}")
         return None
@@ -818,102 +817,99 @@ def get_book_file_for_download(book_id, format_type):
     Returns (file_data, filename, mime_type, error) tuple.
     On error, file_data is None and error contains the message.
     """
+    temp_file_to_cleanup = None
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("SELECT b.path, b.title FROM books b WHERE b.id = ?", (book_id,))
-        book_row = cursor.fetchone()
+            cursor.execute("SELECT b.path, b.title FROM books b WHERE b.id = ?", (book_id,))
+            book_row = cursor.fetchone()
 
-        if not book_row:
-            conn.close()
-            return None, None, None, f"Book {book_id} not found"
+            if not book_row:
+                return None, None, None, f"Book {book_id} not found"
 
-        library_path = get_calibre_library()
-        book_dir = os.path.join(library_path, book_row['path'])
-        book_title = book_row['title']
-        book_file_path = None
-        temp_file_to_cleanup = None
+            library_path = get_calibre_library()
+            book_dir = os.path.join(library_path, book_row['path'])
+            book_title = book_row['title']
+            book_file_path = None
 
-        if format_type == 'KEPUB':
-            # Check if KEPUB exists
-            if os.path.isdir(book_dir):
-                for f in os.listdir(book_dir):
-                    if f.lower().endswith('.kepub') or f.lower().endswith('.kepub.epub'):
-                        book_file_path = os.path.join(book_dir, f)
-                        break
+            if format_type == 'KEPUB':
+                # Check if KEPUB exists
+                if os.path.isdir(book_dir):
+                    for f in os.listdir(book_dir):
+                        if f.lower().endswith('.kepub') or f.lower().endswith('.kepub.epub'):
+                            book_file_path = os.path.join(book_dir, f)
+                            break
 
-            # Convert from EPUB if needed
-            if not book_file_path:
-                kepubify_path = find_kepubify()
-                if not kepubify_path:
-                    conn.close()
-                    return None, None, None, "kepubify not installed"
+                # Convert from EPUB if needed
+                if not book_file_path:
+                    kepubify_path = find_kepubify()
+                    if not kepubify_path:
+                        return None, None, None, "kepubify not installed"
 
-                # Find EPUB source
-                epub_file = None
-                for f in os.listdir(book_dir):
-                    if f.lower().endswith('.epub') and not f.lower().endswith('.kepub.epub'):
-                        epub_file = os.path.join(book_dir, f)
-                        break
+                    # Find EPUB source
+                    epub_file = None
+                    for f in os.listdir(book_dir):
+                        if f.lower().endswith('.epub') and not f.lower().endswith('.kepub.epub'):
+                            epub_file = os.path.join(book_dir, f)
+                            break
 
-                if not epub_file:
-                    conn.close()
-                    return None, None, None, "No EPUB source for KEPUB conversion"
+                    if not epub_file:
+                        return None, None, None, "No EPUB source for KEPUB conversion"
 
-                # Convert to KEPUB
-                temp_dir = tempfile.mkdtemp(prefix='kepub_')
-                temp_file_to_cleanup = temp_dir
-                epub_basename = os.path.splitext(os.path.basename(epub_file))[0]
-                temp_kepub = os.path.join(temp_dir, f"{epub_basename}.kepub.epub")
+                    # Convert to KEPUB
+                    temp_dir = tempfile.mkdtemp(prefix='kepub_')
+                    temp_file_to_cleanup = temp_dir
+                    epub_basename = os.path.splitext(os.path.basename(epub_file))[0]
+                    temp_kepub = os.path.join(temp_dir, f"{epub_basename}.kepub.epub")
 
-                # Check if we have a cover.jpg to embed in the EPUB before conversion
-                cover_jpg = os.path.join(book_dir, 'cover.jpg')
-                epub_to_convert = epub_file
-                if os.path.exists(cover_jpg):
-                    # Copy EPUB to temp and update cover before kepubify
-                    temp_epub_with_cover = os.path.join(temp_dir, f"{epub_basename}_with_cover.epub")
-                    shutil.copy2(epub_file, temp_epub_with_cover)
-                    with open(cover_jpg, 'rb') as f:
-                        cover_data = f.read()
-                    if update_epub_cover(temp_epub_with_cover, cover_data):
-                        epub_to_convert = temp_epub_with_cover
-                        print(f"🖼️ Updated EPUB cover before KEPUB conversion", flush=True)
+                    # Check if we have a cover.jpg to embed in the EPUB before conversion
+                    cover_jpg = os.path.join(book_dir, 'cover.jpg')
+                    epub_to_convert = epub_file
+                    if os.path.exists(cover_jpg):
+                        # Copy EPUB to temp and update cover before kepubify
+                        temp_epub_with_cover = os.path.join(temp_dir, f"{epub_basename}_with_cover.epub")
+                        shutil.copy2(epub_file, temp_epub_with_cover)
+                        with open(cover_jpg, 'rb') as f:
+                            cover_data = f.read()
+                        if update_epub_cover(temp_epub_with_cover, cover_data):
+                            epub_to_convert = temp_epub_with_cover
+                            print(f"🖼️ Updated EPUB cover before KEPUB conversion", flush=True)
 
-                print(f"🔄 Converting to KEPUB: {epub_basename}", flush=True)
-                result = subprocess.run(
-                    [kepubify_path, '-o', temp_kepub, epub_to_convert],
-                    capture_output=True, text=True, timeout=120
-                )
+                    print(f"🔄 Converting to KEPUB: {epub_basename}", flush=True)
+                    result = subprocess.run(
+                        [kepubify_path, '-o', temp_kepub, epub_to_convert],
+                        capture_output=True, text=True, timeout=120
+                    )
 
-                if result.returncode != 0 or not os.path.exists(temp_kepub):
-                    shutil.rmtree(temp_dir)
-                    conn.close()
-                    return None, None, None, f"KEPUB conversion failed: {result.stderr}"
+                    if result.returncode != 0 or not os.path.exists(temp_kepub):
+                        shutil.rmtree(temp_dir)
+                        temp_file_to_cleanup = None
+                        return None, None, None, f"KEPUB conversion failed: {result.stderr}"
 
-                book_file_path = temp_kepub
-                print(f"✅ KEPUB conversion complete", flush=True)
+                    book_file_path = temp_kepub
+                    print(f"✅ KEPUB conversion complete", flush=True)
 
-                # Cache for future
-                try:
-                    permanent_kepub = os.path.join(book_dir, f"{epub_basename}.kepub.epub")
-                    shutil.copy2(temp_kepub, permanent_kepub)
-                except:
-                    pass
-        else:
-            # Other formats
-            cursor.execute("SELECT name FROM data WHERE book = ? AND format = ?", (book_id, format_type))
-            format_row = cursor.fetchone()
-            if not format_row:
-                conn.close()
-                return None, None, None, f"Format {format_type} not found"
-            book_file_path = os.path.join(book_dir, f"{format_row['name']}.{format_type.lower()}")
+                    # Cache for future
+                    try:
+                        permanent_kepub = os.path.join(book_dir, f"{epub_basename}.kepub.epub")
+                        shutil.copy2(temp_kepub, permanent_kepub)
+                    except:
+                        pass
+            else:
+                # Other formats
+                cursor.execute("SELECT name FROM data WHERE book = ? AND format = ?", (book_id, format_type))
+                format_row = cursor.fetchone()
+                if not format_row:
+                    return None, None, None, f"Format {format_type} not found"
+                book_file_path = os.path.join(book_dir, f"{format_row['name']}.{format_type.lower()}")
 
-        conn.close()
+        # Connection is now closed automatically
 
         if not os.path.exists(book_file_path):
             if temp_file_to_cleanup:
                 shutil.rmtree(temp_file_to_cleanup)
+                temp_file_to_cleanup = None
             return None, None, None, "Book file not found"
 
         # Read file
@@ -923,6 +919,7 @@ def get_book_file_for_download(book_id, format_type):
         # Cleanup temp
         if temp_file_to_cleanup:
             shutil.rmtree(temp_file_to_cleanup)
+            temp_file_to_cleanup = None
 
         # MIME types
         mime_types = {
@@ -942,6 +939,13 @@ def get_book_file_for_download(book_id, format_type):
 
     except Exception as e:
         return None, None, None, str(e)
+    finally:
+        # Ensure temp files are cleaned up even on exception
+        if temp_file_to_cleanup and os.path.exists(temp_file_to_cleanup):
+            try:
+                shutil.rmtree(temp_file_to_cleanup)
+            except:
+                pass
 
 
 def update_epub_cover(epub_path, cover_data, output_path=None):
@@ -1176,11 +1180,10 @@ def migrate_import_history_from_json():
                 # Try to find book_id if this book exists in Calibre
                 book_id = None
                 try:
-                    calibre_conn = get_db_connection(readonly=True)
-                    calibre_cursor = calibre_conn.cursor()
-                    # This is a best-effort attempt - we don't have a reliable way to match
-                    # files to book_ids from just the filepath, so we'll leave book_id as NULL
-                    calibre_conn.close()
+                    with get_db_connection(readonly=True) as calibre_conn:
+                        calibre_cursor = calibre_conn.cursor()
+                        # This is a best-effort attempt - we don't have a reliable way to match
+                        # files to book_ids from just the filepath, so we'll leave book_id as NULL
                 except:
                     pass
                 
@@ -1484,44 +1487,58 @@ def cleanup_fulfilled_requests_db():
         return []
 
 
+@contextmanager
 def get_db_connection(readonly=False):
-    """Get a connection to the Calibre metadata database
-    
+    """Get a connection to the Calibre metadata database as a context manager
+
     Args:
         readonly: If True, open in read-only mode for better concurrency
+
+    Yields:
+        sqlite3.Connection: Database connection that will be automatically closed
+
+    Example:
+        with get_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM books")
     """
-    library_path = get_calibre_library()
-    db_path = os.path.join(library_path, 'metadata.db')
-
-    if not os.path.exists(db_path):
-        raise FileNotFoundError(f"Calibre database not found at {db_path}")
-
-    # Add timeout for concurrent access (threaded server)
-    # Use URI mode to support read-only connections
-    if readonly:
-        conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=30.0)
-    else:
-        conn = sqlite3.connect(db_path, timeout=30.0)
-        # Enable WAL mode for better concurrent read/write performance
-        # This only needs to be set once per database, but is safe to call repeatedly
-        try:
-            conn.execute("PRAGMA journal_mode=WAL")
-        except Exception:
-            pass  # May fail on read-only filesystems, which is fine
-    
-    conn.row_factory = sqlite3.Row
-
-    # Some Calibre databases use custom SQLite functions (e.g. title_sort)
-    # in indexes or queries. When those functions are missing, *any* query
-    # that touches the affected index can raise "no such function: title_sort".
-    # We register lightweight fallbacks so the queries (and index usage) work.
+    conn = None
     try:
-        conn.create_function("title_sort", 1, lambda s: s or "")
-    except Exception:
-        # Best-effort only – don't break connection creation if this fails
-        pass
+        library_path = get_calibre_library()
+        db_path = os.path.join(library_path, 'metadata.db')
 
-    return conn
+        if not os.path.exists(db_path):
+            raise FileNotFoundError(f"Calibre database not found at {db_path}")
+
+        # Add timeout for concurrent access (threaded server)
+        # Use URI mode to support read-only connections
+        if readonly:
+            conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=30.0)
+        else:
+            conn = sqlite3.connect(db_path, timeout=30.0)
+            # Enable WAL mode for better concurrent read/write performance
+            # This only needs to be set once per database, but is safe to call repeatedly
+            try:
+                conn.execute("PRAGMA journal_mode=WAL")
+            except Exception:
+                pass  # May fail on read-only filesystems, which is fine
+
+        conn.row_factory = sqlite3.Row
+
+        # Some Calibre databases use custom SQLite functions (e.g. title_sort)
+        # in indexes or queries. When those functions are missing, *any* query
+        # that touches the affected index can raise "no such function: title_sort".
+        # We register lightweight fallbacks so the queries (and index usage) work.
+        try:
+            conn.create_function("title_sort", 1, lambda s: s or "")
+        except Exception:
+            # Best-effort only – don't break connection creation if this fails
+            pass
+
+        yield conn
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_books(limit=50, offset=0, search=None, sort='recent'):
@@ -1534,181 +1551,180 @@ def get_books(limit=50, offset=0, search=None, sort='recent'):
         sort: Sort order - 'recent' (default), 'title', 'author'
     """
     try:
-        conn = get_db_connection(readonly=True)
-        cursor = conn.cursor()
+        with get_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
 
-        # Determine sort order - default to recently added
-        if sort == 'title':
-            order_clause = "ORDER BY b.sort"
-        elif sort == 'author':
-            order_clause = "ORDER BY authors, b.sort"
-        else:  # 'recent' is default
-            order_clause = "ORDER BY b.timestamp DESC"
+            # Determine sort order - default to recently added
+            if sort == 'title':
+                order_clause = "ORDER BY b.sort"
+            elif sort == 'author':
+                order_clause = "ORDER BY authors, b.sort"
+            else:  # 'recent' is default
+                order_clause = "ORDER BY b.timestamp DESC"
 
-        # Base query
-        query = """
-            SELECT
-                b.id,
-                b.title,
-                b.sort,
-                b.timestamp,
-                b.pubdate,
-                b.series_index,
-                b.path,
-                b.has_cover,
-                GROUP_CONCAT(a.name, ' & ') as authors,
-                GROUP_CONCAT(t.name, ', ') as tags,
-                c.text as comments,
-                p.name as publisher,
-                s.name as series
-            FROM books b
-            LEFT JOIN books_authors_link bal ON b.id = bal.book
-            LEFT JOIN authors a ON bal.author = a.id
-            LEFT JOIN books_tags_link btl ON b.id = btl.book
-            LEFT JOIN tags t ON btl.tag = t.id
-            LEFT JOIN comments c ON b.id = c.book
-            LEFT JOIN books_publishers_link bpl ON b.id = bpl.book
-            LEFT JOIN publishers p ON bpl.publisher = p.id
-            LEFT JOIN books_series_link bsl ON b.id = bsl.book
-            LEFT JOIN series s ON bsl.series = s.id
-        """
+            # Base query
+            query = """
+                SELECT
+                    b.id,
+                    b.title,
+                    b.sort,
+                    b.timestamp,
+                    b.pubdate,
+                    b.series_index,
+                    b.path,
+                    b.has_cover,
+                    GROUP_CONCAT(a.name, ' & ') as authors,
+                    GROUP_CONCAT(t.name, ', ') as tags,
+                    c.text as comments,
+                    p.name as publisher,
+                    s.name as series
+                FROM books b
+                LEFT JOIN books_authors_link bal ON b.id = bal.book
+                LEFT JOIN authors a ON bal.author = a.id
+                LEFT JOIN books_tags_link btl ON b.id = btl.book
+                LEFT JOIN tags t ON btl.tag = t.id
+                LEFT JOIN comments c ON b.id = c.book
+                LEFT JOIN books_publishers_link bpl ON b.id = bpl.book
+                LEFT JOIN publishers p ON bpl.publisher = p.id
+                LEFT JOIN books_series_link bsl ON b.id = bsl.book
+                LEFT JOIN series s ON bsl.series = s.id
+            """
 
-        # Add search if provided
-        if search:
-            query += " WHERE b.title LIKE ? OR a.name LIKE ?"
-            params = (f'%{search}%', f'%{search}%', limit, offset)
-        else:
-            params = (limit, offset)
+            # Add search if provided
+            if search:
+                query += " WHERE b.title LIKE ? OR a.name LIKE ?"
+                params = (f'%{search}%', f'%{search}%', limit, offset)
+            else:
+                params = (limit, offset)
 
-        query += f" GROUP BY b.id {order_clause} LIMIT ? OFFSET ?"
+            query += f" GROUP BY b.id {order_clause} LIMIT ? OFFSET ?"
 
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        
-        # Get all book IDs for batch format query
-        book_ids = [row['id'] for row in rows]
-        
-        # Batch query for formats (avoids N+1 queries)
-        formats_map = {}
-        if book_ids:
-            placeholders = ','.join('?' * len(book_ids))
-            cursor.execute(f"SELECT book, format FROM data WHERE book IN ({placeholders})", book_ids)
-            for fmt_row in cursor.fetchall():
-                book_id = fmt_row['book']
-                if book_id not in formats_map:
-                    formats_map[book_id] = []
-                formats_map[book_id].append(fmt_row['format'].upper())
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
 
-        # Get library path for filesystem-based format detection
-        library_path = get_calibre_library()
-        
-        books = []
-        for row in rows:
-            formats = formats_map.get(row['id'], [])
-            
-            # Filesystem-based KEPUB detection as fallback
-            # Check if .kepub file exists but isn't in the database
-            if 'KEPUB' not in formats and row['path']:
-                book_dir = os.path.join(library_path, row['path'])
-                if os.path.isdir(book_dir):
-                    for filename in os.listdir(book_dir):
-                        if filename.lower().endswith('.kepub'):
-                            formats.append('KEPUB')
-                            break
+            # Get all book IDs for batch format query
+            book_ids = [row['id'] for row in rows]
 
-            # Parse authors - handle various separators and formats, and deduplicate
-            # Calibre stores authors as "LastName, FirstName" or "LastName| FirstName" - convert to "FirstName LastName"
-            authors_list = []
-            seen_authors = set()  # Use set for O(1) lookup
-            
-            def normalize_author_name(author_str):
-                """Convert 'LastName, FirstName' or 'LastName| FirstName' to 'FirstName LastName'"""
-                author_str = author_str.strip()
-                if not author_str:
-                    return None
-                
-                # Handle pipe format: "LastName| FirstName" or "LastName|FirstName"
-                if '|' in author_str:
-                    parts = author_str.split('|', 1)
-                    if len(parts) == 2:
-                        last_name = parts[0].strip()
-                        first_name = parts[1].strip()
-                        if first_name and last_name:
-                            return f"{first_name} {last_name}"
-                
-                # Handle comma format: "LastName, FirstName" or "LastName,FirstName"
-                if ', ' in author_str:
-                    parts = author_str.split(', ', 1)
-                    if len(parts) == 2:
-                        last_name = parts[0].strip()
-                        first_name = parts[1].strip()
-                        if first_name and last_name:
-                            return f"{first_name} {last_name}"
-                elif author_str.count(',') == 1 and not author_str.startswith(','):
-                    # Handle "LastName,FirstName" (no space)
-                    parts = author_str.split(',', 1)
-                    if len(parts) == 2:
-                        last_name = parts[0].strip()
-                        first_name = parts[1].strip()
-                        if first_name and last_name:
-                            return f"{first_name} {last_name}"
-                
-                # If no conversion needed, return as-is
-                return author_str
-            
-            if row['authors']:
-                authors_str = str(row['authors']).strip()
-                if authors_str:
-                    # First, handle pipe separators between authors (rare, but possible)
-                    # Replace '|' used as author separator with ' & ', but preserve '|' within names
-                    # We'll split by ' & ' first, then normalize each author
-                    authors_str = authors_str.replace(', and ', ' & ').replace(' and ', ' & ')
-                    
-                    # Split by ' & ' for multiple authors
-                    # Note: '|' within an author name (like "Smith| John") will be handled by normalize_author_name
-                    for author in authors_str.split(' & '):
-                        author = author.strip()
-                        if not author:
-                            continue
-                        
-                        # Normalize the author name format
-                        normalized_author = normalize_author_name(author)
-                        if normalized_author:
-                            # Deduplicate
-                            key = normalized_author.lower()
-                            if key not in seen_authors:
-                                seen_authors.add(key)
-                                authors_list.append(normalized_author)
-            
-            # Deduplicate tags while preserving order
-            tags_list = []
-            if row['tags']:
-                seen_tags = set()
-                for tag in row['tags'].split(','):
-                    tag = tag.strip()
-                    if tag and tag.lower() not in seen_tags:
-                        seen_tags.add(tag.lower())
-                        tags_list.append(tag)
+            # Batch query for formats (avoids N+1 queries)
+            formats_map = {}
+            if book_ids:
+                placeholders = ','.join('?' * len(book_ids))
+                cursor.execute(f"SELECT book, format FROM data WHERE book IN ({placeholders})", book_ids)
+                for fmt_row in cursor.fetchall():
+                    book_id = fmt_row['book']
+                    if book_id not in formats_map:
+                        formats_map[book_id] = []
+                    formats_map[book_id].append(fmt_row['format'].upper())
 
-            book = {
-                'id': row['id'],
-                'title': row['title'],
-                'authors': authors_list,
-                'tags': tags_list,
-                'comments': row['comments'],
-                'publisher': row['publisher'],
-                'series': row['series'],
-                'series_index': row['series_index'],
-                'timestamp': row['timestamp'],
-                'pubdate': row['pubdate'],
-                'has_cover': bool(row['has_cover']),
-                'formats': formats,
-                'path': row['path']
-            }
-            books.append(book)
+            # Get library path for filesystem-based format detection
+            library_path = get_calibre_library()
 
-        conn.close()
-        return books
+            books = []
+            for row in rows:
+                formats = formats_map.get(row['id'], [])
+
+                # Filesystem-based KEPUB detection as fallback
+                # Check if .kepub file exists but isn't in the database
+                if 'KEPUB' not in formats and row['path']:
+                    book_dir = os.path.join(library_path, row['path'])
+                    if os.path.isdir(book_dir):
+                        for filename in os.listdir(book_dir):
+                            if filename.lower().endswith('.kepub'):
+                                formats.append('KEPUB')
+                                break
+
+                # Parse authors - handle various separators and formats, and deduplicate
+                # Calibre stores authors as "LastName, FirstName" or "LastName| FirstName" - convert to "FirstName LastName"
+                authors_list = []
+                seen_authors = set()  # Use set for O(1) lookup
+
+                def normalize_author_name(author_str):
+                    """Convert 'LastName, FirstName' or 'LastName| FirstName' to 'FirstName LastName'"""
+                    author_str = author_str.strip()
+                    if not author_str:
+                        return None
+
+                    # Handle pipe format: "LastName| FirstName" or "LastName|FirstName"
+                    if '|' in author_str:
+                        parts = author_str.split('|', 1)
+                        if len(parts) == 2:
+                            last_name = parts[0].strip()
+                            first_name = parts[1].strip()
+                            if first_name and last_name:
+                                return f"{first_name} {last_name}"
+
+                    # Handle comma format: "LastName, FirstName" or "LastName,FirstName"
+                    if ', ' in author_str:
+                        parts = author_str.split(', ', 1)
+                        if len(parts) == 2:
+                            last_name = parts[0].strip()
+                            first_name = parts[1].strip()
+                            if first_name and last_name:
+                                return f"{first_name} {last_name}"
+                    elif author_str.count(',') == 1 and not author_str.startswith(','):
+                        # Handle "LastName,FirstName" (no space)
+                        parts = author_str.split(',', 1)
+                        if len(parts) == 2:
+                            last_name = parts[0].strip()
+                            first_name = parts[1].strip()
+                            if first_name and last_name:
+                                return f"{first_name} {last_name}"
+
+                    # If no conversion needed, return as-is
+                    return author_str
+
+                if row['authors']:
+                    authors_str = str(row['authors']).strip()
+                    if authors_str:
+                        # First, handle pipe separators between authors (rare, but possible)
+                        # Replace '|' used as author separator with ' & ', but preserve '|' within names
+                        # We'll split by ' & ' first, then normalize each author
+                        authors_str = authors_str.replace(', and ', ' & ').replace(' and ', ' & ')
+
+                        # Split by ' & ' for multiple authors
+                        # Note: '|' within an author name (like "Smith| John") will be handled by normalize_author_name
+                        for author in authors_str.split(' & '):
+                            author = author.strip()
+                            if not author:
+                                continue
+
+                            # Normalize the author name format
+                            normalized_author = normalize_author_name(author)
+                            if normalized_author:
+                                # Deduplicate
+                                key = normalized_author.lower()
+                                if key not in seen_authors:
+                                    seen_authors.add(key)
+                                    authors_list.append(normalized_author)
+
+                # Deduplicate tags while preserving order
+                tags_list = []
+                if row['tags']:
+                    seen_tags = set()
+                    for tag in row['tags'].split(','):
+                        tag = tag.strip()
+                        if tag and tag.lower() not in seen_tags:
+                            seen_tags.add(tag.lower())
+                            tags_list.append(tag)
+
+                book = {
+                    'id': row['id'],
+                    'title': row['title'],
+                    'authors': authors_list,
+                    'tags': tags_list,
+                    'comments': row['comments'],
+                    'publisher': row['publisher'],
+                    'series': row['series'],
+                    'series_index': row['series_index'],
+                    'timestamp': row['timestamp'],
+                    'pubdate': row['pubdate'],
+                    'has_cover': bool(row['has_cover']),
+                    'formats': formats,
+                    'path': row['path']
+                }
+                books.append(book)
+
+            return books
     except Exception as e:
         print(f"❌ Error loading books: {e}")
         return []
@@ -1731,19 +1747,18 @@ def get_book_cover(book_id):
         
         if cached is None:
             # Still no cache - fall back to direct DB query
-            conn = get_db_connection(readonly=True)
-            cursor = conn.cursor()
-            cursor.execute("SELECT path, has_cover FROM books WHERE id = ?", (book_id,))
-            row = cursor.fetchone()
-            conn.close()
-            
-            if not row:
-                return None
-            
-            cached = {
-                'path': row['path'],
-                'has_cover': bool(row['has_cover'])
-            }
+            with get_db_connection(readonly=True) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT path, has_cover FROM books WHERE id = ?", (book_id,))
+                row = cursor.fetchone()
+
+                if not row:
+                    return None
+
+                cached = {
+                    'path': row['path'],
+                    'has_cover': bool(row['has_cover'])
+                }
         
         if not cached.get('has_cover'):
             return None
@@ -1774,125 +1789,121 @@ def get_reading_list_books(sort='added', user='default'):
     reading_list_ids = get_reading_list_ids_for_user(user)
     if not reading_list_ids:
         return []
-    
-    conn = None
+
     try:
-        conn = get_db_connection(readonly=True)
-        cursor = conn.cursor()
-        
-        # Build query to get books by IDs
-        placeholders = ','.join('?' * len(reading_list_ids))
-        
-        # Determine sort order
-        if sort == 'title':
-            order_clause = "ORDER BY b.sort"
-        elif sort == 'author':
-            order_clause = "ORDER BY authors, b.sort"
-        else:  # 'added' is default - sort by when added to library
-            order_clause = "ORDER BY b.timestamp DESC"
-        
-        query = f"""
-            SELECT
-                b.id,
-                b.title,
-                b.sort,
-                b.timestamp,
-                b.pubdate,
-                b.path,
-                b.has_cover,
-                GROUP_CONCAT(a.name, ' & ') as authors
-            FROM books b
-            LEFT JOIN books_authors_link bal ON b.id = bal.book
-            LEFT JOIN authors a ON bal.author = a.id
-            WHERE b.id IN ({placeholders})
-            GROUP BY b.id {order_clause}
-        """
-        
-        cursor.execute(query, reading_list_ids)
-        rows = cursor.fetchall()
-        
-        # Batch query for formats
-        book_ids = [row['id'] for row in rows]
-        formats_map = {}
-        if book_ids:
-            fmt_placeholders = ','.join('?' * len(book_ids))
-            cursor.execute(f"SELECT book, format, uncompressed_size FROM data WHERE book IN ({fmt_placeholders})", book_ids)
-            for fmt_row in cursor.fetchall():
-                book_id = fmt_row['book']
-                if book_id not in formats_map:
-                    formats_map[book_id] = []
-                formats_map[book_id].append({
-                    'format': fmt_row['format'].upper(),
-                    'size': fmt_row['uncompressed_size'] or 0
-                })
-        
-        # Get library path for filesystem-based format detection
-        library_path = get_calibre_library()
-        
-        books = []
-        for row in rows:
-            formats = formats_map.get(row['id'], [])
-            
-            # Filesystem-based KEPUB detection as fallback
-            # Check if .kepub file exists but isn't in the database
-            format_names = [f['format'] for f in formats]
-            if 'KEPUB' not in format_names and row['path']:
-                book_dir = os.path.join(library_path, row['path'])
-                if os.path.isdir(book_dir):
-                    for filename in os.listdir(book_dir):
-                        if filename.lower().endswith('.kepub'):
-                            # Get file size
-                            kepub_path = os.path.join(book_dir, filename)
-                            try:
-                                size = os.path.getsize(kepub_path)
-                            except:
-                                size = 0
-                            formats.append({'format': 'KEPUB', 'size': size})
-                            break
-            
-            # Parse authors - handle "LastName, FirstName" format
-            authors_list = []
-            seen_authors = set()
-            
-            def normalize_author(author_str):
-                author_str = author_str.strip()
-                if ', ' in author_str:
-                    parts = author_str.split(', ', 1)
-                    if len(parts) == 2:
-                        return f"{parts[1]} {parts[0]}"
-                elif '|' in author_str:
-                    parts = author_str.split('|', 1)
-                    if len(parts) == 2:
-                        return f"{parts[1].strip()} {parts[0].strip()}"
-                return author_str
-            
-            if row['authors']:
-                for author in row['authors'].split(' & '):
-                    normalized = normalize_author(author)
-                    key = normalized.lower()
-                    if key not in seen_authors:
-                        seen_authors.add(key)
-                        authors_list.append(normalized)
-            
-            book = {
-                'id': row['id'],
-                'title': row['title'],
-                'authors': authors_list if authors_list else ['Unknown Author'],
-                'timestamp': row['timestamp'],
-                'pubdate': row['pubdate'],
-                'has_cover': bool(row['has_cover']),
-                'formats': formats,
-                'path': row['path']
-            }
-            books.append(book)
-        
-        return books
+        with get_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+
+            # Build query to get books by IDs
+            placeholders = ','.join('?' * len(reading_list_ids))
+
+            # Determine sort order
+            if sort == 'title':
+                order_clause = "ORDER BY b.sort"
+            elif sort == 'author':
+                order_clause = "ORDER BY authors, b.sort"
+            else:  # 'added' is default - sort by when added to library
+                order_clause = "ORDER BY b.timestamp DESC"
+
+            query = f"""
+                SELECT
+                    b.id,
+                    b.title,
+                    b.sort,
+                    b.timestamp,
+                    b.pubdate,
+                    b.path,
+                    b.has_cover,
+                    GROUP_CONCAT(a.name, ' & ') as authors
+                FROM books b
+                LEFT JOIN books_authors_link bal ON b.id = bal.book
+                LEFT JOIN authors a ON bal.author = a.id
+                WHERE b.id IN ({placeholders})
+                GROUP BY b.id {order_clause}
+            """
+
+            cursor.execute(query, reading_list_ids)
+            rows = cursor.fetchall()
+
+            # Batch query for formats
+            book_ids = [row['id'] for row in rows]
+            formats_map = {}
+            if book_ids:
+                fmt_placeholders = ','.join('?' * len(book_ids))
+                cursor.execute(f"SELECT book, format, uncompressed_size FROM data WHERE book IN ({fmt_placeholders})", book_ids)
+                for fmt_row in cursor.fetchall():
+                    book_id = fmt_row['book']
+                    if book_id not in formats_map:
+                        formats_map[book_id] = []
+                    formats_map[book_id].append({
+                        'format': fmt_row['format'].upper(),
+                        'size': fmt_row['uncompressed_size'] or 0
+                    })
+
+            # Get library path for filesystem-based format detection
+            library_path = get_calibre_library()
+
+            books = []
+            for row in rows:
+                formats = formats_map.get(row['id'], [])
+
+                # Filesystem-based KEPUB detection as fallback
+                # Check if .kepub file exists but isn't in the database
+                format_names = [f['format'] for f in formats]
+                if 'KEPUB' not in format_names and row['path']:
+                    book_dir = os.path.join(library_path, row['path'])
+                    if os.path.isdir(book_dir):
+                        for filename in os.listdir(book_dir):
+                            if filename.lower().endswith('.kepub'):
+                                # Get file size
+                                kepub_path = os.path.join(book_dir, filename)
+                                try:
+                                    size = os.path.getsize(kepub_path)
+                                except:
+                                    size = 0
+                                formats.append({'format': 'KEPUB', 'size': size})
+                                break
+
+                # Parse authors - handle "LastName, FirstName" format
+                authors_list = []
+                seen_authors = set()
+
+                def normalize_author(author_str):
+                    author_str = author_str.strip()
+                    if ', ' in author_str:
+                        parts = author_str.split(', ', 1)
+                        if len(parts) == 2:
+                            return f"{parts[1]} {parts[0]}"
+                    elif '|' in author_str:
+                        parts = author_str.split('|', 1)
+                        if len(parts) == 2:
+                            return f"{parts[1].strip()} {parts[0].strip()}"
+                    return author_str
+
+                if row['authors']:
+                    for author in row['authors'].split(' & '):
+                        normalized = normalize_author(author)
+                        key = normalized.lower()
+                        if key not in seen_authors:
+                            seen_authors.add(key)
+                            authors_list.append(normalized)
+
+                book = {
+                    'id': row['id'],
+                    'title': row['title'],
+                    'authors': authors_list if authors_list else ['Unknown Author'],
+                    'timestamp': row['timestamp'],
+                    'pubdate': row['pubdate'],
+                    'has_cover': bool(row['has_cover']),
+                    'formats': formats,
+                    'path': row['path']
+                }
+                books.append(book)
+
+            return books
     except Exception as e:
         print(f"❌ Error loading reading list books: {e}")
         return []
-    finally:
-        if conn:
-            conn.close()
 
 
 def render_kobo_page(books, page=1, sort='added', books_per_page=5):
@@ -2372,11 +2383,10 @@ def convert_book_to_kepub(book_id):
 
     try:
         # Get book info from database
-        conn = get_db_connection(readonly=True)
-        cursor = conn.cursor()
-        cursor.execute("SELECT path FROM books WHERE id = ?", (book_id,))
-        row = cursor.fetchone()
-        conn.close()
+        with get_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT path FROM books WHERE id = ?", (book_id,))
+            row = cursor.fetchone()
 
         if not row:
             print(f"❌ Book {book_id} not found for KEPUB conversion", flush=True)
@@ -2703,18 +2713,17 @@ def fetch_and_apply_itunes_metadata(book_id):
     """
     try:
         # Get book info from database
-        conn = get_db_connection(readonly=True)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT b.title, GROUP_CONCAT(a.name, ' & ') as authors
-            FROM books b
-            LEFT JOIN books_authors_link bal ON b.id = bal.book
-            LEFT JOIN authors a ON bal.author = a.id
-            WHERE b.id = ?
-            GROUP BY b.id
-        """, (book_id,))
-        row = cursor.fetchone()
-        conn.close()
+        with get_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT b.title, GROUP_CONCAT(a.name, ' & ') as authors
+                FROM books b
+                LEFT JOIN books_authors_link bal ON b.id = bal.book
+                LEFT JOIN authors a ON bal.author = a.id
+                WHERE b.id = ?
+                GROUP BY b.id
+            """, (book_id,))
+            row = cursor.fetchone()
 
         if not row:
             print(f"❌ Book {book_id} not found for metadata fetch")
@@ -3469,33 +3478,32 @@ def check_book_in_library(title, author=None):
     Returns the book ID if found, None otherwise.
     """
     try:
-        conn = get_db_connection(readonly=True)
-        cursor = conn.cursor()
+        with get_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
 
-        # Search by title (case-insensitive)
-        title_pattern = f'%{title}%'
+            # Search by title (case-insensitive)
+            title_pattern = f'%{title}%'
 
-        if author:
-            # Search with both title and author
-            author_pattern = f'%{author}%'
-            cursor.execute("""
-                SELECT DISTINCT b.id, b.title
-                FROM books b
-                LEFT JOIN books_authors_link bal ON b.id = bal.book
-                LEFT JOIN authors a ON bal.author = a.id
-                WHERE b.title LIKE ? AND a.name LIKE ?
-                LIMIT 1
-            """, (title_pattern, author_pattern))
-        else:
-            # Search by title only
-            cursor.execute("""
-                SELECT id, title FROM books
-                WHERE title LIKE ?
-                LIMIT 1
-            """, (title_pattern,))
+            if author:
+                # Search with both title and author
+                author_pattern = f'%{author}%'
+                cursor.execute("""
+                    SELECT DISTINCT b.id, b.title
+                    FROM books b
+                    LEFT JOIN books_authors_link bal ON b.id = bal.book
+                    LEFT JOIN authors a ON bal.author = a.id
+                    WHERE b.title LIKE ? AND a.name LIKE ?
+                    LIMIT 1
+                """, (title_pattern, author_pattern))
+            else:
+                # Search by title only
+                cursor.execute("""
+                    SELECT id, title FROM books
+                    WHERE title LIKE ?
+                    LIMIT 1
+                """, (title_pattern,))
 
-        row = cursor.fetchone()
-        conn.close()
+            row = cursor.fetchone()
 
         return row['id'] if row else None
     except Exception as e:
@@ -5144,12 +5152,11 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
         # API: Get all unique authors from library (for autocomplete)
         if path == '/api/authors':
             try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT DISTINCT name FROM authors ORDER BY name")
-                raw_authors = [row['name'] for row in cursor.fetchall()]
-                conn.close()
-                
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT DISTINCT name FROM authors ORDER BY name")
+                    raw_authors = [row['name'] for row in cursor.fetchall()]
+
                 # Normalize author names: convert "LastName, FirstName" or "LastName| FirstName" to "FirstName LastName"
                 def normalize_author_name(author_str):
                     """Convert 'LastName, FirstName' or 'LastName| FirstName' to 'FirstName LastName'"""
@@ -5218,11 +5225,10 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
         # API: Get all unique tags/genres from library (for autocomplete)
         if path == '/api/tags':
             try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT DISTINCT name FROM tags ORDER BY name")
-                tags = [row['name'] for row in cursor.fetchall()]
-                conn.close()
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT DISTINCT name FROM tags ORDER BY name")
+                    tags = [row['name'] for row in cursor.fetchall()]
                 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
@@ -5290,18 +5296,17 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
             format = download_match.group(2).upper()
 
             try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
 
-                # Get book info
-                cursor.execute(
-                    "SELECT b.path, b.title FROM books b WHERE b.id = ?",
-                    (book_id,)
-                )
-                book_row = cursor.fetchone()
-                
+                    # Get book info
+                    cursor.execute(
+                        "SELECT b.path, b.title FROM books b WHERE b.id = ?",
+                        (book_id,)
+                    )
+                    book_row = cursor.fetchone()
+
                 if not book_row:
-                    conn.close()
                     self.send_error(404, f"Book {book_id} not found")
                     return
 
@@ -5324,7 +5329,6 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                     if not book_file_path:
                         kepubify_path = find_kepubify()
                         if not kepubify_path:
-                            conn.close()
                             self.send_error(500, f"kepubify not installed - cannot convert to KEPUB")
                             return
                         
@@ -5373,7 +5377,6 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                             
                             if not ebook_convert_path:
                                 shutil.rmtree(temp_dir)
-                                conn.close()
                                 self.send_error(500, f"ebook-convert not found - cannot convert {other_format} to KEPUB")
                                 return
                             
@@ -5390,7 +5393,6 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                             
                             if result.returncode != 0 or not os.path.exists(temp_epub):
                                 shutil.rmtree(temp_dir)
-                                conn.close()
                                 self.send_error(500, f"Failed to convert {other_format} to EPUB: {result.stderr}")
                                 return
                             
@@ -5399,7 +5401,6 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                         
                         if not epub_file:
                             shutil.rmtree(temp_dir)
-                            conn.close()
                             self.send_error(404, f"No convertible format found for this book")
                             return
                         
@@ -5429,7 +5430,6 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                         
                         if result.returncode != 0 or not os.path.exists(temp_kepub):
                             shutil.rmtree(temp_dir)
-                            conn.close()
                             self.send_error(500, f"KEPUB conversion failed: {result.stderr}")
                             return
                         
@@ -5445,20 +5445,19 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                             print(f"⚠️ Could not cache KEPUB (will reconvert next time): {e}")
                 else:
                     # For other formats, look up in database
-                    cursor.execute(
-                        "SELECT name FROM data WHERE book = ? AND format = ?",
-                        (book_id, format)
-                    )
-                    format_row = cursor.fetchone()
-                    
+                    with get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "SELECT name FROM data WHERE book = ? AND format = ?",
+                            (book_id, format)
+                        )
+                        format_row = cursor.fetchone()
+
                     if not format_row:
-                        conn.close()
                         self.send_error(404, f"Format {format} not found for this book")
                         return
-                    
+
                     book_file_path = os.path.join(book_dir, f"{format_row['name']}.{format.lower()}")
-                
-                conn.close()
 
                 if not os.path.exists(book_file_path):
                     if temp_file_to_cleanup:
@@ -6978,34 +6977,32 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                 
                 if image_data:
                     # Get book path from database
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT path FROM books WHERE id = ?", (book_id,))
-                    row = cursor.fetchone()
+                    with get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT path FROM books WHERE id = ?", (book_id,))
+                        row = cursor.fetchone()
 
-                    if row:
-                        book_path = row['path']
-                        library_path = get_calibre_library()
-                        cover_path = os.path.join(library_path, book_path, 'cover.jpg')
+                        if row:
+                            book_path = row['path']
+                            library_path = get_calibre_library()
+                            cover_path = os.path.join(library_path, book_path, 'cover.jpg')
 
-                        # Write cover file directly to book directory
-                        with open(cover_path, 'wb') as f:
-                            f.write(image_data)
-                            f.flush()  # Force flush to disk
-                            os.fsync(f.fileno())  # Ensure written to disk
+                            # Write cover file directly to book directory
+                            with open(cover_path, 'wb') as f:
+                                f.write(image_data)
+                                f.flush()  # Force flush to disk
+                                os.fsync(f.fileno())  # Ensure written to disk
 
-                        # Update has_cover flag in database
-                        cursor.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (book_id,))
-                        conn.commit()
-                        
-                        # Invalidate cover cache so new cover is served immediately
-                        cover_cache.invalidate(int(book_id))
+                            # Update has_cover flag in database
+                            cursor.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (book_id,))
+                            conn.commit()
 
-                        print(f"✅ Cover updated for book {book_id}")
-                    else:
-                        errors.append(f'Failed to update cover: Book not found')
+                            # Invalidate cover cache so new cover is served immediately
+                            cover_cache.invalidate(int(book_id))
 
-                    conn.close()
+                            print(f"✅ Cover updated for book {book_id}")
+                        else:
+                            errors.append(f'Failed to update cover: Book not found')
             except Exception as e:
                 errors.append(f'Failed to process cover: {str(e)}')
                 print(f"❌ Cover update error: {e}")
