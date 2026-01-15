@@ -12,11 +12,16 @@ RUN apt-get update && \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install kepubify for EPUB to KEPUB conversion
+RUN curl -L -o /usr/local/bin/kepubify \
+    https://github.com/pgaskin/kepubify/releases/latest/download/kepubify-linux-64bit \
+    && chmod +x /usr/local/bin/kepubify
+
 # Set working directory
 WORKDIR /app
 
 # Copy application files
-COPY serve.py .
+COPY folio.py .
 COPY public/ ./public/
 
 # Create empty config.json with valid JSON (avoids parse errors on first run)
@@ -34,4 +39,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:9099/api/config || exit 1
 
 # Run the server
-CMD ["python3", "serve.py"]
+CMD ["python3", "folio.py"]

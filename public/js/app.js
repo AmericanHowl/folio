@@ -95,7 +95,7 @@ function folioApp() {
         searchQuery: '',
         sortBy: 'recent',
         libraryView: 'grid', // 'list' or 'grid' - default to grid for main page
-        bookshelfView: 'list', // 'list' or 'grid' - default to list for bookshelf
+        bookshelfView: 'grid', // 'list' or 'grid' - default to grid for bookshelf
         booksPerPage: 10, // Books per page in list view
         currentListPage: 1, // Current page in list view
         libraryLoading: false,
@@ -148,6 +148,9 @@ function folioApp() {
         selectedBookiTunesMatch: null,
         updatingMetadata: false,
         savingMetadata: false, // Track if we're saving edited metadata
+        // iTunes metadata search in edit mode
+        itunesMetadataResults: [], // Multiple results for user to pick from
+        searchingItunesMetadata: false, // Loading state for metadata search
 
         // Requests
         requestedBooks: [],
@@ -180,6 +183,10 @@ function folioApp() {
         showBookshelf: false,
         bookshelfTitle: '',
         bookshelfBooks: [],
+        bookshelfType: '', // Track current bookshelf type for infinite scroll
+        bookshelfHasMore: false, // Whether more books can be loaded
+        loadingMoreBookshelf: false, // Prevent double-loading
+        bookshelfSortBy: 'recent', // Sorting option for bookshelf
 
         // Search (iTunes)
         searchiTunesResults: [],
@@ -198,6 +205,19 @@ function folioApp() {
         capturedImageSrc: '',
         cameraRequestId: 0, // Used to track/cancel pending camera requests
 
+        // Navigation state for browser history
+        currentView: 'library', // 'library' | 'bookshelf' | 'requests'
+        navigationLocked: false, // Prevent navigation loops
+        headerCompact: false, // Whether the header title should be compact (on scroll)
+        headerHidden: false, // Whether the header is hidden (scroll down = hide, scroll up = show)
+        lastScrollY: 0, // Track last scroll position for direction detection
+
+        // Kobo Sync state
+        koboToken: null,
+        koboApiEndpoint: '',
+        loadingKoboToken: false,
+        koboEndpointCopied: false,
+
         /**
          * Initialize the application
          */
@@ -208,21 +228,55 @@ function folioApp() {
             this.calculateBooksPerPage();
             window.addEventListener('resize', () => this.calculateBooksPerPage());
 
-            // Back-to-top visibility and infinite scroll
+            // Back-to-top visibility, header compact state, scroll direction, and infinite scroll
             window.addEventListener('scroll', () => {
-                this.showBackToTop = window.scrollY > 400;
-                
+                const currentScrollY = window.scrollY;
+                this.showBackToTop = currentScrollY > 400;
+
+                // Detect scroll direction for header compact state
+                // When scrolling down: hide search bar, show icons in section header
+                // When scrolling up: show full header with search bar
+                if (currentScrollY > 50) {
+                    const scrollDiff = currentScrollY - this.lastScrollY;
+                    // Only trigger if scrolled more than 5px to avoid micro-movements
+                    if (scrollDiff > 5) {
+                        // Scrolling down - compact header (hide search bar)
+                        this.headerCompact = true;
+                    } else if (scrollDiff < -5) {
+                        // Scrolling up - expand header (show search bar)
+                        this.headerCompact = false;
+                    }
+                } else {
+                    // At top of page - always show full header
+                    this.headerCompact = false;
+                }
+                this.lastScrollY = currentScrollY;
+
                 // Infinite scroll for search results
                 if (this.searchQuery && this.searchQuery.trim() && !this.loadingSearchiTunes && this.searchiTunesHasMore) {
-                    const scrollPosition = window.innerHeight + window.scrollY;
+                    const scrollPosition = window.innerHeight + currentScrollY;
                     const documentHeight = document.documentElement.scrollHeight;
                     // Load more when within 200px of bottom
                     if (scrollPosition >= documentHeight - 200) {
                         this.loadMoreiTunesSearch();
                     }
                 }
+
+                // Infinite scroll for bookshelf (grid view only)
+                if (this.showBookshelf && this.bookshelfView === 'grid' && !this.loadingMoreBookshelf && this.bookshelfHasMore) {
+                    const scrollPosition = window.innerHeight + currentScrollY;
+                    const documentHeight = document.documentElement.scrollHeight;
+                    // Load more when within 300px of bottom
+                    if (scrollPosition >= documentHeight - 300) {
+                        this.loadMoreBookshelf();
+                    }
+                }
             });
 
+            // Browser history navigation (back/forward)
+            window.addEventListener('popstate', (event) => {
+                this.handleHistoryNavigation(event.state);
+            });
 
             // Load server config
             await this.loadConfig();
@@ -298,6 +352,9 @@ function folioApp() {
                 this.libraryLoading = false;
             }
 
+            // Restore previous view if page was refreshed
+            this.restoreSavedView();
+
             // Periodically refresh library to pick up external changes
             // Only refresh if not searching (to prevent library view from reappearing)
             setInterval(() => {
@@ -329,7 +386,7 @@ function folioApp() {
                 // Note: prowlarr_api_key is sent as boolean for security, so we can't pre-populate it
                 // But if prowlarrApiKey is true, we know it's configured
                 
-                console.log('📖 Loaded config:', { 
+                console.log('📖 Loaded config:', {
                     library: this.calibreLibraryPath ? 'Set' : 'Not set',
                     token: this.hardcoverToken ? 'Set' : 'Not set',
                     prowlarr: this.prowlarrUrl ? 'Set' : 'Not set'
@@ -337,6 +394,132 @@ function folioApp() {
             } catch (error) {
                 console.error('Failed to load config:', error);
             }
+        },
+
+        /**
+         * Navigation Management - Browser History Integration
+         */
+
+        /**
+         * Push a new history state for navigation
+         */
+        pushHistoryState(view, data = {}) {
+            if (this.navigationLocked) return;
+
+            const state = { view, ...data };
+            const url = `#${view}`;
+
+            // Save to localStorage for page refresh restoration
+            localStorage.setItem('folio_current_view', JSON.stringify(state));
+
+            // Push to browser history
+            history.pushState(state, '', url);
+            this.currentView = view;
+        },
+
+        /**
+         * Handle browser back/forward navigation
+         */
+        handleHistoryNavigation(state) {
+            if (this.navigationLocked) return;
+
+            this.navigationLocked = true;
+
+            // If no state, we're back at library view
+            if (!state || !state.view) {
+                this.navigateToLibrary();
+            } else {
+                // Restore the view from history state
+                switch (state.view) {
+                    case 'library':
+                        this.navigateToLibrary();
+                        break;
+                    case 'bookshelf':
+                        this.navigateToBookshelf(state.title || 'Reading List');
+                        break;
+                    case 'requests':
+                        this.navigateToRequests();
+                        break;
+                    default:
+                        this.navigateToLibrary();
+                }
+            }
+
+            setTimeout(() => {
+                this.navigationLocked = false;
+            }, 100);
+        },
+
+        /**
+         * Initialize view on page load - always start at library
+         */
+        restoreSavedView() {
+            // Always start at library view on page load/refresh
+            this.currentView = 'library';
+            this.showBookshelf = false;
+            this.showRequests = false;
+            localStorage.setItem('folio_current_view', JSON.stringify({ view: 'library' }));
+            history.replaceState({ view: 'library' }, '', '#library');
+        },
+
+        /**
+         * Navigate to library view
+         */
+        navigateToLibrary() {
+            this.showBookshelf = false;
+            this.showRequests = false;
+            this.selectedBook = null;
+            this.selectedHardcoverBook = null;
+            this.showSettings = false;
+            this.showCameraCapture = false;
+            this.currentView = 'library';
+            this.unlockBodyScroll();
+            localStorage.setItem('folio_current_view', JSON.stringify({ view: 'library' }));
+        },
+
+        /**
+         * Navigate to bookshelf view (reading list or Hardcover sections)
+         */
+        navigateToBookshelf(title) {
+            this.showBookshelf = true;
+            this.bookshelfTitle = title;
+            this.showRequests = false;
+            this.selectedBook = null;
+            this.selectedHardcoverBook = null;
+            this.showSettings = false;
+            this.showCameraCapture = false;
+            this.currentView = 'bookshelf';
+            this.unlockBodyScroll();
+        },
+
+        /**
+         * Navigate to requests view
+         */
+        navigateToRequests() {
+            this.showRequests = true;
+            this.showBookshelf = false;
+            this.selectedBook = null;
+            this.selectedHardcoverBook = null;
+            this.showSettings = false;
+            this.showCameraCapture = false;
+            this.currentView = 'requests';
+            this.unlockBodyScroll();
+        },
+
+        /**
+         * Lock body scroll (for modals)
+         */
+        lockBodyScroll() {
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+        },
+
+        /**
+         * Unlock body scroll
+         */
+        unlockBodyScroll() {
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         },
 
         /**
@@ -517,6 +700,86 @@ function folioApp() {
         skipProwlarr() {
             this.showSetup = false;
             this.loadApp();
+        },
+
+        /**
+         * Get Kobo sync token for current user
+         */
+        async getKoboToken() {
+            this.loadingKoboToken = true;
+            try {
+                const response = await fetch('/api/kobo/token');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Failed to get Kobo token:', data.error);
+                    return;
+                }
+
+                this.koboToken = data.token;
+                this.koboApiEndpoint = data.api_endpoint;
+                console.log('📱 Kobo sync token retrieved');
+            } catch (error) {
+                console.error('Failed to get Kobo token:', error);
+            } finally {
+                this.loadingKoboToken = false;
+            }
+        },
+
+        /**
+         * Regenerate Kobo sync token
+         */
+        async regenerateKoboToken() {
+            if (!confirm('Are you sure you want to regenerate your Kobo sync token? Your current token will be invalidated and you will need to update your Kobo device.')) {
+                return;
+            }
+
+            this.loadingKoboToken = true;
+            try {
+                const response = await fetch('/api/kobo/token/regenerate', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Failed to regenerate Kobo token:', data.error);
+                    return;
+                }
+
+                this.koboToken = data.token;
+                this.koboApiEndpoint = data.api_endpoint;
+                console.log('📱 Kobo sync token regenerated');
+            } catch (error) {
+                console.error('Failed to regenerate Kobo token:', error);
+            } finally {
+                this.loadingKoboToken = false;
+            }
+        },
+
+        /**
+         * Copy Kobo API endpoint to clipboard
+         */
+        async copyKoboEndpoint() {
+            try {
+                await navigator.clipboard.writeText(this.koboApiEndpoint);
+                this.koboEndpointCopied = true;
+                setTimeout(() => {
+                    this.koboEndpointCopied = false;
+                }, 2000);
+            } catch (error) {
+                console.error('Failed to copy to clipboard:', error);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = this.koboApiEndpoint;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                this.koboEndpointCopied = true;
+                setTimeout(() => {
+                    this.koboEndpointCopied = false;
+                }, 2000);
+            }
         },
 
         /**
@@ -855,19 +1118,17 @@ function folioApp() {
             if (this.selectionMode) {
                 return;
             }
-            
+
             this.selectedBook = book;
             this.selectedHardcoverBook = null;
-            
+            this.lockBodyScroll();
+
             // Check if book is already in reading list and set status accordingly
             if (this.isInReadingList(book.id)) {
                 this.readingListStatus = 'remove';
                 } else {
                 this.readingListStatus = null;
             }
-            
-            // Check for iTunes match
-            this.checkiTunesMatch(book);
         },
 
         /**
@@ -1063,6 +1324,7 @@ function folioApp() {
             this.tagSuggestions = [];
             this.showAuthorSuggestions = false;
             this.showTagSuggestions = false;
+            this.itunesMetadataResults = [];
         },
 
         /**
@@ -1152,6 +1414,56 @@ function folioApp() {
         },
 
         /**
+         * Handle book file upload
+         */
+        async handleBookUpload(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+
+            const validExtensions = ['.epub', '.pdf', '.mobi', '.azw', '.azw3', '.fb2', '.lit', '.prc', '.txt', '.rtf', '.djvu', '.cbz', '.cbr'];
+            const validFiles = Array.from(files).filter(file => {
+                const ext = '.' + file.name.split('.').pop().toLowerCase();
+                return validExtensions.includes(ext);
+            });
+
+            if (validFiles.length === 0) {
+                alert('No valid book files selected. Supported formats: EPUB, PDF, MOBI, AZW, AZW3, FB2, LIT, PRC, TXT, RTF, DJVU, CBZ, CBR');
+                event.target.value = '';
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                validFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const response = await fetch('/api/upload-books', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`Successfully uploaded ${validFiles.length} book file(s). They will be imported shortly.`);
+                    // Reload books after a delay to show newly imported books
+                    setTimeout(() => {
+                        this.loadBooks();
+                    }, 2000);
+                } else {
+                    alert('Upload failed: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Error uploading files: ' + error.message);
+            } finally {
+                // Reset file input
+                event.target.value = '';
+            }
+        },
+
+        /**
          * Filter author suggestions
          */
         filterAuthorSuggestions() {
@@ -1224,6 +1536,73 @@ function folioApp() {
             this.selectedBook = null;
             this.selectedBookHardcoverMatch = null;
             this.exitEditMode();
+            this.unlockBodyScroll();
+        },
+
+        /**
+         * Search iTunes for metadata options (shows multiple results for user to pick)
+         */
+        async searchItunesForMetadata() {
+            if (!this.editingBook) return;
+
+            this.itunesMetadataResults = [];
+            this.searchingItunesMetadata = true;
+
+            try {
+                const title = this.editingBook.title;
+                const author = this.editingBook.authors || '';
+                const firstAuthor = author.split(',')[0].trim();
+                const searchQuery = title + (firstAuthor ? ' ' + firstAuthor : '');
+
+                // Check client-side cache first
+                const cacheKey = `itunes_metadata_${searchQuery}`;
+                let data = FolioCache.get(cacheKey);
+
+                if (!data) {
+                    const response = await fetch(`/api/itunes/search?q=${encodeURIComponent(searchQuery)}&limit=5`);
+                    data = await response.json();
+                    FolioCache.set(cacheKey, data, FolioCache.TTL.ITUNES_SEARCH);
+                } else {
+                    console.log(`📦 Cache hit: iTunes metadata for "${title}"`);
+                }
+
+                if (data.books && data.books.length > 0) {
+                    // Return top 3 results for user to choose
+                    this.itunesMetadataResults = data.books.slice(0, 3);
+                    console.log(`🔍 Found ${this.itunesMetadataResults.length} iTunes results for "${title}"`);
+                }
+            } catch (error) {
+                console.error('Failed to search iTunes for metadata:', error);
+            } finally {
+                this.searchingItunesMetadata = false;
+            }
+        },
+
+        /**
+         * Apply selected iTunes result to the editing form
+         */
+        applyItunesMetadata(itunesBook) {
+            if (!this.editingBook || !itunesBook) return;
+
+            // Apply metadata to editing form
+            if (itunesBook.title) this.editingBook.title = itunesBook.title;
+            if (itunesBook.author) this.editingBook.authors = itunesBook.author;
+            if (itunesBook.year) this.editingBook.year = itunesBook.year.toString();
+            if (itunesBook.description) this.editingBook.comments = itunesBook.description;
+            if (itunesBook.genres && Array.isArray(itunesBook.genres)) {
+                // Combine with existing tags
+                const existingTags = this.editingBook.tags ? this.editingBook.tags.split(',').map(t => t.trim()).filter(t => t) : [];
+                const newTags = [...new Set([...existingTags, ...itunesBook.genres])];
+                this.editingBook.tags = newTags.join(', ');
+            }
+            if (itunesBook.image) {
+                this.editingBook.coverPreview = itunesBook.image;
+                this.editingBook.coverData = itunesBook.image; // URL will be downloaded by server
+            }
+
+            // Clear results after selection
+            this.itunesMetadataResults = [];
+            console.log(`✅ Applied iTunes metadata from "${itunesBook.title}"`);
         },
 
         // ============================================
@@ -1323,6 +1702,7 @@ function folioApp() {
         openHardcoverModal(book) {
             this.selectedHardcoverBook = this.enrichHardcoverBook(book);
             this.selectedBook = null;
+            this.lockBodyScroll();
         },
 
         /**
@@ -1773,21 +2153,26 @@ function folioApp() {
         async openBookshelf(type, title) {
             this.bookshelfTitle = title;
             this.bookshelfBooks = [];
-            this.bookshelfView = 'list'; // Default to list view for bookshelf
+            this.bookshelfView = 'grid'; // Default to grid view for bookshelf
+            this.bookshelfType = type; // Track type for infinite scroll
+            this.bookshelfHasMore = false; // Will be set based on results
+            this.bookshelfSortBy = 'recent'; // Reset sort
             this.currentListPage = 1; // Reset to first page
             this.showBookshelf = true;
-            
+
             // Load 30 books for the bookshelf
             try {
                 let cacheKey;
                 let data;
-                
+
                 switch (type) {
                     case 'library':
                         this.bookshelfBooks = this.sortedBooks.slice(0, 30);
+                        this.bookshelfHasMore = this.sortedBooks.length > 30;
                         return;
                     case 'library-all':
                         this.bookshelfBooks = this.sortedBooks;
+                        this.bookshelfHasMore = false; // All loaded
                         return;
                     case 'trending':
                         cacheKey = 'bookshelf_trending_30';
@@ -1851,12 +2236,64 @@ function folioApp() {
                 
                 if (data && data.books) {
                     this.bookshelfBooks = this.matchWithLibrary(data.books);
+                    // Set hasMore if we received the full limit (30 books)
+                    this.bookshelfHasMore = data.books.length >= 30;
                     if (cacheKey && FolioCache.get(cacheKey)) {
                         console.log(`📦 Cache hit: bookshelf ${type}`);
                     }
                 }
             } catch (error) {
                 console.error('Failed to load bookshelf:', error);
+            }
+        },
+
+        /**
+         * Load more books for infinite scroll in bookshelf
+         */
+        async loadMoreBookshelf() {
+            if (this.loadingMoreBookshelf || !this.bookshelfHasMore) return;
+
+            this.loadingMoreBookshelf = true;
+            const offset = this.bookshelfBooks.length;
+            const limit = 30;
+
+            try {
+                let data;
+                const type = this.bookshelfType;
+
+                switch (type) {
+                    case 'library':
+                        // Load more from local library
+                        const moreBooks = this.sortedBooks.slice(offset, offset + limit);
+                        this.bookshelfBooks = [...this.bookshelfBooks, ...moreBooks];
+                        this.bookshelfHasMore = offset + limit < this.sortedBooks.length;
+                        break;
+                    case 'trending':
+                    case 'trending-month':
+                        const trendingResponse = await fetch(`/api/hardcover/trending?limit=${limit}&offset=${offset}`);
+                        data = await trendingResponse.json();
+                        break;
+                    case 'recent':
+                        const recentResponse = await fetch(`/api/hardcover/recent?limit=${limit}&offset=${offset}`);
+                        data = await recentResponse.json();
+                        break;
+                    default:
+                        if (type.startsWith('list-')) {
+                            const listId = type.replace('list-', '');
+                            const listResponse = await fetch(`/api/hardcover/list?id=${listId}&limit=${limit}&offset=${offset}`);
+                            data = await listResponse.json();
+                        }
+                }
+
+                if (data && data.books) {
+                    const matchedBooks = this.matchWithLibrary(data.books);
+                    this.bookshelfBooks = [...this.bookshelfBooks, ...matchedBooks];
+                    this.bookshelfHasMore = data.books.length >= limit;
+                }
+            } catch (error) {
+                console.error('Failed to load more bookshelf books:', error);
+            } finally {
+                this.loadingMoreBookshelf = false;
             }
         },
 
@@ -1870,13 +2307,15 @@ function folioApp() {
                 this.bookshelfBooks = this.sortedBooks.filter(book =>
                     this.isInReadingList(book.id)
                 );
-                this.showBookshelf = true;
+                this.navigateToBookshelf('Reading List');
+                this.pushHistoryState('bookshelf', { title: 'Reading List' });
             }).catch(() => {
                 // Fallback: use current ids even if reload fails
                 this.bookshelfBooks = this.sortedBooks.filter(book =>
                     this.isInReadingList(book.id)
                 );
-                this.showBookshelf = true;
+                this.navigateToBookshelf('Reading List');
+                this.pushHistoryState('bookshelf', { title: 'Reading List' });
             });
         },
 
@@ -1885,20 +2324,22 @@ function folioApp() {
          */
         async openRequests() {
             await this.loadRequestedBooks();
-            this.showRequests = true;
+            this.navigateToRequests();
+            this.pushHistoryState('requests');
         },
 
         /**
-         * Close requests view
+         * Close requests view (navigate back)
          */
         closeRequests() {
-            this.showRequests = false;
             this.selectedRequestBook = null;
             this.prowlarrSearchResults = [];
             // Clear download states
             this.downloadingProwlarr = null;
             this.downloadProwlarrSuccess = null;
             this.downloadProwlarrError = null;
+            // Use browser back to return to previous view
+            history.back();
         },
         
         /**
@@ -2015,6 +2456,40 @@ function folioApp() {
             if (!timestamp) return 'Unknown date';
             const date = new Date(timestamp * 1000);
             return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        },
+
+        /**
+         * Get the current section title based on view state
+         */
+        getSectionTitle() {
+            if (this.searchQuery && this.searchQuery.trim()) {
+                return 'Search Results';
+            }
+            if (this.showRequests) {
+                return 'Book Requests';
+            }
+            if (this.showBookshelf) {
+                return this.bookshelfTitle || 'Books';
+            }
+            return 'Your Library';
+        },
+
+        /**
+         * Check if back button should be shown
+         */
+        showBackButton() {
+            return this.showRequests || this.showBookshelf;
+        },
+
+        /**
+         * Handle back button click
+         */
+        handleBackButton() {
+            if (this.showRequests) {
+                this.closeRequests();
+            } else if (this.showBookshelf) {
+                this.closeBookshelf();
+            }
         },
 
         /**
@@ -2140,12 +2615,61 @@ function folioApp() {
         },
 
         /**
+         * Sort bookshelf books based on bookshelfSortBy
+         */
+        sortBookshelf() {
+            let sorted = [...this.bookshelfBooks];
+
+            switch (this.bookshelfSortBy) {
+                case 'recent':
+                    // Sort by timestamp, newest first
+                    sorted.sort((a, b) => {
+                        const dateA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+                        const dateB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+                        return dateB - dateA;
+                    });
+                    break;
+                case 'title':
+                    sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                    break;
+                case 'title-desc':
+                    sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+                    break;
+                case 'author':
+                    sorted.sort((a, b) => {
+                        const authorA = a.authors ? this.formatAuthors(a.authors) : (a.author || '');
+                        const authorB = b.authors ? this.formatAuthors(b.authors) : (b.author || '');
+                        const lastNameA = this.getLastNameForSort(authorA);
+                        const lastNameB = this.getLastNameForSort(authorB);
+                        return lastNameA.localeCompare(lastNameB);
+                    });
+                    break;
+                case 'author-desc':
+                    sorted.sort((a, b) => {
+                        const authorA = a.authors ? this.formatAuthors(a.authors) : (a.author || '');
+                        const authorB = b.authors ? this.formatAuthors(b.authors) : (b.author || '');
+                        const lastNameA = this.getLastNameForSort(authorA);
+                        const lastNameB = this.getLastNameForSort(authorB);
+                        return lastNameB.localeCompare(lastNameA);
+                    });
+                    break;
+            }
+
+            this.bookshelfBooks = sorted;
+            this.currentListPage = 1; // Reset to first page
+        },
+
+        /**
          * Close bookshelf view
          */
         closeBookshelf() {
             this.showBookshelf = false;
             this.bookshelfTitle = '';
             this.bookshelfBooks = [];
+            this.bookshelfType = '';
+            this.bookshelfHasMore = false;
+            this.loadingMoreBookshelf = false;
+            this.bookshelfSortBy = 'recent';
             this.currentListPage = 1; // Reset pagination
         },
 
@@ -2314,6 +2838,7 @@ function folioApp() {
             this.cameraState = 'initializing';
             this.cameraError = '';
             this.capturedImageSrc = '';
+            this.lockBodyScroll();
 
             // Increment request ID to track this specific request
             // This allows us to detect if the modal was closed while getUserMedia was pending
@@ -2398,6 +2923,7 @@ function folioApp() {
             this.showCameraCapture = false;
             this.cameraState = 'initializing';
             this.capturedImageSrc = '';
+            this.unlockBodyScroll();
 
             // Stop camera stream
             if (this.cameraStream) {
