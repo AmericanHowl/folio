@@ -6,33 +6,75 @@ import os
 import time
 import sqlite3
 import threading
+from collections import OrderedDict
 
 from .config import get_calibre_library
 
 
 class APICache:
-    """Simple in-memory cache with TTL for API responses."""
+    """In-memory cache with TTL and LRU eviction for API responses.
 
-    def __init__(self):
-        self._cache = {}
+    Features:
+    - TTL-based expiration
+    - LRU eviction when cache size exceeds max_size
+    - Proactive cleanup of expired entries
+    - Thread-safe operations
+    """
+
+    def __init__(self, max_size=1000):
+        """Initialize cache with maximum size limit.
+
+        Args:
+            max_size: Maximum number of cache entries (default: 1000)
+        """
+        self._cache = OrderedDict()  # Maintains insertion order for LRU
         self._lock = threading.Lock()
+        self._max_size = max_size
 
     def get(self, key):
-        """Get cached value if not expired."""
+        """Get cached value if not expired, and mark as recently used."""
         with self._lock:
             if key in self._cache:
                 value, expiry = self._cache[key]
                 if time.time() < expiry:
+                    # Move to end (mark as recently used)
+                    self._cache.move_to_end(key)
                     return value
                 else:
+                    # Expired - remove it
                     del self._cache[key]
             return None
 
     def set(self, key, value, ttl_seconds):
-        """Cache a value with TTL."""
+        """Cache a value with TTL, applying LRU eviction if needed."""
         with self._lock:
             expiry = time.time() + ttl_seconds
-            self._cache[key] = (value, expiry)
+
+            # If key exists, update it and mark as recently used
+            if key in self._cache:
+                self._cache[key] = (value, expiry)
+                self._cache.move_to_end(key)
+            else:
+                # New key - check if we need to evict
+                if len(self._cache) >= self._max_size:
+                    # Remove oldest entry (first item in OrderedDict)
+                    self._cache.popitem(last=False)
+
+                # Add new entry
+                self._cache[key] = (value, expiry)
+
+    def cleanup_expired(self):
+        """Proactively remove expired entries.
+
+        This should be called periodically to free up memory.
+        Returns the number of entries removed.
+        """
+        with self._lock:
+            now = time.time()
+            expired_keys = [k for k, (_, expiry) in self._cache.items() if now >= expiry]
+            for k in expired_keys:
+                del self._cache[k]
+            return len(expired_keys)
 
     def clear(self, pattern=None):
         """Clear cache entries, optionally matching a pattern."""
@@ -49,9 +91,12 @@ class APICache:
         with self._lock:
             now = time.time()
             valid_count = sum(1 for _, (_, expiry) in self._cache.items() if now < expiry)
+            expired_count = len(self._cache) - valid_count
             return {
                 'total_entries': len(self._cache),
                 'valid_entries': valid_count,
+                'expired_entries': expired_count,
+                'max_size': self._max_size,
                 'keys': list(self._cache.keys())
             }
 
@@ -97,11 +142,14 @@ class CoverCache:
                 return True
             self._loading = True
 
+        conn = None
         try:
             library_path = get_calibre_library()
             db_path = os.path.join(library_path, 'metadata.db')
 
             if not os.path.exists(db_path):
+                with self._lock:
+                    self._loading = False
                 return False
 
             conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=30.0)
@@ -110,7 +158,6 @@ class CoverCache:
             cursor = conn.cursor()
             cursor.execute("SELECT id, path, has_cover FROM books")
             rows = cursor.fetchall()
-            conn.close()
 
             new_cache = {}
             for row in rows:
@@ -132,6 +179,9 @@ class CoverCache:
             with self._lock:
                 self._loading = False
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def invalidate(self, book_id=None):
         """Invalidate cache for a specific book or all books."""

@@ -9,6 +9,7 @@ from ..config import get_folio_db_path
 def init_folio_db():
     """Initialize the folio database with required tables."""
     db_path = get_folio_db_path()
+    conn = None
     try:
         conn = sqlite3.connect(db_path, timeout=10.0)
         cursor = conn.cursor()
@@ -106,9 +107,11 @@ def init_folio_db():
         """)
 
         conn.commit()
-        conn.close()
         print(f"✅ Folio database initialized at {db_path}")
         return True
     except Exception as e:
         print(f"❌ Failed to initialize folio database: {e}")
         return False
+    finally:
+        if conn:
+            conn.close()
