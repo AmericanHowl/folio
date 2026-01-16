@@ -6,9 +6,6 @@
     <title>folio - Your Personal Library</title>
     <meta name="description" content="A modern interface for browsing and managing your Calibre library with Hardcover.app discovery">
     
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/folio.svg">
-
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#f6f7fa">
@@ -22,7 +19,7 @@
                     fontFamily: {
                         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
                         display: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                        logo: ['Oldenburg', 'system-ui', 'serif'],
+                        logo: ['Cal Sans', 'system-ui', 'sans-serif'],
                     },
                     colors: {
                         ink: {
@@ -110,7 +107,7 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oldenburg&family=Scope+One&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cal+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Bootstrap Icons (CSS-only, no JS needed) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -121,8 +118,7 @@
         :root {
             --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
             --font-display: 'Inter', system-ui, -apple-system, sans-serif;
-            --font-logo: 'Oldenburg', system-ui, serif;
-            --font-section: 'Scope One', Georgia, serif;
+            --font-logo: 'Cal Sans', system-ui, sans-serif;
         }
         
         * {
@@ -406,15 +402,15 @@
             }
         }
         .section-title {
-            font-family: var(--font-section);
+            font-family: var(--font-display);
             font-size: 1.25rem;
-            font-weight: 400;
+            font-weight: 600;
             color: #1f1f2e;
         }
         .section-title-large {
-            font-family: var(--font-section);
+            font-family: var(--font-display);
             font-size: 1.75rem;
-            font-weight: 400;
+            font-weight: 700;
             color: #1f1f2e;
         }
         
@@ -540,6 +536,16 @@
             background: #0ea5e9;
         }
         
+        /* Compact header */
+        .compact-header {
+            height: 48px;
+        }
+
+        /* Header scroll shadow effect */
+        .header-scrolled {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
         /* Divider with text */
         .divider-text {
             display: flex;
@@ -585,7 +591,7 @@
         <div class="setup-card max-w-md w-full mx-auto p-8 fade-in">
             <!-- Logo -->
             <div class="text-center mb-8">
-                <h1 class="font-logo text-5xl sm:text-6xl font-bold mb-4" style="color: #1f1f2e;">folio</h1>
+                <h1 class="font-logo text-5xl sm:text-6xl font-bold mb-4" style="color: #D4406F;">folio</h1>
                 <p class="text-ink-500 mt-2">Let's get your library set up</p>
         </div>
 
@@ -837,161 +843,141 @@
     <!-- Main App -->
     <div x-show="!showSetup" x-cloak class="min-h-screen">
         
-        <!-- Fixed Header Container - unified background, no borders -->
-        <div class="fixed top-0 left-0 right-0 z-40 safe-area-top bg-ink-50 transition-all duration-300">
-            <!-- Header Bar -->
-            <header>
-                <div class="max-w-7xl mx-auto px-3">
-                    <div class="flex items-center justify-between h-14">
-                        <!-- Logo -->
-                        <div class="flex items-center gap-2 pl-2">
-                            <img src="/folio.svg" alt="Folio logo" class="h-8 w-8">
-                            <span class="font-logo text-2xl" style="color: #1f1f2e;">folio</span>
-                        </div>
+        <!-- New Consistent Header -->
+        <header
+            class="sticky top-0 z-40 bg-white safe-area-top transition-shadow duration-200"
+            x-data="{ scrolled: false }"
+            @scroll.window="scrolled = window.scrollY > 10"
+            :class="{ 'header-scrolled': scrolled }"
+        >
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex items-center justify-between compact-header">
+                    <!-- Logo -->
+                    <a @click.prevent="showSetup = false; searchQuery = ''; selectedBook = null; selectedHardcoverBook = null; showSettings = false; showRequests = false; showProwlarrSearch = false; showReadingList = false; bookshelfView = false; showSearchModal = false; window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                        <span class="font-logo text-2xl sm:text-3xl font-bold" style="color: #D4406F;">folio</span>
+                    </a>
 
-                        <!-- Actions -->
-                        <div class="flex items-center gap-1">
-                            <button
-                                @click="openReadingList()"
-                                class="px-3 py-2 text-sm font-medium text-ink-700 hover:text-ink-900 hover:bg-ink-100 rounded-lg transition-colors flex items-center gap-2"
-                            >
-                                <i class="bi bi-bookmark text-base" style="color: #2fb8b8;"></i>
-                                <span>Reading List</span>
-                            </button>
-                            <!-- More Menu -->
-                            <div class="relative" x-data="{ menuOpen: false }">
-                                <button 
-                                    @click="menuOpen = !menuOpen" 
-                                    class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center"
-                                    title="More options"
-                                >
-                                    <i class="bi bi-three-dots-vertical text-lg"></i>
-                                </button>
-                                <!-- Dropdown Menu -->
-                                <div 
-                                    x-show="menuOpen" 
-                                    @click.away="menuOpen = false" 
-                                    x-cloak
-                                    x-transition:enter="transition ease-out duration-150"
-                                    x-transition:enter-start="opacity-0 scale-95 translate-y-1"
-                                    x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                                    x-transition:leave="transition ease-in duration-100"
-                                    x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-                                    x-transition:leave-end="opacity-0 scale-95 translate-y-1"
-                                    class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-ink-200 py-1.5 z-50 overflow-hidden">
-                                    <label class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors cursor-pointer">
-                                        <i class="bi bi-upload text-ink-400 text-sm"></i>
-                                        <span>Import Books</span>
-                                        <input type="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.fb2,.lit,.prc,.txt,.rtf,.djvu,.cbz,.cbr" multiple @change="handleBookUpload($event)" class="hidden">
-                                    </label>
-                                    <button @click="menuOpen = false; openRequests()" class="w-full flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <span>Requests</span>
-                                        <i class="bi bi-inbox-fill text-ink-400 text-sm"></i>
-                                    </button>
-                                    <button @click="menuOpen = false; toggleSelectionMode()" class="w-full flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <span>Select Books</span>
-                                        <i class="bi bi-check-square text-ink-400 text-sm"></i>
-                                    </button>
-                                    <div class="border-t border-ink-200 my-1"></div>
-                                    <button @click="menuOpen = false; showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" class="w-full flex items-right gap-2.5 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 transition-colors text-left">
-                                        <span>Settings</span>
-                                        <i class="bi bi-gear text-ink-400 text-sm"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-            
-            <!-- Search Bar (visible when not scrolled) -->
-            <div x-show="!headerCompact" 
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0 -translate-y-2"
-                 x-transition:enter-end="opacity-100 translate-y-0"
-                 x-transition:leave="transition ease-in duration-150"
-                 x-transition:leave-start="opacity-100 translate-y-0"
-                 x-transition:leave-end="opacity-0 -translate-y-2"
-                 class="px-4 py-2">
-                <div class="relative max-w-7xl mx-auto">
-                    <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></i>
-                    <input
-                        type="text"
-                        x-model="searchQuery"
-                        x-ref="searchInput"
-                        @input.debounce.300ms="searchBooks()"
-                        placeholder="Search for books"
-                        class="w-full pl-10 pr-12 py-2.5 bg-white border border-ink-200 rounded-lg text-base text-ink-700 placeholder-ink-400 focus:ring-2 focus:ring-ocean-500 focus:border-ocean-500 transition-all"
-                    >
-                    <button
-                        @click="openCameraCapture()"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-ink-400 hover:text-ink-600 hover:bg-ink-100 rounded-md transition-colors"
-                        title="Scan book cover"
-                    >
-                        <i class="bi bi-camera text-lg"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Section Title Bar -->
-            <div class="px-4 pb-3" :class="headerCompact ? 'pt-2' : 'pt-1'">
-                <div class="max-w-7xl mx-auto flex items-center gap-2">
-                    <!-- Back button (only visible in sub-views) -->
-                    <button
-                        x-show="showBackButton()"
-                        @click="handleBackButton()"
-                        class="p-2 -ml-2 text-ink-600 hover:text-ink-800 hover:bg-ink-100 rounded-lg transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-                    >
-                        <i class="bi bi-chevron-left text-lg"></i>
-                    </button>
-                    <h1 class="font-display font-bold text-ink-900 transition-all duration-200 flex-1"
-                        :class="headerCompact ? 'text-base' : 'text-xl'"
-                        x-text="getSectionTitle()">
-                        Your Library
-                    </h1>
-
-                    <!-- Right side actions -->
-                    <div class="flex items-center gap-1">
-                        <!-- Compact Icons (only visible when scrolled) -->
-                        <template x-if="headerCompact">
-                            <div class="flex items-center gap-1">
-                                <button
-                                    @click="window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $refs.searchInput.focus(), 300)"
-                                    class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
-                                    title="Search"
-                                >
-                                    <i class="bi bi-search text-lg"></i>
-                                </button>
-                                <button
-                                    @click="openCameraCapture()"
-                                    class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
-                                    title="Scan book cover"
-                                >
-                                    <i class="bi bi-camera text-lg"></i>
-                                </button>
-                            </div>
-                        </template>
-
-                        <!-- View All arrow (only on library view, not in sub-views) -->
+                    <!-- Action Buttons -->
+                    <div class="flex items-center gap-2">
+                        <!-- Search Button -->
                         <button
-                            x-show="!showBackButton() && !searchQuery"
-                            @click="openBookshelf('library-all', 'Your Library')"
-                            class="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
-                            title="View all books"
+                            @click="showSearchModal = true; $nextTick(() => $refs.searchModalInput?.focus())"
+                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                            title="Search"
                         >
-                            <i class="bi bi-chevron-right text-lg"></i>
+                            <i class="bi bi-search text-xl"></i>
+                        </button>
+
+                        <!-- Camera Button -->
+                        <button
+                            @click="openCameraCapture()"
+                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                            title="Scan book cover"
+                        >
+                            <i class="bi bi-camera text-xl"></i>
+                        </button>
+
+                        <!-- Settings Button -->
+                        <button
+                            @click="showSettings = true; hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;"
+                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                            title="Settings"
+                        >
+                            <i class="bi bi-gear text-xl"></i>
                         </button>
                     </div>
                 </div>
             </div>
-            
-            <!-- Bottom shadow line -->
-            <div class="h-px bg-ink-200 shadow-sm"></div>
+        </header>
+
+        <!-- Search Modal -->
+        <div x-show="showSearchModal" x-cloak @click.self="showSearchModal = false"
+             class="fixed inset-0 z-[60] modal-overlay flex items-start justify-center pt-20">
+            <div x-show="showSearchModal" x-transition
+                 @keydown.escape.window="showSearchModal = false"
+                 class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+                <!-- Search Header -->
+                <div class="p-4 border-b border-ink-200">
+                    <div class="relative flex items-center gap-3">
+                        <i class="bi bi-search text-ink-400 text-xl"></i>
+                        <input
+                            type="text"
+                            x-model="searchQuery"
+                            x-ref="searchModalInput"
+                            @input.debounce.300ms="searchBooks()"
+                            placeholder="Search for books..."
+                            class="flex-1 bg-transparent border-none outline-none text-lg text-ink-900 placeholder-ink-400"
+                            @keydown.escape="showSearchModal = false"
+                        >
+                        <button
+                            @click="showSearchModal = false"
+                            class="p-2 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center"
+                            title="Close"
+                        >
+                            <i class="bi bi-x-lg text-ink-500"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Results Container -->
+                <div class="max-h-[60vh] overflow-y-auto p-4">
+                    <!-- Loading State -->
+                    <div x-show="loadingSearchiTunes && searchiTunesResults.length === 0" class="py-12 px-4 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                            <div class="spinner w-6 h-6"></div>
+                        </div>
+                        <h3 class="text-lg font-semibold text-ink-700 mb-2">Searching...</h3>
+                        <p class="text-ink-500 text-sm">Finding books for you</p>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div x-show="!searchQuery && !loadingSearchiTunes" class="py-12 px-4 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                            <i class="bi bi-search text-2xl text-ink-400"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-ink-700 mb-2">Search for books</h3>
+                        <p class="text-ink-500 text-sm">Start typing to find books in your library and beyond</p>
+                    </div>
+
+                    <!-- Search Results Grid -->
+                    <div x-show="searchQuery && searchiTunesResults.length > 0" class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-ink-700">Search Results</h3>
+                            <span class="text-ink-500 text-sm" x-text="`${searchiTunesResults.length} books`"></span>
+                        </div>
+                        <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
+                            <template x-for="book in searchiTunesResults" :key="book.id">
+                                <div @click="openHardcoverModal(book); showSearchModal = false" class="book-card cursor-pointer">
+                                    <div class="book-cover relative">
+                                        <img :src="book.image" :alt="book.title" loading="lazy" class="w-full h-full object-cover"
+                                             @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                        <!-- Overlay badge for library -->
+                                        <span x-show="book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                            <i class="bi bi-check-lg text-white text-xs"></i>
+                                        </span>
+                                        <!-- Overlay badge for requested -->
+                                        <span x-show="book.requested && !book.inLibrary" class="absolute top-1 right-1 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                            <i class="bi bi-download text-white text-xs"></i>
+                                        </span>
+                                    </div>
+                                    <h3 class="mt-1.5 text-xs font-semibold text-ink-900 line-clamp-2 leading-tight" x-text="book.title"></h3>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- No Results -->
+                    <div x-show="searchQuery && !loadingSearchiTunes && searchiTunesResults.length === 0" class="py-12 px-4 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
+                            <i class="bi bi-search text-2xl text-ink-400"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-ink-700 mb-2">No results found</h3>
+                        <p class="text-ink-500 text-sm">Try a different search term</p>
+                    </div>
+                </div>
+            </div>
         </div>
-        
-        <!-- Spacer for fixed header -->
-        <div class="h-[160px]"></div>
-        
+
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto safe-area-bottom">
             
@@ -1071,20 +1057,44 @@
             <!-- ============================================ -->
             <!-- YOUR LIBRARY - Primary Section -->
             <!-- ============================================ -->
-            <section x-show="!searchQuery && !libraryLoading && books.length > 0" class="pb-4">
-                <!-- Cancel Selection (only shown when selection mode is active from menu) -->
-                <div x-show="selectionMode" class="px-3 mb-2">
-                    <button 
-                        @click="toggleSelectionMode(); selectedBookIds = []" 
-                        class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
-                    >
-                        <i class="bi bi-x-lg"></i>
-                        <span>Cancel Selection</span>
-                    </button>
-                </div>
+            <section x-show="!searchQuery && !libraryLoading && books.length > 0" class="pt-3 pb-4">
+                <!-- Library Header -->
+                <div class="px-3 mb-3">
+                    <div class="flex items-center justify-between">
+                        <h2 class="section-title-large">Your Library</h2>
+                        <div class="flex items-center gap-2">
+                            <!-- Selection Mode Toggle -->
+                            <button 
+                                x-show="!selectionMode"
+                                @click="toggleSelectionMode()" 
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
+                                title="Select multiple books"
+                            >
+                                <i class="bi bi-check-square"></i>
+                                <span class="hidden sm:inline">Select</span>
+                            </button>
+                            <!-- Cancel Selection -->
+                            <button 
+                                x-show="selectionMode"
+                                @click="toggleSelectionMode(); selectedBookIds = []" 
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-50"
+                            >
+                                <i class="bi bi-x-lg"></i>
+                                <span class="hidden sm:inline">Cancel</span>
+                            </button>
+                            <button 
+                                x-show="!selectionMode"
+                                @click="openBookshelf('library-all', 'Your Library')" 
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-700"
+                            >
+                                <span>View all</span>
+                                <i class="bi bi-chevron-right text-xs"></i>
+                            </button>
+                        </div>
+            </div>
 
-                <!-- Bulk Action Toolbar -->
-                <div x-show="selectionMode && selectedBookIds.length > 0" class="flex items-center justify-between gap-2 p-3 bg-primary-50 border border-primary-200 rounded-lg mx-3 mb-2">
+                    <!-- Bulk Action Toolbar -->
+                    <div x-show="selectionMode && selectedBookIds.length > 0" class="flex items-center justify-between gap-2 p-3 bg-primary-50 border border-primary-200 rounded-lg mt-2 mb-2">
                         <div class="flex items-center gap-2">
                             <span class="text-sm font-medium text-ink-900">
                                 <span x-text="selectedBookIds.length"></span> selected
@@ -1129,7 +1139,7 @@
                     </div>
 
                     <!-- Sorting Options and View Toggle -->
-                    <div class="flex items-center justify-between gap-3 px-3">
+                    <div class="flex items-center justify-between gap-3 mt-2">
                         <select x-model="sortBy" @change="sortBooks()" class="sort-select flex-1">
                             <option value="recent">Date Added</option>
                             <option value="title">Title A-Z</option>
@@ -1155,9 +1165,10 @@
                                 title="Grid View"
                             >
                                 <i class="bi bi-grid-3x3-gap"></i>
-                            </button>
+                        </button>
                         </div>
                     </div>
+                </div>
 
                 <!-- List View -->
                 <div x-show="libraryView === 'list'" class="px-3">
@@ -1231,10 +1242,10 @@
                                 >
                                     <i :class="isInReadingList(book.id) ? 'bi bi-bookmark-fill' : 'bi bi-bookmark-plus'"></i>
                                 </button>
-                            </div>
+                        </div>
                         </template>
-                    </div>
-                </div>
+                                        </div>
+                                    </div>
                 
                 <!-- Grid View (Swipeable Pages) -->
                 <div x-show="libraryView === 'grid'">
@@ -1399,7 +1410,7 @@
         <footer x-show="!showSetup && !searchQuery" class="py-6 px-4 border-t border-ink-200 bg-ink-50">
             <div class="max-w-7xl mx-auto flex items-center justify-center">
                 <button 
-                    @click="showSettings = true; lockBodyScroll(); hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" 
+                    @click="showSettings = true; hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;" 
                     class="text-sm text-ink-500 hover:text-ink-700 transition-colors flex items-center gap-2"
                 >
                     <i class="bi bi-gear"></i>
@@ -1421,11 +1432,15 @@
                 <div class="flex gap-2">
                     <button @click="enterEditMode()" title="Edit" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                         <i class="bi bi-pencil text-ink-600"></i>
-                    </button>
+                                        </button>
+                    <button x-show="selectedBookiTunesMatch" @click="updateMetadataFromiTunes()" :disabled="updatingMetadata" title="Update from iTunes" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
+                        <span x-show="!updatingMetadata"><i class="bi bi-search text-ink-600"></i></span>
+                        <span x-show="updatingMetadata" class="spinner w-5 h-5"></span>
+                                        </button>
                     <button @click="closeBookModal()" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                         <i class="bi bi-x-lg text-ink-600"></i>
-                    </button>
-                </div>
+                                        </button>
+                                    </div>
                                 </div>
 
             <!-- Scrollable Body -->
@@ -1466,6 +1481,13 @@
                             <span class="font-semibold">Publisher:</span> <span x-text="selectedBook?.publisher"></span>
                                         </div>
 
+                        <!-- Formats -->
+                        <div x-show="selectedBook?.formats?.length" class="text-sm text-ink-500">
+                            <span class="font-semibold">Formats:</span> 
+                            <template x-for="(format, index) in (selectedBook?.formats || [])" :key="format">
+                                <span><span x-text="format"></span><span x-show="index < selectedBook.formats.length - 1">, </span></span>
+                                                </template>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1550,40 +1572,6 @@
                             <textarea x-model="editingBook.comments" rows="6"
                                       class="w-full px-3 py-2 border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ocean-500 resize-none"></textarea>
                                             </div>
-
-                        <!-- iTunes Metadata Search -->
-                        <div class="pt-2 border-t border-ink-200">
-                            <div class="flex items-center justify-between mb-2">
-                                <label class="block text-sm font-semibold text-ink-700">Search for Metadata</label>
-                                <button @click="searchItunesForMetadata()" :disabled="searchingItunesMetadata"
-                                        class="btn btn-secondary text-sm py-1.5 px-3">
-                                    <span x-show="!searchingItunesMetadata" class="inline-flex items-center gap-1">
-                                        <i class="bi bi-search"></i> Search iTunes
-                                    </span>
-                                    <span x-show="searchingItunesMetadata" class="inline-flex items-center gap-1">
-                                        <span class="spinner w-4 h-4"></span> Searching...
-                                    </span>
-                                </button>
-                            </div>
-
-                            <!-- iTunes Results -->
-                            <div x-show="itunesMetadataResults.length > 0" class="space-y-2">
-                                <p class="text-xs text-ink-500">Select a result to apply its metadata:</p>
-                                <template x-for="(result, index) in itunesMetadataResults" :key="result.id || index">
-                                    <button @click="applyItunesMetadata(result)"
-                                            class="w-full flex items-start gap-3 p-2 bg-white border border-ink-200 rounded-lg hover:border-ocean-400 hover:bg-ocean-50 transition-colors text-left">
-                                        <img :src="result.image" :alt="result.title"
-                                             class="w-12 h-16 object-cover rounded flex-shrink-0 bg-ink-100">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="text-sm font-medium text-ink-900 truncate" x-text="result.title"></div>
-                                            <div class="text-xs text-ink-600 truncate" x-text="result.author"></div>
-                                            <div class="text-xs text-ink-500" x-text="result.year"></div>
-                                        </div>
-                                        <i class="bi bi-chevron-right text-ink-400 flex-shrink-0 mt-2"></i>
-                                    </button>
-                                </template>
-                            </div>
-                        </div>
                 </div>
             </div>
         </div>
@@ -1640,11 +1628,11 @@
                                     </div>
 
     <!-- Hardcover Book Modal -->
-    <div x-show="selectedHardcoverBook" x-cloak @click.self="selectedHardcoverBook = null; unlockBodyScroll()"
+    <div x-show="selectedHardcoverBook" x-cloak @click.self="selectedHardcoverBook = null" 
          class="fixed inset-0 z-[60] modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div x-show="selectedHardcoverBook" x-transition:enter="slide-up"
+        <div x-show="selectedHardcoverBook" x-transition:enter="slide-up" 
              class="bg-ink-100 w-full sm:max-w-[720px] sm:rounded-2xl rounded-t-[20px] max-h-[90vh] flex flex-col shadow-2xl border border-ink-200">
-
+            
             <!-- Sticky Header -->
             <div class="flex justify-between items-center p-4 border-b border-ink-100 sticky top-0 bg-white z-10 rounded-t-[20px] sm:rounded-t-2xl">
                                 <div class="flex items-center gap-2">
@@ -1656,7 +1644,7 @@
                         <i class="bi bi-clock"></i> Requested
                                         </span>
                                     </div>
-                <button @click="selectedHardcoverBook = null; unlockBodyScroll()" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
+                <button @click="selectedHardcoverBook = null" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                     <i class="bi bi-x-lg text-ink-600"></i>
                                 </button>
                                 </div>
@@ -1731,12 +1719,12 @@
                                     </div>
 
     <!-- Settings Modal -->
-    <div x-show="showSettings" x-cloak @click.self="showSettings = false; unlockBodyScroll()"
+    <div x-show="showSettings" x-cloak @click.self="showSettings = false" 
          class="fixed inset-0 z-[60] modal-overlay flex items-center justify-center p-4">
         <div x-show="showSettings" x-transition class="bg-ink-100 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
             <div class="p-5 border-b border-ink-100 flex items-center justify-between">
                 <h2 class="font-display text-lg font-bold text-ink-900">Settings</h2>
-                <button @click="showSettings = false; unlockBodyScroll()" class="p-3 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
+                <button @click="showSettings = false" class="p-3 hover:bg-ink-100 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                     <i class="bi bi-x-lg text-ink-500"></i>
                 </button>
                                 </div>
@@ -1812,56 +1800,6 @@
                     </div>
                 </div>
 
-                <!-- Kobo Sync -->
-                <div>
-                    <label class="block text-sm font-semibold text-ink-700 mb-2">
-                        Kobo Sync
-                        <span class="text-xs font-normal text-ink-400">(Wireless sync to Kobo e-readers)</span>
-                    </label>
-                    <div class="space-y-2">
-                        <div x-show="!koboToken" class="p-4 bg-ink-50 rounded-xl text-center">
-                            <p class="text-sm text-ink-500 mb-3">Generate a sync token to wirelessly sync your reading list to your Kobo</p>
-                            <button @click="getKoboToken()"
-                                    :disabled="loadingKoboToken"
-                                    class="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 transition-colors text-sm font-semibold">
-                                <span x-show="!loadingKoboToken">Generate Sync Token</span>
-                                <span x-show="loadingKoboToken">Generating...</span>
-                            </button>
-                        </div>
-                        <div x-show="koboToken" class="space-y-3">
-                            <div class="p-4 bg-ink-50 rounded-xl">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-xs font-semibold text-ink-600">Your Kobo API Endpoint:</span>
-                                    <button @click="copyKoboEndpoint()"
-                                            class="text-xs text-primary-600 hover:text-primary-700 font-semibold flex items-center gap-1">
-                                        <i class="bi" :class="koboEndpointCopied ? 'bi-check' : 'bi-clipboard'"></i>
-                                        <span x-text="koboEndpointCopied ? 'Copied!' : 'Copy'"></span>
-                                    </button>
-                                </div>
-                                <code class="block text-xs text-ink-700 bg-ink-100 p-2 rounded break-all select-all" x-text="koboApiEndpoint"></code>
-                            </div>
-                            <div class="text-xs text-ink-500 space-y-1">
-                                <p class="font-semibold">Setup Instructions:</p>
-                                <ol class="list-decimal list-inside space-y-1 pl-1">
-                                    <li>Connect your Kobo to your computer via USB</li>
-                                    <li>Open the hidden <code class="bg-ink-100 px-1 rounded">.kobo</code> folder</li>
-                                    <li>Edit <code class="bg-ink-100 px-1 rounded">Kobo/Kobo eReader.conf</code></li>
-                                    <li>Find <code class="bg-ink-100 px-1 rounded">api_endpoint=...</code> line</li>
-                                    <li>Replace with your endpoint above</li>
-                                    <li>Safely eject and tap "Sync" on Kobo</li>
-                                </ol>
-                            </div>
-                            <button @click="regenerateKoboToken()"
-                                    :disabled="loadingKoboToken"
-                                    class="w-full px-4 py-2 bg-ink-200 text-ink-700 rounded-xl hover:bg-ink-300 disabled:opacity-50 transition-colors text-sm font-semibold">
-                                <span x-show="!loadingKoboToken">Regenerate Token</span>
-                                <span x-show="loadingKoboToken">Regenerating...</span>
-                            </button>
-                            <p class="text-xs text-ink-400 text-center">Warning: Regenerating will invalidate your current token</p>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Requests -->
                                 <div>
                     <label class="block text-sm font-semibold text-ink-700 mb-2">
@@ -1899,9 +1837,20 @@
             </div>
 
     <!-- Requests View (List format) -->
-    <div x-show="showRequests" x-cloak class="fixed inset-0 z-30 bg-ink-50 pt-[160px] overflow-y-auto">
+    <div x-show="showRequests" x-cloak class="fixed inset-0 z-50 bg-ink-50">
+        <!-- Header -->
+        <div class="sticky top-0 z-10 glass border-b border-ink-200 safe-area-top">
+            <div class="flex items-center h-12 px-3">
+                <button @click="closeRequests()" class="p-3 -ml-2 text-ink-600 hover:text-ink-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+                    <i class="bi bi-arrow-left text-lg"></i>
+                </button>
+                <h1 class="flex-1 text-center font-display text-base font-semibold text-ink-800 truncate px-4">Book Requests</h1>
+                <div class="w-8"></div>
+        </div>
+    </div>
+
         <!-- Requests List -->
-        <div class="p-3 pb-16">
+        <div class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 48px);">
             <!-- Empty State -->
             <div x-show="requestedBooks.length === 0" class="py-12 text-center">
                 <i class="bi bi-inbox text-4xl text-ink-300 mb-3"></i>
@@ -1912,43 +1861,31 @@
             <div x-show="requestedBooks.length > 0" class="space-y-3">
                 <template x-for="book in requestedBooks" :key="book.id">
                     <div class="flex items-center gap-3 p-3 bg-white border border-ink-200 rounded-xl hover:border-ink-300 transition-colors">
-                        <!-- Cover (clickable) -->
-                        <img
-                            @click="openHardcoverModal(book)"
-                            :src="book.image"
-                            :alt="book.title"
-                            class="w-16 h-24 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        <!-- Cover -->
+                        <img 
+                            :src="book.image" 
+                            :alt="book.title" 
+                            class="w-16 h-24 object-cover rounded-lg flex-shrink-0"
                             @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'"
                         >
-
-                        <!-- Details (clickable) -->
-                        <div @click="openHardcoverModal(book)" class="flex-1 min-w-0 cursor-pointer">
+                        
+                        <!-- Details -->
+                        <div class="flex-1 min-w-0">
                             <h3 class="text-sm font-semibold text-ink-900 line-clamp-2 mb-1" x-text="book.title"></h3>
                             <p class="text-xs text-ink-600 mb-1" x-text="book.author || 'Unknown Author'"></p>
                             <p class="text-xs text-ink-400" x-text="formatRequestDate(book.requested_at)"></p>
                                         </div>
-
-                        <!-- Action Buttons -->
-                        <div class="flex flex-col gap-2 flex-shrink-0">
-                            <!-- Search Button -->
-                            <button
-                                @click="searchProwlarr(book)"
-                                :disabled="!prowlarrUrl || !prowlarrApiKey"
-                                class="p-3 bg-coral-500 hover:bg-coral-600 disabled:bg-ink-200 disabled:text-ink-400 text-white rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
-                                title="Search in Prowlarr"
-                            >
-                                <i class="bi bi-search"></i>
-                            </button>
-
-                            <!-- Remove Button -->
-                            <button
-                                @click="cancelRequest(book)"
-                                class="p-3 bg-ink-100 hover:bg-red-100 text-ink-600 hover:text-red-600 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
-                                title="Remove from requests"
-                            >
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
+                        
+                        <!-- Search Button -->
+                        <button 
+                            @click="searchProwlarr(book)"
+                            :disabled="!prowlarrUrl || !prowlarrApiKey"
+                            class="px-4 py-2 bg-coral-500 hover:bg-coral-600 disabled:bg-ink-200 disabled:text-ink-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 flex-shrink-0"
+                            title="Search in Prowlarr"
+                        >
+                            <i class="bi bi-search"></i>
+                            <span class="hidden sm:inline">Search</span>
+                                        </button>
                                     </div>
                                 </template>
             </div>
@@ -1956,43 +1893,44 @@
     </div>
 
     <!-- Bookshelf View (Full page grid of books) -->
-    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-30 bg-white pt-[160px] overflow-y-auto">
-        <!-- Sorting and View Toggle -->
-        <div class="bg-white border-b border-ink-200 px-3 py-2">
-            <div class="flex items-center justify-between gap-3">
-                <!-- Sorting Options -->
-                <select x-model="bookshelfSortBy" @change="sortBookshelf()" class="sort-select flex-1">
-                    <option value="recent">Date Added</option>
-                    <option value="title">Title A-Z</option>
-                    <option value="title-desc">Title Z-A</option>
-                    <option value="author">Author A-Z</option>
-                    <option value="author-desc">Author Z-A</option>
-                </select>
+    <div x-show="showBookshelf" x-cloak class="fixed inset-0 z-50 bg-white">
+        <!-- Header -->
+        <div class="sticky top-0 z-10 glass border-b border-ink-200 safe-area-top">
+            <div class="flex items-center h-12 px-3">
+                <button @click="closeBookshelf()" class="p-3 -ml-2 text-ink-600 hover:text-ink-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+                    <i class="bi bi-arrow-left text-lg"></i>
+                </button>
+                <h1 class="flex-1 text-center font-display text-base font-semibold text-ink-800 truncate px-4" x-text="bookshelfTitle"></h1>
+                <div class="w-8"></div>
+                                </div>
+                            </div>
 
-                <!-- View Toggle -->
+        <!-- View Toggle -->
+        <div class="sticky top-12 z-10 bg-white border-b border-ink-200 px-3 py-2">
+            <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1 bg-ink-100 rounded-lg p-1">
-                    <button
+                    <button 
                         @click="bookshelfView = 'list'; currentListPage = 1"
                         :class="bookshelfView === 'list' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'"
-                        class="p-2 rounded transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                        class="p-3 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="List View"
                     >
                         <i class="bi bi-list"></i>
                     </button>
-                    <button
+                    <button 
                         @click="bookshelfView = 'grid'; currentListPage = 1"
                         :class="bookshelfView === 'grid' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'"
-                        class="p-2 rounded transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                        class="p-3 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Grid View"
                     >
                         <i class="bi bi-grid-3x3-gap"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
         <!-- List View -->
-        <div x-show="bookshelfView === 'list'" class="p-3 pb-16">
+        <div x-show="bookshelfView === 'list'" class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 96px);">
             <!-- Pagination Controls -->
             <div class="flex items-center justify-between mb-4 gap-2">
                 <div class="flex items-center gap-2">
@@ -2045,7 +1983,7 @@
                                 </div>
 
         <!-- Grid View -->
-        <div x-show="bookshelfView === 'grid'" class="p-3 pb-16">
+        <div x-show="bookshelfView === 'grid'" class="p-3 pb-16 overflow-y-auto" style="height: calc(100vh - 96px);">
             <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                 <template x-for="book in bookshelfBooks" :key="book.id">
                     <div @click="book.authors ? openBookModal(book) : openHardcoverModal(book)" class="book-card cursor-pointer">
@@ -2065,23 +2003,15 @@
                         <p class="text-xs text-ink-500 line-clamp-1" x-text="book.authors ? formatAuthors(book.authors) : (book.author || 'Unknown Author')"></p>
                                     </div>
                 </template>
-            </div>
-
-            <!-- Loading more indicator for infinite scroll -->
-            <div x-show="loadingMoreBookshelf" class="py-4 text-center">
-                <div class="flex items-center justify-center gap-2 text-ink-500">
-                    <div class="spinner w-4 h-4"></div>
-                    <span class="text-sm">Loading more books...</span>
-                </div>
-            </div>
+                                </div>
 
             <!-- Empty State -->
-            <div x-show="bookshelfBooks.length === 0 && !loadingMoreBookshelf" class="py-12 text-center">
+            <div x-show="bookshelfBooks.length === 0" class="py-12 text-center">
                 <div class="spinner w-6 h-6 mx-auto"></div>
                 <p class="text-ink-500 text-sm mt-3">Loading books...</p>
-            </div>
-        </div>
-    </div>
+                                        </div>
+                                    </div>
+                                </div>
 
         <!-- Back to top button -->
         <button 
