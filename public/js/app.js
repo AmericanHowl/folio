@@ -979,36 +979,36 @@ function folioApp() {
         },
 
         /**
-         * Check if a book is in the requested list (matches by title/author)
+         * Get combined list of library books and requested books for Your Books view
          */
-        isBookRequested(bookId) {
-            // Find the library book
-            const libraryBook = this.books.find(b => b.id === bookId);
-            if (!libraryBook) return false;
+        getCombinedBooksForYourBooks() {
+            // Start with library books
+            const libraryBooks = this.sortedBooks.map(book => ({
+                ...book,
+                isRequested: false,
+                isLibraryBook: true
+            }));
 
-            // Check if any requested book matches this library book
-            const libTitle = this.normalizeForMatching(libraryBook.title);
-            const libAuthor = this.normalizeForMatching(
-                Array.isArray(libraryBook.authors) ? libraryBook.authors.join(' ') : libraryBook.authors
-            );
+            // Add requested books that aren't already in the library
+            const requestedBooksToAdd = this.requestedBooks
+                .filter(reqBook => {
+                    // Check if this requested book is already in the library
+                    const inLibrary = this.findLibraryMatch(reqBook);
+                    return !inLibrary;
+                })
+                .map(book => ({
+                    ...book,
+                    isRequested: true,
+                    isLibraryBook: false,
+                    // Normalize the structure to match library books
+                    authors: book.author || '',
+                    formats: []
+                }));
 
-            for (const requestedBook of this.requestedBooks) {
-                const reqTitle = this.normalizeForMatching(requestedBook.title);
-                const reqAuthor = this.normalizeForMatching(requestedBook.author);
-
-                const titleSimilarity = this.calculateSimilarity(libTitle, reqTitle);
-                const authorSimilarity = this.calculateSimilarity(libAuthor, reqAuthor);
-
-                if (titleSimilarity > 0.85 && authorSimilarity > 0.5) {
-                    return true;
-                }
-                if (titleSimilarity > 0.7 && authorSimilarity > 0.7) {
-                    return true;
-                }
-            }
-
-            return false;
+            // Combine and return
+            return [...libraryBooks, ...requestedBooksToAdd];
         },
+
 
         /**
          * Check if a book has KEPUB format (for Kobo sync)
