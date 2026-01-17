@@ -525,30 +525,29 @@
         }
 
         /* Pill-style navigation toggle */
-        .pill-nav {
-            display: inline-flex;
-            background: #f4f4f5;
-            border-radius: 100px;
-            padding: 4px;
-            gap: 4px;
-        }
-        .pill-nav-btn {
-            padding: 8px 20px;
-            border-radius: 100px;
-            font-size: 14px;
+        /* Modern tab navigation styles */
+        .tab-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 0;
+            font-size: 15px;
             font-weight: 600;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            color: #71717a;
-            background: transparent;
             border: none;
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+            position: relative;
         }
-        .pill-nav-btn.active {
-            background: #ffffff;
+        .tab-active {
             color: #18181b;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+            border-bottom-color: #18181b;
         }
-        .pill-nav-btn:hover:not(.active) {
+        .tab-inactive {
+            color: #71717a;
+        }
+        .tab-inactive:hover {
             color: #52525b;
         }
 
@@ -577,6 +576,7 @@
             border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
         .badge-kobo {
             background: #71717a;
@@ -588,6 +588,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             display: inline-flex;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
             align-items: center;
             gap: 3px;
         }
@@ -852,67 +853,77 @@
     <!-- Main App -->
     <div x-show="!showSetup" x-cloak class="min-h-screen">
         
-        <!-- New Consistent Header -->
+        <!-- New Two-Row Header -->
         <header
-            class="sticky top-0 z-40 bg-white safe-area-top transition-shadow duration-200"
+            class="sticky top-0 z-40 bg-white safe-area-top transition-shadow duration-200 border-b border-ink-200"
             x-data="{ scrolled: false }"
             @scroll.window="scrolled = window.scrollY > 10"
             :class="{ 'header-scrolled': scrolled }"
         >
-            <div class="max-w-7xl mx-auto px-4">
-                <div class="flex items-center justify-between compact-header">
-                    <!-- Logo -->
-                    <a @click.prevent="activeView = 'yourBooks'; searchQuery = ''; selectedBook = null; selectedHardcoverBook = null; showSettings = false; showSearchModal = false; window.scrollTo({ top: 0, behavior: 'smooth' })" href="#" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                        <span class="font-logo text-2xl sm:text-3xl font-bold text-ink-900">folio</span>
-                    </a>
+            <!-- Row 1: Logo, Search, Settings -->
+            <div class="border-b border-ink-100">
+                <div class="max-w-7xl mx-auto px-4 py-3">
+                    <div class="flex items-center gap-4">
+                        <!-- Logo with icon -->
+                        <a @click.prevent="activeView = 'yourBooks'; searchQuery = ''; selectedBook = null; selectedHardcoverBook = null; showSettings = false; showSearchModal = false; window.scrollTo({ top: 0, behavior: 'smooth' })"
+                           href="#"
+                           class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity shrink-0">
+                            <img src="/folio.svg" alt="Folio" class="w-8 h-8">
+                            <span class="font-logo text-2xl font-bold text-ink-900">folio</span>
+                        </a>
 
-                    <!-- Pill Navigation -->
-                    <div class="pill-nav">
-                        <button
-                            @click="activeView = 'yourBooks'; window.scrollTo({ top: 0, behavior: 'smooth' })"
-                            :class="{ 'active': activeView === 'yourBooks' }"
-                            class="pill-nav-btn"
-                        >
-                            Your Books
-                        </button>
-                        <button
-                            @click="activeView = 'discover'; window.scrollTo({ top: 0, behavior: 'smooth' })"
-                            :class="{ 'active': activeView === 'discover' }"
-                            class="pill-nav-btn"
-                        >
-                            Discover
-                        </button>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex items-center gap-2">
-                        <!-- Search Button -->
-                        <button
-                            @click="showSearchModal = true; $nextTick(() => $refs.searchModalInput?.focus())"
-                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
-                            title="Search"
-                        >
-                            <i class="bi bi-search text-xl"></i>
-                        </button>
-
-                        <!-- Camera Button -->
-                        <button
-                            @click="openCameraCapture()"
-                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
-                            title="Scan book cover"
-                        >
-                            <i class="bi bi-camera text-xl"></i>
-                        </button>
+                        <!-- Search Bar -->
+                        <div class="flex-1 relative">
+                            <div class="relative flex items-center">
+                                <i class="bi bi-search absolute left-3 text-ink-400 text-lg pointer-events-none"></i>
+                                <input
+                                    type="text"
+                                    x-model="searchQuery"
+                                    @input.debounce.300ms="searchBooks()"
+                                    placeholder="Search your library..."
+                                    class="w-full pl-10 pr-12 py-2.5 bg-ink-50 border border-ink-200 rounded-lg text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-ink-900 focus:border-transparent transition-all"
+                                >
+                                <button
+                                    @click="openCameraCapture()"
+                                    class="absolute right-2 p-1.5 text-ink-600 hover:text-ink-900 hover:bg-ink-100 rounded-md transition-colors"
+                                    title="Scan book cover"
+                                >
+                                    <i class="bi bi-camera text-lg"></i>
+                                </button>
+                            </div>
+                        </div>
 
                         <!-- Settings Button -->
                         <button
                             @click="showSettings = true; hardcoverApiKeyInput = ''; prowlarrUrlInput = prowlarrUrl || ''; prowlarrApiKeyInput = ''; apiKeyError = ''; prowlarrError = ''; apiKeySuccess = false; prowlarrSuccess = false;"
-                            class="p-3 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                            class="p-2.5 text-ink-600 hover:text-ink-900 hover:bg-ink-50 rounded-lg transition-colors shrink-0"
                             title="Settings"
                         >
                             <i class="bi bi-gear text-xl"></i>
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Navigation Tabs -->
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex items-center gap-6 border-b-2 border-transparent">
+                    <button
+                        @click="activeView = 'yourBooks'; window.scrollTo({ top: 0, behavior: 'smooth' })"
+                        :class="activeView === 'yourBooks' ? 'tab-active' : 'tab-inactive'"
+                        class="tab-btn"
+                    >
+                        <i class="bi bi-book text-lg"></i>
+                        <span>Your Books</span>
+                    </button>
+                    <button
+                        @click="activeView = 'discover'; window.scrollTo({ top: 0, behavior: 'smooth' })"
+                        :class="activeView === 'discover' ? 'tab-active' : 'tab-inactive'"
+                        class="tab-btn"
+                    >
+                        <i class="bi bi-compass text-lg"></i>
+                        <span>Discover</span>
+                    </button>
                 </div>
             </div>
         </header>
@@ -1085,9 +1096,9 @@
             <!-- YOUR BOOKS VIEW -->
             <!-- ============================================ -->
             <section x-show="activeView === 'yourBooks' && !searchQuery && !libraryLoading && books.length > 0" class="pt-4 pb-4 view-fade-enter">
-                <!-- Your Books Grid - Simple 3 Column Layout -->
+                <!-- Your Books Grid - Responsive 3-6 Column Layout -->
                 <div class="px-4">
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 md:gap-4">
                         <template x-for="book in sortedBooks" :key="book.id">
                             <div @click="openBookModal(book)" class="book-card cursor-pointer">
                                 <div class="book-cover relative">
@@ -1096,11 +1107,11 @@
                                          loading="lazy"
                                          @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
                                     <!-- Requested Badge -->
-                                    <div x-show="requestedBooks.includes(book.id)" class="absolute bottom-2 left-2 right-2">
+                                    <div x-show="requestedBooks.includes(book.id)" class="absolute bottom-1.5 left-1.5 right-1.5 z-10">
                                         <span class="badge-requested block text-center">Requested</span>
                                     </div>
                                     <!-- Kobo Badge -->
-                                    <div x-show="koboBooks.includes(book.id)" class="absolute top-2 right-2">
+                                    <div x-show="koboBooks.includes(book.id)" class="absolute top-1.5 right-1.5 z-10">
                                         <span class="badge-kobo">
                                             <i class="bi bi-check-lg"></i>
                                             Kobo
@@ -1111,6 +1122,11 @@
                                 <p class="text-xs text-ink-500 line-clamp-1" x-text="formatAuthors(book.authors)"></p>
                             </div>
                         </template>
+                    </div>
+
+                    <!-- Infinite Scroll Trigger -->
+                    <div x-intersect="loadMoreBooks()" class="h-20 flex items-center justify-center">
+                        <div x-show="loadingMoreBooks" class="spinner w-6 h-6"></div>
                     </div>
                 </div>
             </section>
