@@ -231,22 +231,6 @@ function folioApp() {
         koboBooks: [], // Books marked for Kobo sync
 
         /**
-         * Get array of requested book IDs for easy checking
-         */
-        get requestedBookIds() {
-            return this.requestedBooks.map(b => b.id);
-        },
-
-        /**
-         * Get array of book IDs that have KEPUB format
-         */
-        get koboBookIds() {
-            return this.books
-                .filter(book => book.formats && book.formats.includes('KEPUB'))
-                .map(book => book.id);
-        },
-
-        /**
          * Initialize the application
          */
         async init() {
@@ -982,6 +966,20 @@ function folioApp() {
 
             const batchSize = 50; // Load 50 books at a time
             await this.loadBooks(batchSize, this.books.length, false);
+        },
+
+        /**
+         * Check if a book is in the requested list
+         */
+        isBookRequested(bookId) {
+            return this.requestedBooks.some(b => b.id === bookId);
+        },
+
+        /**
+         * Check if a book has KEPUB format (for Kobo sync)
+         */
+        hasKepubFormat(book) {
+            return book.formats && Array.isArray(book.formats) && book.formats.includes('KEPUB');
         },
 
         /**
