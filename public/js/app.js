@@ -212,11 +212,21 @@ function folioApp() {
         headerHidden: false, // Whether the header is hidden (scroll down = hide, scroll up = show)
         lastScrollY: 0, // Track last scroll position for direction detection
 
+        // Active view for pill navigation
+        activeView: 'yourBooks', // 'yourBooks' | 'discover'
+
+        // Card Catalog state
+        showCardCatalog: false,
+        cardCatalogBooks: [],
+        currentCardIndex: 0,
+        loadingCardCatalog: false,
+
         // Kobo Sync state
         koboToken: null,
         koboApiEndpoint: '',
         loadingKoboToken: false,
         koboEndpointCopied: false,
+        koboBooks: [], // Books marked for Kobo sync
 
         /**
          * Initialize the application
@@ -1711,13 +1721,89 @@ function folioApp() {
         enrichHardcoverBook(book) {
             const libraryMatch = this.findLibraryMatch(book);
             const isRequested = this.requestedBooks.some(r => r.id === book.id);
-            
+
             return {
                 ...book,
                 inLibrary: !!libraryMatch,
                 libraryBookId: libraryMatch?.id,
                 requested: isRequested
             };
+        },
+
+        // ============================================
+        // Card Catalog
+        // ============================================
+
+        /**
+         * Open Card Catalog modal with trending books
+         */
+        async openCardCatalog() {
+            this.showCardCatalog = true;
+            this.loadingCardCatalog = true;
+            this.currentCardIndex = 0;
+
+            try {
+                // Load trending books for the card catalog
+                const response = await fetch('/api/hardcover/trending?limit=30');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Card catalog error:', data.error);
+                    this.cardCatalogBooks = [];
+                } else {
+                    // Enrich books and filter out ones already in library or requested
+                    this.cardCatalogBooks = (data.books || [])
+                        .map(book => this.enrichHardcoverBook(book))
+                        .filter(book => !book.inLibrary && !book.requested);
+                    console.log(`📚 Loaded ${this.cardCatalogBooks.length} books for card catalog`);
+                }
+            } catch (error) {
+                console.error('Failed to load card catalog:', error);
+                this.cardCatalogBooks = [];
+            } finally {
+                this.loadingCardCatalog = false;
+            }
+        },
+
+        /**
+         * Navigate to previous card
+         */
+        previousCard() {
+            if (this.currentCardIndex > 0) {
+                this.currentCardIndex--;
+            }
+        },
+
+        /**
+         * Navigate to next card
+         */
+        nextCard() {
+            if (this.currentCardIndex < this.cardCatalogBooks.length - 1) {
+                this.currentCardIndex++;
+            }
+        },
+
+        /**
+         * Dismiss current card (move to next)
+         */
+        dismissCard() {
+            if (this.currentCardIndex < this.cardCatalogBooks.length - 1) {
+                this.currentCardIndex++;
+            } else {
+                // Last card, close modal
+                this.showCardCatalog = false;
+            }
+        },
+
+        /**
+         * Add current card to requests
+         */
+        async addCardToRequests(book) {
+            // Add to requests
+            await this.requestBook(book);
+
+            // Move to next card or close if last
+            this.dismissCard();
         },
 
         // ============================================
