@@ -1128,7 +1128,7 @@
                 <!-- Your Books Grid - Responsive 3-6 Column Layout -->
                 <div class="px-4">
                     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 md:gap-4">
-                        <template x-for="book in getFilteredYourBooks()" :key="book.id">
+                        <template x-for="book in combinedBooksForYourBooks" :key="book.id">
                             <div @click="book.isRequested ? openHardcoverModal(book) : openBookModal(book)" class="book-card cursor-pointer">
                                 <div class="book-cover relative">
                                     <img :src="book.isRequested ? book.image : `/api/cover/${book.id}?v=${coverVersion}`"
