@@ -1009,29 +1009,24 @@ function folioApp() {
                     formats: []
                 }));
 
-            // Combine and cache
-            this.combinedBooksForYourBooks = [...libraryBooks, ...requestedBooksToAdd];
-        },
+            // Combine all books
+            let allBooks = [...libraryBooks, ...requestedBooksToAdd];
 
-        /**
-         * Get filtered and sorted books for Your Books section
-         */
-        getFilteredYourBooks() {
-            // First filter
+            // Apply filter
             let filtered = [];
             if (this.yourBooksFilter === 'all') {
-                filtered = this.combinedBooksForYourBooks;
+                filtered = allBooks;
             } else if (this.yourBooksFilter === 'kobo') {
-                filtered = this.combinedBooksForYourBooks.filter(book =>
+                filtered = allBooks.filter(book =>
                     book.isLibraryBook && this.isInKoboSync(book)
                 );
             } else if (this.yourBooksFilter === 'requests') {
-                filtered = this.combinedBooksForYourBooks.filter(book => book.isRequested);
+                filtered = allBooks.filter(book => book.isRequested);
             } else {
-                filtered = this.combinedBooksForYourBooks;
+                filtered = allBooks;
             }
 
-            // Then sort
+            // Apply sort
             let sorted = [...filtered];
             switch (this.yourBooksSortBy) {
                 case 'author':
@@ -1065,7 +1060,8 @@ function folioApp() {
                     break;
             }
 
-            return sorted;
+            // Update the array (create new reference for reactivity)
+            this.combinedBooksForYourBooks = sorted;
         },
 
         /**
@@ -1082,6 +1078,7 @@ function folioApp() {
          */
         changeYourBooksFilter(filter) {
             this.yourBooksFilter = filter;
+            this.updateCombinedBooksForYourBooks();
             this.showYourBooksFilterModal = false;
         },
 
@@ -1090,6 +1087,7 @@ function folioApp() {
          */
         changeYourBooksSort(sortBy) {
             this.yourBooksSortBy = sortBy;
+            this.updateCombinedBooksForYourBooks();
             this.showYourBooksFilterModal = false;
         },
 
