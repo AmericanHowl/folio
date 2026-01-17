@@ -283,6 +283,16 @@ function folioApp() {
                         this.loadMoreBookshelf();
                     }
                 }
+
+                // Infinite scroll for Your Books view
+                if (this.activeView === 'yourBooks' && !this.searchQuery && !this.loadingMoreBooks && this.hasMoreBooks) {
+                    const scrollPosition = window.innerHeight + currentScrollY;
+                    const documentHeight = document.documentElement.scrollHeight;
+                    // Load more when within 500px of bottom
+                    if (scrollPosition >= documentHeight - 500) {
+                        this.loadMoreBooks();
+                    }
+                }
             });
 
             // Browser history navigation (back/forward)
@@ -969,17 +979,44 @@ function folioApp() {
         },
 
         /**
-         * Check if a book is in the requested list
+         * Get combined list of library books and requested books for Your Books view
          */
-        isBookRequested(bookId) {
-            return this.requestedBooks.some(b => b.id === bookId);
+        getCombinedBooksForYourBooks() {
+            // Start with library books
+            const libraryBooks = this.sortedBooks.map(book => ({
+                ...book,
+                isRequested: false,
+                isLibraryBook: true
+            }));
+
+            // Add requested books that aren't already in the library
+            const requestedBooksToAdd = this.requestedBooks
+                .filter(reqBook => {
+                    // Check if this requested book is already in the library
+                    const inLibrary = this.findLibraryMatch(reqBook);
+                    return !inLibrary;
+                })
+                .map(book => ({
+                    ...book,
+                    isRequested: true,
+                    isLibraryBook: false,
+                    // Normalize the structure to match library books
+                    authors: book.author || '',
+                    formats: []
+                }));
+
+            // Combine and return
+            return [...libraryBooks, ...requestedBooksToAdd];
         },
+
 
         /**
          * Check if a book has KEPUB format (for Kobo sync)
          */
         hasKepubFormat(book) {
-            return book.formats && Array.isArray(book.formats) && book.formats.includes('KEPUB');
+            if (!book || !book.formats) return false;
+            const hasKepub = Array.isArray(book.formats) && book.formats.includes('KEPUB');
+            return hasKepub;
         },
 
         /**

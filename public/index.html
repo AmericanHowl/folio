@@ -1096,23 +1096,23 @@
             <!-- ============================================ -->
             <!-- YOUR BOOKS VIEW -->
             <!-- ============================================ -->
-            <section x-show="activeView === 'yourBooks' && !searchQuery && !libraryLoading && books.length > 0" class="pt-4 pb-4 view-fade-enter">
+            <section x-show="activeView === 'yourBooks' && !searchQuery && !libraryLoading && (books.length > 0 || requestedBooks.length > 0)" class="pt-4 pb-4 view-fade-enter">
                 <!-- Your Books Grid - Responsive 3-6 Column Layout -->
                 <div class="px-4">
                     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 md:gap-4">
-                        <template x-for="book in sortedBooks" :key="book.id">
-                            <div @click="openBookModal(book)" class="book-card cursor-pointer">
+                        <template x-for="book in getCombinedBooksForYourBooks()" :key="book.id">
+                            <div @click="book.isRequested ? openHardcoverModal(book) : openBookModal(book)" class="book-card cursor-pointer">
                                 <div class="book-cover relative">
-                                    <img :src="`/api/cover/${book.id}?v=${coverVersion}`"
+                                    <img :src="book.isRequested ? book.image : `/api/cover/${book.id}?v=${coverVersion}`"
                                          :alt="book.title"
                                          loading="lazy"
                                          @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
                                     <!-- Requested Badge -->
-                                    <div x-show="isBookRequested(book.id)" class="absolute bottom-1.5 left-1.5 right-1.5 z-10">
+                                    <div x-show="book.isRequested" class="absolute bottom-1.5 left-1.5 right-1.5 z-10">
                                         <span class="badge-requested block text-center">Requested</span>
                                     </div>
                                     <!-- Kobo Badge -->
-                                    <div x-show="hasKepubFormat(book)" class="absolute top-1.5 right-1.5 z-10">
+                                    <div x-show="book.isLibraryBook && hasKepubFormat(book)" class="absolute top-1.5 right-1.5 z-10">
                                         <span class="badge-kobo">
                                             <i class="bi bi-check-lg"></i>
                                             Kobo
@@ -1125,9 +1125,9 @@
                         </template>
                     </div>
 
-                    <!-- Infinite Scroll Trigger -->
-                    <div x-intersect:enter="loadMoreBooks" class="h-20 flex items-center justify-center">
-                        <div x-show="loadingMoreBooks" class="spinner w-6 h-6"></div>
+                    <!-- Infinite Scroll Indicator -->
+                    <div x-show="loadingMoreBooks" class="h-20 flex items-center justify-center py-8">
+                        <div class="spinner w-6 h-6"></div>
                     </div>
                 </div>
             </section>
@@ -1208,7 +1208,7 @@
                 </div>
             </section>
                 <!-- Empty State -->
-            <div x-show="!libraryLoading && books.length === 0 && !searchQuery" class="py-12 px-4 text-center">
+            <div x-show="!libraryLoading && books.length === 0 && requestedBooks.length === 0 && !searchQuery" class="py-12 px-4 text-center">
                 <div class="inline-flex items-center justify-center w-16 h-16 bg-ink-100 rounded-full mb-4">
                     <i class="bi bi-journal-x text-2xl text-ink-400"></i>
                     </div>
