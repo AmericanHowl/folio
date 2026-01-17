@@ -100,7 +100,9 @@ function folioApp() {
         currentListPage: 1, // Current page in list view
         libraryLoading: false,
         loadingMoreBooks: false, // Track if we're loading more books in background
-        
+        booksLoadedCount: 0, // Track how many books have been loaded
+        hasMoreBooks: true, // Whether there are more books to load
+
         // Selection mode for bulk operations
         selectionMode: false,
         selectedBookIds: [],
@@ -336,11 +338,11 @@ function folioApp() {
          */
         async loadApp() {
             this.libraryLoading = true;
-            
+
             try {
-                // Load first 6 books immediately for fast initial display
-                await this.loadBooks(6, 0, true);
-                
+                // Load first 30 books for initial display with lazy loading
+                await this.loadBooks(30, 0, true);
+
                 // Load requested books and reading list in parallel
                 await Promise.all([
                     this.loadRequestedBooks(),
@@ -348,10 +350,6 @@ function folioApp() {
                 ]);
 
                 this.libraryLoading = false;
-
-                // Load remaining books in background (non-blocking)
-                // Load up to 500 more books (which should cover most libraries)
-                this.loadBooks(494, 6, false);
 
                 // Load Hardcover data asynchronously - prioritize recent releases
                 this.loadHardcoverData();
@@ -924,22 +922,26 @@ function folioApp() {
                 if (!isInitialLoad && offset > 0) {
                     this.loadingMoreBooks = true;
                 }
-                
+
                 const response = await fetch(`/api/books?limit=${limit}&offset=${offset}`);
                 const newBooks = await response.json();
-                
+
                 if (isInitialLoad || offset === 0) {
                     // Replace all books for initial load
                     this.books = newBooks;
+                    this.booksLoadedCount = newBooks.length;
+                    this.hasMoreBooks = newBooks.length >= limit;
                     console.log(`📖 Loaded ${this.books.length} books from library`);
                 } else {
                     // Append new books, avoiding duplicates
                     const existingIds = new Set(this.books.map(b => b.id));
                     const uniqueNewBooks = newBooks.filter(b => !existingIds.has(b.id));
                     this.books = [...this.books, ...uniqueNewBooks];
+                    this.booksLoadedCount += uniqueNewBooks.length;
+                    this.hasMoreBooks = newBooks.length >= limit;
                     console.log(`📖 Loaded ${uniqueNewBooks.length} more books (total: ${this.books.length})`);
                 }
-                
+
                 this.sortBooks();
             } catch (error) {
                 console.error('Failed to load books:', error);
@@ -951,6 +953,19 @@ function folioApp() {
             } finally {
                 this.loadingMoreBooks = false;
             }
+        },
+
+        /**
+         * Load more books for infinite scroll
+         */
+        async loadMoreBooks() {
+            // Only load if not already loading and there are more books
+            if (this.loadingMoreBooks || !this.hasMoreBooks || this.activeView !== 'yourBooks') {
+                return;
+            }
+
+            const batchSize = 50; // Load 50 books at a time
+            await this.loadBooks(batchSize, this.books.length, false);
         },
 
         /**
