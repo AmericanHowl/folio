@@ -1113,34 +1113,16 @@
             <!-- YOUR BOOKS VIEW -->
             <!-- ============================================ -->
             <section x-show="activeView === 'yourBooks' && !searchQuery && !libraryLoading && (books.length > 0 || requestedBooks.length > 0)" class="pt-4 pb-4 view-fade-enter">
-                <!-- Filter Controls -->
+                <!-- Filter & Sort Button -->
                 <div class="px-4 mb-4">
-                    <div class="flex items-center gap-2 overflow-x-auto pb-2">
-                        <button
-                            @click="yourBooksFilter = 'all'"
-                            :class="yourBooksFilter === 'all' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
-                            class="px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
-                        >
-                            <i class="bi bi-book"></i>
-                            <span>All Books</span>
-                        </button>
-                        <button
-                            @click="yourBooksFilter = 'kobo'"
-                            :class="yourBooksFilter === 'kobo' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
-                            class="px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
-                        >
-                            <i class="bi bi-check-circle-fill"></i>
-                            <span>Kobo Sync</span>
-                        </button>
-                        <button
-                            @click="yourBooksFilter = 'requests'"
-                            :class="yourBooksFilter === 'requests' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
-                            class="px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
-                        >
-                            <i class="bi bi-download"></i>
-                            <span>Requests</span>
-                        </button>
-                    </div>
+                    <button
+                        @click="showYourBooksFilterModal = true"
+                        class="flex items-center gap-2 px-4 py-2 bg-ink-100 text-ink-700 hover:bg-ink-200 rounded-lg transition-colors text-sm font-medium"
+                    >
+                        <i class="bi bi-funnel"></i>
+                        <span>Filter & Sort</span>
+                        <span x-show="yourBooksFilter !== 'all' || yourBooksSortBy !== 'recent'" class="ml-1 w-2 h-2 bg-sage-500 rounded-full"></span>
+                    </button>
                 </div>
 
                 <!-- Your Books Grid - Responsive 3-6 Column Layout -->
@@ -1587,6 +1569,93 @@
                             </div>
                                     </div>
                                     </div>
+
+    <!-- Your Books Filter & Sort Modal -->
+    <div x-show="showYourBooksFilterModal" x-cloak @click.self="showYourBooksFilterModal = false"
+         class="fixed inset-0 z-[60] modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div x-show="showYourBooksFilterModal" x-transition:enter="slide-up"
+             class="bg-white w-full sm:max-w-[400px] sm:rounded-2xl rounded-t-[20px] shadow-2xl border border-ink-200">
+
+            <!-- Header -->
+            <div class="flex justify-between items-center p-4 border-b border-ink-200">
+                <h2 class="text-lg font-semibold text-ink-900">Filter & Sort</h2>
+                <button @click="showYourBooksFilterModal = false" class="p-2 hover:bg-ink-50 rounded-lg transition-colors">
+                    <i class="bi bi-x-lg text-ink-600"></i>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="p-4 space-y-6">
+                <!-- Filter Section -->
+                <div>
+                    <h3 class="text-sm font-semibold text-ink-700 mb-3">Filter</h3>
+                    <div class="space-y-2">
+                        <button
+                            @click="changeYourBooksFilter('all')"
+                            :class="yourBooksFilter === 'all' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors flex items-center gap-3"
+                        >
+                            <i class="bi bi-book text-base"></i>
+                            <span>All Books</span>
+                            <i x-show="yourBooksFilter === 'all'" class="bi bi-check-lg ml-auto"></i>
+                        </button>
+                        <button
+                            @click="changeYourBooksFilter('kobo')"
+                            :class="yourBooksFilter === 'kobo' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors flex items-center gap-3"
+                        >
+                            <i class="bi bi-check-circle-fill text-base"></i>
+                            <span>Kobo Sync</span>
+                            <i x-show="yourBooksFilter === 'kobo'" class="bi bi-check-lg ml-auto"></i>
+                        </button>
+                        <button
+                            @click="changeYourBooksFilter('requests')"
+                            :class="yourBooksFilter === 'requests' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors flex items-center gap-3"
+                        >
+                            <i class="bi bi-download text-base"></i>
+                            <span>Requests</span>
+                            <i x-show="yourBooksFilter === 'requests'" class="bi bi-check-lg ml-auto"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sort Section -->
+                <div>
+                    <h3 class="text-sm font-semibold text-ink-700 mb-3">Sort</h3>
+                    <div class="space-y-2">
+                        <button
+                            @click="changeYourBooksSort('recent')"
+                            :class="yourBooksSortBy === 'recent' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors flex items-center gap-3"
+                        >
+                            <i class="bi bi-clock-history text-base"></i>
+                            <span>Recently Added</span>
+                            <i x-show="yourBooksSortBy === 'recent'" class="bi bi-check-lg ml-auto"></i>
+                        </button>
+                        <button
+                            @click="changeYourBooksSort('author')"
+                            :class="yourBooksSortBy === 'author' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors flex items-center gap-3"
+                        >
+                            <i class="bi bi-person text-base"></i>
+                            <span>Author (Last Name)</span>
+                            <i x-show="yourBooksSortBy === 'author'" class="bi bi-check-lg ml-auto"></i>
+                        </button>
+                        <button
+                            @click="changeYourBooksSort('title')"
+                            :class="yourBooksSortBy === 'title' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors flex items-center gap-3"
+                        >
+                            <i class="bi bi-type text-base"></i>
+                            <span>Title (A-Z)</span>
+                            <i x-show="yourBooksSortBy === 'title'" class="bi bi-check-lg ml-auto"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Settings Modal -->
     <div x-show="showSettings" x-cloak @click.self="showSettings = false" 

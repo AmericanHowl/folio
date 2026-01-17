@@ -89,7 +89,10 @@ function folioApp() {
         sortedBooks: [],
         filteredBooks: [],
         combinedBooksForYourBooks: [], // Cached combination of library + requested books
+        filteredYourBooks: [], // Filtered and sorted books for Your Books section
         yourBooksFilter: 'all', // Filter for Your Books section: 'all', 'kobo', 'requests'
+        yourBooksSortBy: 'recent', // Sort for Your Books section: 'recent', 'author', 'title'
+        showYourBooksFilterModal: false, // Show/hide the filter and sort dropdown
         libraryPages: [],
         currentPage: 0,
         booksPerPage: 12, // Will be calculated based on screen
@@ -231,22 +234,6 @@ function folioApp() {
         loadingKoboToken: false,
         koboEndpointCopied: false,
         koboBooks: [], // Books marked for Kobo sync
-
-        /**
-         * Get filtered books for Your Books section
-         */
-        get filteredYourBooks() {
-            if (this.yourBooksFilter === 'all') {
-                return this.combinedBooksForYourBooks;
-            } else if (this.yourBooksFilter === 'kobo') {
-                return this.combinedBooksForYourBooks.filter(book =>
-                    book.isLibraryBook && this.isInKoboSync(book)
-                );
-            } else if (this.yourBooksFilter === 'requests') {
-                return this.combinedBooksForYourBooks.filter(book => book.isRequested);
-            }
-            return this.combinedBooksForYourBooks;
-        },
 
         /**
          * Initialize the application
@@ -1025,8 +1012,92 @@ function folioApp() {
 
             // Combine and cache
             this.combinedBooksForYourBooks = [...libraryBooks, ...requestedBooksToAdd];
+
+            // Update filtered and sorted books
+            this.updateFilteredYourBooks();
         },
 
+        /**
+         * Update filtered and sorted books for Your Books section
+         */
+        updateFilteredYourBooks() {
+            // First filter
+            let filtered = [];
+            if (this.yourBooksFilter === 'all') {
+                filtered = this.combinedBooksForYourBooks;
+            } else if (this.yourBooksFilter === 'kobo') {
+                filtered = this.combinedBooksForYourBooks.filter(book =>
+                    book.isLibraryBook && this.isInKoboSync(book)
+                );
+            } else if (this.yourBooksFilter === 'requests') {
+                filtered = this.combinedBooksForYourBooks.filter(book => book.isRequested);
+            } else {
+                filtered = this.combinedBooksForYourBooks;
+            }
+
+            // Then sort
+            let sorted = [...filtered];
+            switch (this.yourBooksSortBy) {
+                case 'author':
+                    sorted.sort((a, b) => {
+                        const authorA = this.getLastName(a.author || a.authors || '').toLowerCase();
+                        const authorB = this.getLastName(b.author || b.authors || '').toLowerCase();
+                        return authorA.localeCompare(authorB);
+                    });
+                    break;
+                case 'title':
+                    sorted.sort((a, b) => {
+                        const titleA = (a.title || '').toLowerCase();
+                        const titleB = (b.title || '').toLowerCase();
+                        return titleA.localeCompare(titleB);
+                    });
+                    break;
+                case 'recent':
+                default:
+                    // Recent is default - library books are already sorted by timestamp
+                    // Requested books at the end sorted by requested_at
+                    sorted.sort((a, b) => {
+                        if (a.isLibraryBook && !b.isLibraryBook) return -1;
+                        if (!a.isLibraryBook && b.isLibraryBook) return 1;
+
+                        if (a.isLibraryBook && b.isLibraryBook) {
+                            return (b.timestamp || 0) - (a.timestamp || 0);
+                        } else {
+                            return (new Date(b.requested_at || 0) - new Date(a.requested_at || 0));
+                        }
+                    });
+                    break;
+            }
+
+            this.filteredYourBooks = sorted;
+        },
+
+        /**
+         * Get last name from author string for sorting
+         */
+        getLastName(authorStr) {
+            if (!authorStr) return '';
+            const parts = authorStr.split(/[,&]/)[0].trim().split(' ');
+            return parts[parts.length - 1] || '';
+        },
+
+        /**
+         * Change Your Books filter and update display
+         */
+        changeYourBooksFilter(filter) {
+            this.yourBooksFilter = filter;
+            this.updateFilteredYourBooks();
+            this.showYourBooksFilterModal = false;
+        },
+
+        /**
+         * Change Your Books sort and update display
+         */
+        changeYourBooksSort(sortBy) {
+            this.yourBooksSortBy = sortBy;
+            this.updateFilteredYourBooks();
+            this.showYourBooksFilterModal = false;
+        },
 
         /**
          * Check if a book is in the Kobo Sync list
