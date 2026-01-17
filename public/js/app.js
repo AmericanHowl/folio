@@ -231,6 +231,22 @@ function folioApp() {
         koboBooks: [], // Books marked for Kobo sync
 
         /**
+         * Get array of requested book IDs for easy checking
+         */
+        get requestedBookIds() {
+            return this.requestedBooks.map(b => b.id);
+        },
+
+        /**
+         * Get array of book IDs that have KEPUB format
+         */
+        get koboBookIds() {
+            return this.books
+                .filter(book => book.formats && book.formats.includes('KEPUB'))
+                .map(book => book.id);
+        },
+
+        /**
          * Initialize the application
          */
         async init() {
