@@ -1125,9 +1125,9 @@
                         </template>
                     </div>
 
-                    <!-- Infinite Scroll Trigger -->
-                    <div x-intersect:enter="loadMoreBooks" class="h-20 flex items-center justify-center">
-                        <div x-show="loadingMoreBooks" class="spinner w-6 h-6"></div>
+                    <!-- Infinite Scroll Indicator -->
+                    <div x-show="loadingMoreBooks" class="h-20 flex items-center justify-center py-8">
+                        <div class="spinner w-6 h-6"></div>
                     </div>
                 </div>
             </section>

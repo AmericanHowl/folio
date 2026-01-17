@@ -283,6 +283,16 @@ function folioApp() {
                         this.loadMoreBookshelf();
                     }
                 }
+
+                // Infinite scroll for Your Books view
+                if (this.activeView === 'yourBooks' && !this.searchQuery && !this.loadingMoreBooks && this.hasMoreBooks) {
+                    const scrollPosition = window.innerHeight + currentScrollY;
+                    const documentHeight = document.documentElement.scrollHeight;
+                    // Load more when within 500px of bottom
+                    if (scrollPosition >= documentHeight - 500) {
+                        this.loadMoreBooks();
+                    }
+                }
             });
 
             // Browser history navigation (back/forward)
@@ -969,17 +979,44 @@ function folioApp() {
         },
 
         /**
-         * Check if a book is in the requested list
+         * Check if a book is in the requested list (matches by title/author)
          */
         isBookRequested(bookId) {
-            return this.requestedBooks.some(b => b.id === bookId);
+            // Find the library book
+            const libraryBook = this.books.find(b => b.id === bookId);
+            if (!libraryBook) return false;
+
+            // Check if any requested book matches this library book
+            const libTitle = this.normalizeForMatching(libraryBook.title);
+            const libAuthor = this.normalizeForMatching(
+                Array.isArray(libraryBook.authors) ? libraryBook.authors.join(' ') : libraryBook.authors
+            );
+
+            for (const requestedBook of this.requestedBooks) {
+                const reqTitle = this.normalizeForMatching(requestedBook.title);
+                const reqAuthor = this.normalizeForMatching(requestedBook.author);
+
+                const titleSimilarity = this.calculateSimilarity(libTitle, reqTitle);
+                const authorSimilarity = this.calculateSimilarity(libAuthor, reqAuthor);
+
+                if (titleSimilarity > 0.85 && authorSimilarity > 0.5) {
+                    return true;
+                }
+                if (titleSimilarity > 0.7 && authorSimilarity > 0.7) {
+                    return true;
+                }
+            }
+
+            return false;
         },
 
         /**
          * Check if a book has KEPUB format (for Kobo sync)
          */
         hasKepubFormat(book) {
-            return book.formats && Array.isArray(book.formats) && book.formats.includes('KEPUB');
+            if (!book || !book.formats) return false;
+            const hasKepub = Array.isArray(book.formats) && book.formats.includes('KEPUB');
+            return hasKepub;
         },
 
         /**
