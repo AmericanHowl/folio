@@ -89,7 +89,6 @@ function folioApp() {
         sortedBooks: [],
         filteredBooks: [],
         combinedBooksForYourBooks: [], // Cached combination of library + requested books
-        filteredYourBooks: [], // Filtered and sorted books for Your Books section
         yourBooksFilter: 'all', // Filter for Your Books section: 'all', 'kobo', 'requests'
         yourBooksSortBy: 'recent', // Sort for Your Books section: 'recent', 'author', 'title'
         showYourBooksFilterModal: false, // Show/hide the filter and sort dropdown
@@ -1012,15 +1011,12 @@ function folioApp() {
 
             // Combine and cache
             this.combinedBooksForYourBooks = [...libraryBooks, ...requestedBooksToAdd];
-
-            // Update filtered and sorted books
-            this.updateFilteredYourBooks();
         },
 
         /**
-         * Update filtered and sorted books for Your Books section
+         * Get filtered and sorted books for Your Books section
          */
-        updateFilteredYourBooks() {
+        getFilteredYourBooks() {
             // First filter
             let filtered = [];
             if (this.yourBooksFilter === 'all') {
@@ -1069,7 +1065,7 @@ function folioApp() {
                     break;
             }
 
-            this.filteredYourBooks = sorted;
+            return sorted;
         },
 
         /**
@@ -1086,7 +1082,6 @@ function folioApp() {
          */
         changeYourBooksFilter(filter) {
             this.yourBooksFilter = filter;
-            this.updateFilteredYourBooks();
             this.showYourBooksFilterModal = false;
         },
 
@@ -1095,7 +1090,6 @@ function folioApp() {
          */
         changeYourBooksSort(sortBy) {
             this.yourBooksSortBy = sortBy;
-            this.updateFilteredYourBooks();
             this.showYourBooksFilterModal = false;
         },
 
