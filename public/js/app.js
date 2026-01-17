@@ -1014,8 +1014,23 @@ function folioApp() {
          * Check if a book has KEPUB format (for Kobo sync)
          */
         hasKepubFormat(book) {
-            if (!book || !book.formats) return false;
-            const hasKepub = Array.isArray(book.formats) && book.formats.includes('KEPUB');
+            if (!book || !book.formats) {
+                return false;
+            }
+
+            // Ensure formats is an array and check for KEPUB
+            if (!Array.isArray(book.formats)) {
+                return false;
+            }
+
+            // Check if KEPUB is in the formats array
+            const hasKepub = book.formats.includes('KEPUB');
+
+            // Debug logging (remove after testing)
+            if (hasKepub) {
+                console.log('Book with KEPUB:', book.title, 'formats:', book.formats);
+            }
+
             return hasKepub;
         },
 
