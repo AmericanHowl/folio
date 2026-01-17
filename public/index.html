@@ -1113,10 +1113,40 @@
             <!-- YOUR BOOKS VIEW -->
             <!-- ============================================ -->
             <section x-show="activeView === 'yourBooks' && !searchQuery && !libraryLoading && (books.length > 0 || requestedBooks.length > 0)" class="pt-4 pb-4 view-fade-enter">
+                <!-- Filter Controls -->
+                <div class="px-4 mb-4">
+                    <div class="flex items-center gap-2 overflow-x-auto pb-2">
+                        <button
+                            @click="yourBooksFilter = 'all'"
+                            :class="yourBooksFilter === 'all' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
+                        >
+                            <i class="bi bi-book"></i>
+                            <span>All Books</span>
+                        </button>
+                        <button
+                            @click="yourBooksFilter = 'kobo'"
+                            :class="yourBooksFilter === 'kobo' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
+                        >
+                            <i class="bi bi-check-circle-fill"></i>
+                            <span>Kobo Sync</span>
+                        </button>
+                        <button
+                            @click="yourBooksFilter = 'requests'"
+                            :class="yourBooksFilter === 'requests' ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'"
+                            class="px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
+                        >
+                            <i class="bi bi-download"></i>
+                            <span>Requests</span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Your Books Grid - Responsive 3-6 Column Layout -->
                 <div class="px-4">
                     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 md:gap-4">
-                        <template x-for="book in combinedBooksForYourBooks" :key="book.id">
+                        <template x-for="book in filteredYourBooks" :key="book.id">
                             <div @click="book.isRequested ? openHardcoverModal(book) : openBookModal(book)" class="book-card cursor-pointer">
                                 <div class="book-cover relative">
                                     <img :src="book.isRequested ? book.image : `/api/cover/${book.id}?v=${coverVersion}`"
@@ -1541,11 +1571,19 @@
                                             </button>
                                         </template>
                 <template x-if="selectedHardcoverBook?.requested && !selectedHardcoverBook?.inLibrary">
-                    <button @click="cancelRequest(selectedHardcoverBook)" class="w-full btn btn-secondary py-3.5 justify-center">
-                                    <i class="bi bi-x-lg"></i>
-                        Cancel Request
-                                </button>
-                                        </template>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button @click="searchProwlarr(selectedHardcoverBook); selectedHardcoverBook = null;"
+                                :disabled="!prowlarrUrl || !prowlarrApiKey"
+                                class="w-full btn btn-primary py-3.5 justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="bi bi-search"></i>
+                            Search Prowlarr
+                        </button>
+                        <button @click="cancelRequest(selectedHardcoverBook)" class="w-full btn btn-secondary py-3.5 justify-center">
+                            <i class="bi bi-x-lg"></i>
+                            Cancel Request
+                        </button>
+                    </div>
+                </template>
                             </div>
                                     </div>
                                     </div>

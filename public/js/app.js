@@ -89,6 +89,7 @@ function folioApp() {
         sortedBooks: [],
         filteredBooks: [],
         combinedBooksForYourBooks: [], // Cached combination of library + requested books
+        yourBooksFilter: 'all', // Filter for Your Books section: 'all', 'kobo', 'requests'
         libraryPages: [],
         currentPage: 0,
         booksPerPage: 12, // Will be calculated based on screen
@@ -230,6 +231,22 @@ function folioApp() {
         loadingKoboToken: false,
         koboEndpointCopied: false,
         koboBooks: [], // Books marked for Kobo sync
+
+        /**
+         * Get filtered books for Your Books section
+         */
+        get filteredYourBooks() {
+            if (this.yourBooksFilter === 'all') {
+                return this.combinedBooksForYourBooks;
+            } else if (this.yourBooksFilter === 'kobo') {
+                return this.combinedBooksForYourBooks.filter(book =>
+                    book.isLibraryBook && this.isInKoboSync(book)
+                );
+            } else if (this.yourBooksFilter === 'requests') {
+                return this.combinedBooksForYourBooks.filter(book => book.isRequested);
+            }
+            return this.combinedBooksForYourBooks;
+        },
 
         /**
          * Initialize the application
