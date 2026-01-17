@@ -88,6 +88,7 @@ function folioApp() {
         books: [],
         sortedBooks: [],
         filteredBooks: [],
+        combinedBooksForYourBooks: [], // Cached combination of library + requested books
         libraryPages: [],
         currentPage: 0,
         booksPerPage: 12, // Will be calculated based on screen
@@ -353,7 +354,7 @@ function folioApp() {
                 // Load first 30 books for initial display with lazy loading
                 await this.loadBooks(30, 0, true);
 
-                // Load requested books and reading list in parallel
+                // Load requested books and Kobo sync in parallel
                 await Promise.all([
                     this.loadRequestedBooks(),
                     this.loadReadingList()
@@ -453,7 +454,7 @@ function folioApp() {
                         this.navigateToLibrary();
                         break;
                     case 'bookshelf':
-                        this.navigateToBookshelf(state.title || 'Reading List');
+                        this.navigateToBookshelf(state.title || 'Kobo Sync');
                         break;
                     case 'requests':
                         this.navigateToRequests();
@@ -496,7 +497,7 @@ function folioApp() {
         },
 
         /**
-         * Navigate to bookshelf view (reading list or Hardcover sections)
+         * Navigate to bookshelf view (Kobo sync or Hardcover sections)
          */
         navigateToBookshelf(title) {
             this.showBookshelf = true;
@@ -979,9 +980,9 @@ function folioApp() {
         },
 
         /**
-         * Get combined list of library books and requested books for Your Books view
+         * Update combined list of library books and requested books for Your Books view
          */
-        getCombinedBooksForYourBooks() {
+        updateCombinedBooksForYourBooks() {
             // Start with library books
             const libraryBooks = this.sortedBooks.map(book => ({
                 ...book,
@@ -1005,33 +1006,19 @@ function folioApp() {
                     formats: []
                 }));
 
-            // Combine and return
-            return [...libraryBooks, ...requestedBooksToAdd];
+            // Combine and cache
+            this.combinedBooksForYourBooks = [...libraryBooks, ...requestedBooksToAdd];
         },
 
 
         /**
-         * Check if a book has KEPUB format (for Kobo sync)
+         * Check if a book is in the Kobo Sync list
          */
-        hasKepubFormat(book) {
-            if (!book || !book.formats) {
+        isInKoboSync(book) {
+            if (!book || !book.id) {
                 return false;
             }
-
-            // Ensure formats is an array and check for KEPUB
-            if (!Array.isArray(book.formats)) {
-                return false;
-            }
-
-            // Check if KEPUB is in the formats array
-            const hasKepub = book.formats.includes('KEPUB');
-
-            // Debug logging (remove after testing)
-            if (hasKepub) {
-                console.log('Book with KEPUB:', book.title, 'formats:', book.formats);
-            }
-
-            return hasKepub;
+            return this.readingListIds.includes(book.id);
         },
 
         /**
@@ -1087,6 +1074,9 @@ function folioApp() {
             }
             // Reset list page when sorting changes
             this.currentListPage = 1;
+
+            // Update combined books for Your Books view
+            this.updateCombinedBooksForYourBooks();
         },
 
         /**
@@ -1135,13 +1125,15 @@ function folioApp() {
                 const data = await response.json();
                 this.requestedBooks = data.books || [];
                 console.log(`📋 Loaded ${this.requestedBooks.length} book requests`);
+                // Update combined books for Your Books view
+                this.updateCombinedBooksForYourBooks();
             } catch (error) {
                 console.error('Failed to load requests:', error);
             }
         },
 
         /**
-         * Load reading list (IDs of library books)
+         * Load Kobo sync (IDs of library books)
          */
         async loadReadingList() {
             try {
@@ -1150,7 +1142,7 @@ function folioApp() {
                 this.readingListIds = Array.isArray(data.ids) ? data.ids : [];
                 console.log(`📚 Reading list loaded: ${this.readingListIds.length} items`);
             } catch (error) {
-                console.error('Failed to load reading list:', error);
+                console.error('Failed to load Kobo sync:', error);
                 this.readingListIds = [];
             }
         },
@@ -1214,7 +1206,7 @@ function folioApp() {
             this.selectedHardcoverBook = null;
             this.lockBodyScroll();
 
-            // Check if book is already in reading list and set status accordingly
+            // Check if book is already in Kobo sync and set status accordingly
             if (this.isInReadingList(book.id)) {
                 this.readingListStatus = 'remove';
                 } else {
@@ -1697,7 +1689,7 @@ function folioApp() {
         },
 
         // ============================================
-        // Reading List
+        // Kobo Sync
         // ============================================
 
         isInReadingList(bookId) {
@@ -1705,22 +1697,22 @@ function folioApp() {
         },
 
         /**
-         * Toggle reading list for a local library book (from modal)
+         * Toggle Kobo sync for a local library book (from modal)
          */
         async toggleReadingListFromLibrary() {
             if (!this.selectedBook) return;
             const bookId = this.selectedBook.id;
 
             if (this.isInReadingList(bookId)) {
-                // Remove from reading list
+                // Remove from Kobo sync
                 await this.removeFromReadingList(bookId);
                 this.readingListStatus = null;
             } else {
-                // Add to reading list
+                // Add to Kobo sync
                 await this.addToReadingList(bookId);
                 this.readingListStatus = 'added';
 
-                // After a short delay, change label to "Remove from Reading List"
+                // After a short delay, change label to "Remove from Kobo Sync"
                 setTimeout(() => {
                     if (this.selectedBook && this.selectedBook.id === bookId) {
                         this.readingListStatus = 'remove';
@@ -1739,10 +1731,10 @@ function folioApp() {
                 const data = await response.json();
                 if (data.success && Array.isArray(data.ids)) {
                     this.readingListIds = [...data.ids]; // Create new array for reactivity
-                    console.log(`🔖 Added to reading list: ${bookId}`);
+                    console.log(`🔖 Added to Kobo sync: ${bookId}`);
                 }
             } catch (error) {
-                console.error('Failed to add to reading list:', error);
+                console.error('Failed to add to Kobo sync:', error);
             }
         },
 
@@ -1754,15 +1746,15 @@ function folioApp() {
                 const data = await response.json();
                 if (data.success && Array.isArray(data.ids)) {
                     this.readingListIds = [...data.ids]; // Create new array for reactivity
-                    console.log(`🗑️ Removed from reading list: ${bookId}`);
+                    console.log(`🗑️ Removed from Kobo sync: ${bookId}`);
                 }
             } catch (error) {
-                console.error('Failed to remove from reading list:', error);
+                console.error('Failed to remove from Kobo sync:', error);
             }
         },
 
         /**
-         * Toggle reading list for a book (used in library list view)
+         * Toggle Kobo sync for a book (used in library list view)
          */
         async toggleReadingList(bookId) {
             try {
@@ -1774,12 +1766,12 @@ function folioApp() {
                 // Force reactivity update
                 this.$nextTick(() => {});
             } catch (error) {
-                console.error('Failed to toggle reading list:', error);
+                console.error('Failed to toggle Kobo sync:', error);
             }
         },
 
         /**
-         * Add matched library book to reading list from Hardcover modal
+         * Add matched library book to Kobo sync from Hardcover modal
          */
         async addLibraryBookToReadingList(hardcoverBook) {
             if (!hardcoverBook || !hardcoverBook.libraryBookId) return;
@@ -2465,24 +2457,24 @@ function folioApp() {
         },
 
         /**
-         * Open bookshelf showing only Reading List books
+         * Open bookshelf showing only Kobo Sync books
          */
         openReadingList() {
-            this.bookshelfTitle = 'Reading List';
-            // Ensure we have latest reading list IDs
+            this.bookshelfTitle = 'Kobo Sync';
+            // Ensure we have latest Kobo sync IDs
             this.loadReadingList().then(() => {
                 this.bookshelfBooks = this.sortedBooks.filter(book =>
                     this.isInReadingList(book.id)
                 );
-                this.navigateToBookshelf('Reading List');
-                this.pushHistoryState('bookshelf', { title: 'Reading List' });
+                this.navigateToBookshelf('Kobo Sync');
+                this.pushHistoryState('bookshelf', { title: 'Kobo Sync' });
             }).catch(() => {
                 // Fallback: use current ids even if reload fails
                 this.bookshelfBooks = this.sortedBooks.filter(book =>
                     this.isInReadingList(book.id)
                 );
-                this.navigateToBookshelf('Reading List');
-                this.pushHistoryState('bookshelf', { title: 'Reading List' });
+                this.navigateToBookshelf('Kobo Sync');
+                this.pushHistoryState('bookshelf', { title: 'Kobo Sync' });
             });
         },
 
@@ -2948,11 +2940,11 @@ function folioApp() {
         },
 
         /**
-         * Bulk add selected books to reading list
+         * Bulk add selected books to Kobo sync
          */
         async bulkAddToReadingList() {
             if (this.selectedBookIds.length === 0) {
-                alert('Please select at least one book to add to reading list.');
+                alert('Please select at least one book to add to Kobo sync.');
                 return;
             }
 
@@ -2968,9 +2960,9 @@ function folioApp() {
                 const data = await response.json();
 
                 if (data.success) {
-                    console.log(`✅ Added ${this.selectedBookIds.length} book(s) to reading list`);
+                    console.log(`✅ Added ${this.selectedBookIds.length} book(s) to Kobo sync`);
                     
-                    // Update reading list IDs
+                    // Update Kobo sync IDs
                     if (Array.isArray(data.ids)) {
                         this.readingListIds = [...data.ids];
                     }
@@ -2980,13 +2972,13 @@ function folioApp() {
                     this.selectionMode = false;
                     
                     // Show success message
-                    alert(`Successfully added ${data.added_count} book(s) to your reading list.`);
+                    alert(`Successfully added ${data.added_count} book(s) to your Kobo sync.`);
                 } else {
-                    alert('Failed to add books to reading list: ' + (data.error || 'Unknown error'));
+                    alert('Failed to add books to Kobo sync: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
-                console.error('Failed to add books to reading list:', error);
-                alert('Error adding books to reading list: ' + error.message);
+                console.error('Failed to add books to Kobo sync:', error);
+                alert('Error adding books to Kobo sync: ' + error.message);
             } finally {
                 this.bulkActionLoading = false;
             }

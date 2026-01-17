@@ -860,7 +860,7 @@
         
         <!-- New Two-Row Header -->
         <header
-            class="sticky top-0 z-40 bg-white safe-area-top transition-shadow duration-200 border-b border-ink-200"
+            class="sticky top-0 z-50 bg-white safe-area-top transition-shadow duration-200 border-b border-ink-200"
             x-data="{ scrolled: false }"
             @scroll.window="scrolled = window.scrollY > 10"
             :class="{ 'header-scrolled': scrolled }"
@@ -1104,7 +1104,7 @@
                 <!-- Your Books Grid - Responsive 3-6 Column Layout -->
                 <div class="px-4">
                     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 md:gap-4">
-                        <template x-for="book in getCombinedBooksForYourBooks()" :key="book.id">
+                        <template x-for="book in combinedBooksForYourBooks" :key="book.id">
                             <div @click="book.isRequested ? openHardcoverModal(book) : openBookModal(book)" class="book-card cursor-pointer">
                                 <div class="book-cover relative">
                                     <img :src="book.isRequested ? book.image : `/api/cover/${book.id}?v=${coverVersion}`"
@@ -1118,8 +1118,8 @@
                                             Requested
                                         </span>
                                     </div>
-                                    <!-- Kobo Badge -->
-                                    <div x-show="book.isLibraryBook && hasKepubFormat(book)" class="absolute top-1.5 left-1.5 z-10">
+                                    <!-- Kobo Sync Badge -->
+                                    <div x-show="book.isLibraryBook && isInKoboSync(book)" class="absolute top-1.5 left-1.5 z-10">
                                         <span class="badge-kobo">
                                             <i class="bi bi-check-circle-fill"></i>
                                             Kobo
@@ -1426,7 +1426,7 @@
                         <template x-if="isInReadingList(selectedBook?.id) && readingListStatus === 'remove'">
                             <span class="inline-flex items-center gap-2">
                                 <i class="bi bi-bookmark-dash"></i>
-                                Remove from Reading List
+                                Remove from Kobo Sync
                                         </span>
                                                 </template>
                         <template x-if="isInReadingList(selectedBook?.id) && readingListStatus !== 'remove'">
@@ -1438,7 +1438,7 @@
                         <template x-if="!isInReadingList(selectedBook?.id)">
                             <span class="inline-flex items-center gap-2">
                                 <i class="bi bi-bookmark-plus"></i>
-                                Add to Reading List
+                                Add to Kobo Sync
                             </span>
                                                 </template>
                                             </button>
@@ -1518,7 +1518,7 @@
                                             </button>
                         <button @click="addLibraryBookToReadingList(selectedHardcoverBook)" class="w-full btn btn-primary py-3.5 justify-center">
                             <i class="bi bi-bookmark-plus"></i>
-                            Add to Reading List
+                            Add to Kobo Sync
                         </button>
                                 </div>
                                         </template>
