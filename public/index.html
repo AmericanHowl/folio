@@ -597,6 +597,18 @@
             align-items: center;
             gap: 4px;
         }
+
+        /* Swipe card styles */
+        .swipe-card {
+            touch-action: none;
+            user-select: none;
+            cursor: grab;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+        }
+        .swipe-card:active {
+            cursor: grabbing;
+            transition: none;
+        }
     </style>
 </head>
 <body x-data="folioApp()" x-init="init()">
@@ -1838,9 +1850,7 @@
          class="fixed inset-0 z-[70] modal-overlay flex items-center justify-center p-4">
         <div x-show="showCardCatalog" x-transition
              @keydown.escape.window="showCardCatalog = false"
-             @keydown.arrow-left.window="previousCard()"
-             @keydown.arrow-right.window="nextCard()"
-             class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden relative">
+             class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-visible relative">
             <!-- Close Button -->
             <button
                 @click="showCardCatalog = false"
@@ -1858,61 +1868,165 @@
                 <h3 class="text-lg font-semibold text-ink-700">Loading books...</h3>
             </div>
 
-            <!-- Card Display -->
-            <div x-show="!loadingCardCatalog && cardCatalogBooks.length > 0" class="relative">
-                <template x-for="(book, index) in cardCatalogBooks" :key="book.id">
-                    <div x-show="currentCardIndex === index" class="p-6">
-                        <!-- Book Cover -->
-                        <div class="mb-4">
-                            <img :src="book.image" :alt="book.title"
-                                 class="w-full aspect-[2/3] object-cover rounded-lg shadow-lg mx-auto max-w-[200px]"
-                                 @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
-                        </div>
+            <!-- Swipeable Cards Stack -->
+            <div x-show="!loadingCardCatalog && cardCatalogBooks.length > 0" class="relative h-[600px] p-6">
+                <!-- Card Counter -->
+                <div class="absolute top-2 left-1/2 transform -translate-x-1/2 z-20 bg-white px-4 py-1 rounded-full shadow-md">
+                    <span class="text-sm font-semibold text-ink-700" x-text="`${currentCardIndex + 1} / ${cardCatalogBooks.length}`"></span>
+                </div>
 
-                        <!-- Book Details -->
-                        <div class="text-center mb-6">
-                            <h2 class="text-xl font-display font-bold text-ink-900 mb-1" x-text="book.title"></h2>
-                            <p class="text-ink-600" x-text="book.author"></p>
-                        </div>
-
-                        <!-- Swipe Instructions -->
-                        <div class="flex items-center justify-center gap-8 mb-6">
-                            <div class="text-center">
-                                <div class="w-12 h-12 bg-ink-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                                    <i class="bi bi-x-lg text-ink-600"></i>
-                                </div>
-                                <p class="text-xs text-ink-500">Dismiss</p>
-                            </div>
-                            <div class="text-center">
-                                <div class="w-12 h-12 bg-ink-900 rounded-full flex items-center justify-center mx-auto mb-2">
-                                    <i class="bi bi-plus-lg text-white"></i>
-                                </div>
-                                <p class="text-xs text-ink-500">Add to Requests</p>
-                            </div>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="grid grid-cols-2 gap-3">
-                            <button
-                                @click="dismissCard()"
-                                class="btn btn-secondary py-3"
+                <!-- Cards Stack (show current and next 2 cards) -->
+                <div class="relative w-full h-full">
+                    <template x-for="(book, index) in cardCatalogBooks.slice(currentCardIndex, currentCardIndex + 3)" :key="book.id">
+                        <div
+                            :class="{
+                                'z-30': index === 0,
+                                'z-20': index === 1,
+                                'z-10': index === 2
+                            }"
+                            :style="{
+                                transform: index === 0 ? 'scale(1) translateY(0)' :
+                                          index === 1 ? 'scale(0.95) translateY(10px)' :
+                                          'scale(0.9) translateY(20px)',
+                                opacity: index === 0 ? '1' : index === 1 ? '0.7' : '0.4'
+                            }"
+                            class="swipe-card absolute inset-0 bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300"
+                            x-data="{
+                                isDragging: false,
+                                startX: 0,
+                                startY: 0,
+                                currentX: 0,
+                                currentY: 0,
+                                offsetX: 0,
+                                offsetY: 0
+                            }"
+                            @mousedown="if (index === 0) { isDragging = true; startX = $event.clientX; startY = $event.clientY; }"
+                            @touchstart="if (index === 0) { isDragging = true; startX = $event.touches[0].clientX; startY = $event.touches[0].clientY; }"
+                            @mousemove.window="if (isDragging && index === 0) {
+                                currentX = $event.clientX;
+                                currentY = $event.clientY;
+                                offsetX = currentX - startX;
+                                offsetY = currentY - startY;
+                                $el.style.transform = `translate(${offsetX}px, ${offsetY}px) rotate(${offsetX * 0.1}deg)`;
+                            }"
+                            @touchmove.window="if (isDragging && index === 0) {
+                                currentX = $event.touches[0].clientX;
+                                currentY = $event.touches[0].clientY;
+                                offsetX = currentX - startX;
+                                offsetY = currentY - startY;
+                                $el.style.transform = `translate(${offsetX}px, ${offsetY}px) rotate(${offsetX * 0.1}deg)`;
+                            }"
+                            @mouseup.window="if (isDragging && index === 0) {
+                                isDragging = false;
+                                if (Math.abs(offsetX) > 100) {
+                                    // Swipe detected
+                                    if (offsetX > 0) {
+                                        // Swipe right - Add to requests
+                                        $el.style.transform = `translate(${window.innerWidth}px, ${offsetY}px) rotate(30deg)`;
+                                        setTimeout(() => { addCardToRequests(book); }, 300);
+                                    } else {
+                                        // Swipe left - Dismiss
+                                        $el.style.transform = `translate(-${window.innerWidth}px, ${offsetY}px) rotate(-30deg)`;
+                                        setTimeout(() => { dismissCard(); }, 300);
+                                    }
+                                } else {
+                                    // Snap back
+                                    $el.style.transform = 'translate(0, 0) rotate(0deg)';
+                                }
+                                offsetX = 0;
+                                offsetY = 0;
+                            }"
+                            @touchend.window="if (isDragging && index === 0) {
+                                isDragging = false;
+                                if (Math.abs(offsetX) > 100) {
+                                    // Swipe detected
+                                    if (offsetX > 0) {
+                                        // Swipe right - Add to requests
+                                        $el.style.transform = `translate(${window.innerWidth}px, ${offsetY}px) rotate(30deg)`;
+                                        setTimeout(() => { addCardToRequests(book); }, 300);
+                                    } else {
+                                        // Swipe left - Dismiss
+                                        $el.style.transform = `translate(-${window.innerWidth}px, ${offsetY}px) rotate(-30deg)`;
+                                        setTimeout(() => { dismissCard(); }, 300);
+                                    }
+                                } else {
+                                    // Snap back
+                                    $el.style.transform = 'translate(0, 0) rotate(0deg)';
+                                }
+                                offsetX = 0;
+                                offsetY = 0;
+                            }"
+                        >
+                            <!-- Swipe Indicators -->
+                            <div
+                                x-show="index === 0 && offsetX > 50"
+                                class="absolute inset-0 bg-green-500 bg-opacity-20 flex items-center justify-center pointer-events-none z-20"
                             >
-                                <i class="bi bi-x-lg"></i> Dismiss
-                            </button>
-                            <button
-                                @click="addCardToRequests(book)"
-                                class="btn btn-primary py-3"
+                                <div class="bg-green-500 text-white px-6 py-3 rounded-xl font-bold text-2xl shadow-lg transform rotate-12">
+                                    <i class="bi bi-heart-fill"></i>
+                                </div>
+                            </div>
+                            <div
+                                x-show="index === 0 && offsetX < -50"
+                                class="absolute inset-0 bg-red-500 bg-opacity-20 flex items-center justify-center pointer-events-none z-20"
                             >
-                                <i class="bi bi-plus-lg"></i> Request
-                            </button>
-                        </div>
+                                <div class="bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-2xl shadow-lg transform -rotate-12">
+                                    <i class="bi bi-x-lg"></i>
+                                </div>
+                            </div>
 
-                        <!-- Card Counter -->
-                        <div class="text-center mt-4 text-sm text-ink-500">
-                            <span x-text="`${currentCardIndex + 1} / ${cardCatalogBooks.length}`"></span>
+                            <!-- Card Content -->
+                            <div class="flex flex-col h-full p-6 pointer-events-none">
+                                <!-- Book Cover -->
+                                <div class="flex-1 flex items-center justify-center mb-4">
+                                    <img :src="book.image" :alt="book.title"
+                                         class="max-w-full max-h-[350px] object-contain rounded-lg shadow-lg"
+                                         @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2212%22>No Cover</text></svg>'">
+                                </div>
+
+                                <!-- Book Details -->
+                                <div class="text-center">
+                                    <h2 class="text-xl font-display font-bold text-ink-900 mb-1 line-clamp-2" x-text="book.title"></h2>
+                                    <p class="text-ink-600 line-clamp-1" x-text="book.author"></p>
+                                    <p class="text-ink-400 text-sm mt-1" x-show="book.year" x-text="book.year"></p>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </template>
+                    </template>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="absolute bottom-6 left-0 right-0 px-6 z-40 flex justify-center gap-4 pointer-events-none">
+                    <button
+                        @click="if (cardCatalogBooks.length > currentCardIndex) {
+                            const el = $el.closest('.relative').querySelector('.swipe-card');
+                            el.style.transform = `translate(-${window.innerWidth}px, 0) rotate(-30deg)`;
+                            setTimeout(() => { dismissCard(); }, 300);
+                        }"
+                        class="w-16 h-16 bg-white border-4 border-red-500 rounded-full flex items-center justify-center shadow-xl hover:bg-red-50 transition-colors pointer-events-auto"
+                        title="Dismiss"
+                    >
+                        <i class="bi bi-x-lg text-red-500 text-2xl"></i>
+                    </button>
+                    <button
+                        @click="if (cardCatalogBooks.length > currentCardIndex) { openHardcoverModal(cardCatalogBooks[currentCardIndex]); }"
+                        class="w-16 h-16 bg-white border-4 border-blue-500 rounded-full flex items-center justify-center shadow-xl hover:bg-blue-50 transition-colors pointer-events-auto"
+                        title="View Details"
+                    >
+                        <i class="bi bi-info-lg text-blue-500 text-2xl"></i>
+                    </button>
+                    <button
+                        @click="if (cardCatalogBooks.length > currentCardIndex) {
+                            const el = $el.closest('.relative').querySelector('.swipe-card');
+                            el.style.transform = `translate(${window.innerWidth}px, 0) rotate(30deg)`;
+                            setTimeout(() => { addCardToRequests(cardCatalogBooks[currentCardIndex]); }, 300);
+                        }"
+                        class="w-16 h-16 bg-white border-4 border-green-500 rounded-full flex items-center justify-center shadow-xl hover:bg-green-50 transition-colors pointer-events-auto"
+                        title="Add to Requests"
+                    >
+                        <i class="bi bi-heart-fill text-green-500 text-2xl"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- Empty State -->
@@ -1922,6 +2036,17 @@
                 </div>
                 <h3 class="text-lg font-semibold text-ink-700 mb-2">No books available</h3>
                 <p class="text-ink-500 text-sm">Check back later for new recommendations</p>
+            </div>
+
+            <!-- All done message -->
+            <div x-show="!loadingCardCatalog && cardCatalogBooks.length > 0 && currentCardIndex >= cardCatalogBooks.length"
+                 class="py-12 px-4 text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                    <i class="bi bi-check-circle text-2xl text-green-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-ink-700 mb-2">All done!</h3>
+                <p class="text-ink-500 text-sm mb-4">You've reviewed all the books</p>
+                <button @click="showCardCatalog = false" class="btn btn-primary">Close</button>
             </div>
         </div>
     </div>
