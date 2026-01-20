@@ -90,8 +90,7 @@ function folioApp() {
         filteredBooks: [],
         combinedBooksForYourBooks: [], // Cached combination of library + requested books
         yourBooksFilter: 'all', // Filter for Your Books section: 'all', 'kobo', 'requests'
-        yourBooksSortBy: 'recent', // Sort for Your Books section: 'recent', 'author', 'title'
-        showYourBooksFilterModal: false, // Show/hide the filter and sort dropdown
+        yourBooksSortBy: 'recent-desc', // Sort for Your Books section: 'recent-desc', 'recent-asc', 'author-asc', 'author-desc', 'title-asc', 'title-desc'
         libraryPages: [],
         currentPage: 0,
         booksPerPage: 12, // Will be calculated based on screen
@@ -1029,33 +1028,49 @@ function folioApp() {
             // Apply sort
             let sorted = [...filtered];
             switch (this.yourBooksSortBy) {
-                case 'author':
+                case 'author-asc':
                     sorted.sort((a, b) => {
                         const authorA = this.getLastName(a.author || a.authors || '').toLowerCase();
                         const authorB = this.getLastName(b.author || b.authors || '').toLowerCase();
                         return authorA.localeCompare(authorB);
                     });
                     break;
-                case 'title':
+                case 'author-desc':
+                    sorted.sort((a, b) => {
+                        const authorA = this.getLastName(a.author || a.authors || '').toLowerCase();
+                        const authorB = this.getLastName(b.author || b.authors || '').toLowerCase();
+                        return authorB.localeCompare(authorA);
+                    });
+                    break;
+                case 'title-asc':
                     sorted.sort((a, b) => {
                         const titleA = (a.title || '').toLowerCase();
                         const titleB = (b.title || '').toLowerCase();
                         return titleA.localeCompare(titleB);
                     });
                     break;
-                case 'recent':
-                default:
-                    // Recent is default - library books are already sorted by timestamp
-                    // Requested books at the end sorted by requested_at
+                case 'title-desc':
                     sorted.sort((a, b) => {
-                        if (a.isLibraryBook && !b.isLibraryBook) return -1;
-                        if (!a.isLibraryBook && b.isLibraryBook) return 1;
-
-                        if (a.isLibraryBook && b.isLibraryBook) {
-                            return (b.timestamp || 0) - (a.timestamp || 0);
-                        } else {
-                            return (new Date(b.requested_at || 0) - new Date(a.requested_at || 0));
-                        }
+                        const titleA = (a.title || '').toLowerCase();
+                        const titleB = (b.title || '').toLowerCase();
+                        return titleB.localeCompare(titleA);
+                    });
+                    break;
+                case 'recent-asc':
+                    // Mix library and requested books, sort by date ascending (oldest first)
+                    sorted.sort((a, b) => {
+                        const dateA = a.isLibraryBook ? (a.timestamp || 0) : (new Date(a.requested_at || 0).getTime() / 1000);
+                        const dateB = b.isLibraryBook ? (b.timestamp || 0) : (new Date(b.requested_at || 0).getTime() / 1000);
+                        return dateA - dateB;
+                    });
+                    break;
+                case 'recent-desc':
+                default:
+                    // Mix library and requested books, sort by date descending (newest first)
+                    sorted.sort((a, b) => {
+                        const dateA = a.isLibraryBook ? (a.timestamp || 0) : (new Date(a.requested_at || 0).getTime() / 1000);
+                        const dateB = b.isLibraryBook ? (b.timestamp || 0) : (new Date(b.requested_at || 0).getTime() / 1000);
+                        return dateB - dateA;
                     });
                     break;
             }
@@ -1079,7 +1094,6 @@ function folioApp() {
         changeYourBooksFilter(filter) {
             this.yourBooksFilter = filter;
             this.updateCombinedBooksForYourBooks();
-            this.showYourBooksFilterModal = false;
         },
 
         /**
@@ -1088,7 +1102,6 @@ function folioApp() {
         changeYourBooksSort(sortBy) {
             this.yourBooksSortBy = sortBy;
             this.updateCombinedBooksForYourBooks();
-            this.showYourBooksFilterModal = false;
         },
 
         /**
