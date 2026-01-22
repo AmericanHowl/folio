@@ -4433,6 +4433,9 @@ h1{color:#333;}p{color:#666;line-height:1.6;}</style></head>
                         sync_results.append({"NewEntitlement": kobo_book})
                         print(f"📚 Sync entitlement for book {book_id}: {book['title']}", flush=True)
 
+                        # Update sync state to track this book was synced
+                        update_kobo_sync_state(user, book_id)
+
                     # Generate new sync token (timestamp-based)
                     new_sync_token = str(int(time.time()))
 
