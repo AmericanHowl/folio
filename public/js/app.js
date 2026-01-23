@@ -3150,6 +3150,12 @@ function folioApp() {
 
             // Request camera access
             try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    this.cameraState = 'error';
+                    this.cameraError = 'Camera not available in this browser. Use HTTPS or a supported browser.';
+                    return;
+                }
+
                 const constraints = {
                     video: {
                         facingMode: 'environment', // Prefer rear camera
@@ -3275,6 +3281,39 @@ function folioApp() {
             }
 
             console.log('📷 Photo captured');
+        },
+
+        /**
+         * Handle uploaded image from file input
+         */
+        handleCameraUpload(event) {
+            const file = event?.target?.files?.[0];
+            if (!file) return;
+
+            if (!file.type || !file.type.startsWith('image/')) {
+                this.cameraState = 'error';
+                this.cameraError = 'Please select a valid image file.';
+                event.target.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (this.cameraStream) {
+                    this.cameraStream.getTracks().forEach(track => track.stop());
+                    this.cameraStream = null;
+                }
+                this.capturedImageSrc = reader.result;
+                this.cameraState = 'captured';
+            };
+            reader.onerror = () => {
+                this.cameraState = 'error';
+                this.cameraError = 'Failed to read the image file.';
+            };
+            reader.readAsDataURL(file);
+
+            // Allow selecting the same file again
+            event.target.value = '';
         },
 
         /**
