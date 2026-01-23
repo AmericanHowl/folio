@@ -1030,16 +1030,20 @@ function folioApp() {
             switch (this.yourBooksSortBy) {
                 case 'author-asc':
                     sorted.sort((a, b) => {
-                        const authorA = this.getLastName(a.author || a.authors || '').toLowerCase();
-                        const authorB = this.getLastName(b.author || b.authors || '').toLowerCase();
-                        return authorA.localeCompare(authorB);
+                        const authorA = a.authors ? this.formatAuthors(a.authors) : (a.author || '');
+                        const authorB = b.authors ? this.formatAuthors(b.authors) : (b.author || '');
+                        const lastNameA = this.getLastNameForSort(authorA).toLowerCase();
+                        const lastNameB = this.getLastNameForSort(authorB).toLowerCase();
+                        return lastNameA.localeCompare(lastNameB);
                     });
                     break;
                 case 'author-desc':
                     sorted.sort((a, b) => {
-                        const authorA = this.getLastName(a.author || a.authors || '').toLowerCase();
-                        const authorB = this.getLastName(b.author || b.authors || '').toLowerCase();
-                        return authorB.localeCompare(authorA);
+                        const authorA = a.authors ? this.formatAuthors(a.authors) : (a.author || '');
+                        const authorB = b.authors ? this.formatAuthors(b.authors) : (b.author || '');
+                        const lastNameA = this.getLastNameForSort(authorA).toLowerCase();
+                        const lastNameB = this.getLastNameForSort(authorB).toLowerCase();
+                        return lastNameB.localeCompare(lastNameA);
                     });
                     break;
                 case 'title-asc':
@@ -1059,8 +1063,8 @@ function folioApp() {
                 case 'recent-asc':
                     // Mix library and requested books, sort by date ascending (oldest first)
                     sorted.sort((a, b) => {
-                        const dateA = a.isLibraryBook ? (a.timestamp || 0) : (new Date(a.requested_at || 0).getTime() / 1000);
-                        const dateB = b.isLibraryBook ? (b.timestamp || 0) : (new Date(b.requested_at || 0).getTime() / 1000);
+                        const dateA = this.getYourBooksSortTimestamp(a);
+                        const dateB = this.getYourBooksSortTimestamp(b);
                         return dateA - dateB;
                     });
                     break;
@@ -1068,8 +1072,8 @@ function folioApp() {
                 default:
                     // Mix library and requested books, sort by date descending (newest first)
                     sorted.sort((a, b) => {
-                        const dateA = a.isLibraryBook ? (a.timestamp || 0) : (new Date(a.requested_at || 0).getTime() / 1000);
-                        const dateB = b.isLibraryBook ? (b.timestamp || 0) : (new Date(b.requested_at || 0).getTime() / 1000);
+                        const dateA = this.getYourBooksSortTimestamp(a);
+                        const dateB = this.getYourBooksSortTimestamp(b);
                         return dateB - dateA;
                     });
                     break;
@@ -1080,12 +1084,32 @@ function folioApp() {
         },
 
         /**
-         * Get last name from author string for sorting
+         * Normalize timestamps to seconds for sorting
          */
-        getLastName(authorStr) {
-            if (!authorStr) return '';
-            const parts = authorStr.split(/[,&]/)[0].trim().split(' ');
-            return parts[parts.length - 1] || '';
+        normalizeTimestampToSeconds(value) {
+            if (!value) return 0;
+            if (typeof value === 'number') {
+                return value > 1000000000000 ? value / 1000 : value;
+            }
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (trimmed && !Number.isNaN(Number(trimmed))) {
+                    return this.normalizeTimestampToSeconds(Number(trimmed));
+                }
+            }
+            const parsed = Date.parse(value);
+            return Number.isNaN(parsed) ? 0 : parsed / 1000;
+        },
+
+        /**
+         * Get a comparable timestamp for Your Books sorting
+         */
+        getYourBooksSortTimestamp(book) {
+            if (!book) return 0;
+            if (book.isLibraryBook) {
+                return this.normalizeTimestampToSeconds(book.timestamp);
+            }
+            return this.normalizeTimestampToSeconds(book.requested_at);
         },
 
         /**
@@ -1099,9 +1123,37 @@ function folioApp() {
         /**
          * Change Your Books sort and update display
          */
-        changeYourBooksSort(sortBy) {
-            this.yourBooksSortBy = sortBy;
+        changeYourBooksSort(sortBase) {
+            const [currentBase, currentDir] = this.yourBooksSortBy.split('-');
+            let nextDir = currentDir;
+            if (currentBase === sortBase) {
+                nextDir = currentDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                nextDir = sortBase === 'recent' ? 'desc' : 'asc';
+            }
+            this.yourBooksSortBy = `${sortBase}-${nextDir}`;
             this.updateCombinedBooksForYourBooks();
+        },
+
+        /**
+         * Get display label for current Your Books sort
+         */
+        getYourBooksSortLabel() {
+            const [base, dir] = this.yourBooksSortBy.split('-');
+            const label = base === 'recent' ? 'Date Added' : base === 'author' ? 'Author Name' : 'Title';
+            const arrow = dir === 'asc' ? '↑' : '↓';
+            return `${label} ${arrow}`;
+        },
+
+        /**
+         * Get display arrow for a Your Books sort option
+         */
+        getYourBooksSortArrow(sortBase) {
+            const [currentBase, currentDir] = this.yourBooksSortBy.split('-');
+            const dir = currentBase === sortBase
+                ? currentDir
+                : sortBase === 'recent' ? 'desc' : 'asc';
+            return dir === 'asc' ? '↑' : '↓';
         },
 
         /**
