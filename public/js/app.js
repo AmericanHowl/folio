@@ -1320,6 +1320,18 @@ function folioApp() {
         },
 
         /**
+         * Clear search and reset to library view
+         */
+        clearSearch() {
+            this.searchQuery = '';
+            this.filteredBooks = this.sortedBooks;
+            this.searchiTunesResults = [];
+            this.loadingSearchiTunes = false;
+            this.searchiTunesHasMore = false;
+            this.searchiTunesPage = 0;
+        },
+
+        /**
          * Get top authors from library
          */
         getTopAuthors() {
@@ -1931,6 +1943,14 @@ function folioApp() {
             this.selectedHardcoverBook = this.enrichHardcoverBook(book);
             this.selectedBook = null;
             this.lockBodyScroll();
+        },
+
+        /**
+         * Close Hardcover book modal
+         */
+        closeHardcoverModal() {
+            this.selectedHardcoverBook = null;
+            this.unlockBodyScroll();
         },
 
         /**

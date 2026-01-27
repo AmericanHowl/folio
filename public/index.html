@@ -921,15 +921,26 @@
                                     x-model="searchQuery"
                                     @input.debounce.300ms="searchBooks()"
                                     placeholder="Search your library..."
-                                    class="w-full pl-10 pr-12 py-2.5 bg-ink-50 border border-ink-200 rounded-lg text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                                    class="w-full pl-10 pr-20 py-2.5 bg-ink-50 border border-ink-200 rounded-lg text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                                 >
-                                <button
-                                    @click="openCameraCapture()"
-                                    class="absolute right-2 p-1.5 text-ink-600 hover:text-ink-900 hover:bg-ink-100 rounded-md transition-colors"
-                                    title="Scan book cover"
-                                >
-                                    <i class="bi bi-camera text-lg"></i>
-                                </button>
+                                <div class="absolute right-2 flex items-center gap-1">
+                                    <button
+                                        x-show="searchQuery"
+                                        x-cloak
+                                        @click="clearSearch()"
+                                        class="p-1.5 text-ink-600 hover:text-ink-900 hover:bg-ink-100 rounded-md transition-colors"
+                                        title="Clear search"
+                                    >
+                                        <i class="bi bi-x-lg text-lg"></i>
+                                    </button>
+                                    <button
+                                        @click="openCameraCapture()"
+                                        class="p-1.5 text-ink-600 hover:text-ink-900 hover:bg-ink-100 rounded-md transition-colors"
+                                        title="Scan book cover"
+                                    >
+                                        <i class="bi bi-camera text-lg"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -1613,7 +1624,7 @@
                                     </div>
 
     <!-- Hardcover Book Modal -->
-    <div x-show="selectedHardcoverBook" x-cloak @click.self="selectedHardcoverBook = null" 
+    <div x-show="selectedHardcoverBook" x-cloak @click.self="closeHardcoverModal()"
          class="fixed inset-0 z-[60] modal-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
         <div x-show="selectedHardcoverBook" x-transition:enter="slide-up" 
              class="bg-ink-100 w-full sm:max-w-[720px] sm:rounded-2xl rounded-t-[20px] max-h-[90vh] flex flex-col shadow-2xl border border-ink-200">
@@ -1629,9 +1640,9 @@
                         <i class="bi bi-clock"></i> Requested
                                         </span>
                                     </div>
-                <button @click="selectedHardcoverBook = null" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
+                <button @click="closeHardcoverModal()" title="Close" class="p-3 hover:bg-ink-50 rounded-lg transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]">
                     <i class="bi bi-x-lg text-ink-600"></i>
-                                </button>
+                </button>
                                 </div>
 
             <!-- Scrollable Body -->
@@ -1695,7 +1706,7 @@
                                         </template>
                 <template x-if="selectedHardcoverBook?.requested && !selectedHardcoverBook?.inLibrary">
                     <div class="flex flex-col sm:flex-row gap-2">
-                        <button @click="searchProwlarr(selectedHardcoverBook); selectedHardcoverBook = null;"
+                        <button @click="searchProwlarr(selectedHardcoverBook); closeHardcoverModal();"
                                 :disabled="!prowlarrUrl || !prowlarrApiKey"
                                 class="w-full btn btn-primary py-3.5 justify-center disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="bi bi-search"></i>
