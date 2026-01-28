@@ -22,6 +22,7 @@ WORKDIR /app
 
 # Copy application files
 COPY folio.py .
+COPY folio_app/ ./folio_app/
 COPY public/ ./public/
 
 # Create empty config.json with valid JSON (avoids parse errors on first run)
