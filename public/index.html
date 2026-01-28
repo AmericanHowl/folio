@@ -8,6 +8,7 @@
     
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/folio.svg">
     <meta name="theme-color" content="#f6f7fa">
 
     <!-- Tailwind CSS -->
@@ -1333,9 +1334,9 @@
                     </div>
 
                     <!-- Curated Lists -->
-                    <template x-for="section in hardcoverSections" :key="section.title">
+                    <template x-for="section in hardcoverSections" :key="section.id">
                         <div class="px-4">
-                            <h2 class="section-title mb-3" x-text="section.title"></h2>
+                            <h2 class="section-title mb-3" x-text="section.name"></h2>
                             <p x-show="section.description" class="text-ink-500 text-sm mb-2 -mt-1" x-text="section.description"></p>
                             <div class="overflow-x-auto">
                                 <div class="grid grid-cols-3 gap-3">
@@ -1407,7 +1408,8 @@
             <!-- Scrollable Body -->
             <div class="flex-1 overflow-y-auto p-5">
                 <!-- View Mode -->
-                <div x-show="!isEditMode" class="sm:grid sm:grid-cols-[180px_1fr] sm:gap-6">
+                <template x-if="selectedBook && !isEditMode">
+                    <div class="sm:grid sm:grid-cols-[180px_1fr] sm:gap-6">
                                     <!-- Cover -->
                     <div class="mb-5 sm:mb-0">
                         <img :src="`/api/cover/${selectedBook?.id}?v=${coverVersion}`" :alt="selectedBook?.title" 
@@ -1450,10 +1452,12 @@
                                                 </template>
                                         </div>
                                     </div>
-                                </div>
+                    </div>
+                </template>
 
                 <!-- Edit Mode -->
-                <div x-show="isEditMode" class="sm:grid sm:grid-cols-[180px_1fr] sm:gap-6">
+                <template x-if="editingBook && isEditMode">
+                    <div class="sm:grid sm:grid-cols-[180px_1fr] sm:gap-6">
                     <!-- Cover Upload -->
                     <div class="mb-5 sm:mb-0">
                         <label 
@@ -1585,7 +1589,8 @@
                                 </template>
                             </div>
                         </div>
-                </div>
+                    </div>
+                </template>
             </div>
         </div>
 

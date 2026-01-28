@@ -85,14 +85,13 @@ def get_kobo_sync_state(user):
     Returns dict mapping book_id to sync info.
     """
     try:
-        conn = get_folio_db_connection(readonly=True)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT book_id, synced_at, last_modified, is_archived FROM kobo_sync_state WHERE user = ?",
-            (user,)
-        )
-        rows = cursor.fetchall()
-        conn.close()
+        with get_folio_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT book_id, synced_at, last_modified, is_archived FROM kobo_sync_state WHERE user = ?",
+                (user,)
+            )
+            rows = cursor.fetchall()
 
         return {
             row['book_id']: {
@@ -112,17 +111,16 @@ def update_kobo_sync_state(user, book_id, is_archived=False):
     Update the sync state for a book.
     """
     try:
-        conn = get_folio_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO kobo_sync_state (user, book_id, last_modified, is_archived)
-            VALUES (?, ?, CURRENT_TIMESTAMP, ?)
-            ON CONFLICT(user, book_id) DO UPDATE SET
-                last_modified = CURRENT_TIMESTAMP,
-                is_archived = excluded.is_archived
-        """, (user, book_id, 1 if is_archived else 0))
-        conn.commit()
-        conn.close()
+        with get_folio_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO kobo_sync_state (user, book_id, last_modified, is_archived)
+                VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+                ON CONFLICT(user, book_id) DO UPDATE SET
+                    last_modified = CURRENT_TIMESTAMP,
+                    is_archived = excluded.is_archived
+            """, (user, book_id, 1 if is_archived else 0))
+            conn.commit()
         return True
     except Exception as e:
         print(f"❌ Failed to update Kobo sync state: {e}")
@@ -589,13 +587,11 @@ def is_file_imported(filepath):
     Returns (is_imported, existing_record) tuple.
     """
     try:
-        conn = get_folio_db_connection(readonly=True)
-        cursor = conn.cursor()
-        
-        # Check by file path first
-        cursor.execute("SELECT * FROM import_history WHERE file_path = ?", (filepath,))
-        row = cursor.fetchone()
-        conn.close()
+        with get_folio_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+            # Check by file path first
+            cursor.execute("SELECT * FROM import_history WHERE file_path = ?", (filepath,))
+            row = cursor.fetchone()
         
         if row:
             return (True, dict(row))
@@ -604,11 +600,10 @@ def is_file_imported(filepath):
         if os.path.exists(filepath):
             file_hash = compute_file_hash(filepath)
             if file_hash:
-                conn = get_folio_db_connection(readonly=True)
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM import_history WHERE file_hash = ?", (file_hash,))
-                row = cursor.fetchone()
-                conn.close()
+                with get_folio_db_connection(readonly=True) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT * FROM import_history WHERE file_hash = ?", (file_hash,))
+                    row = cursor.fetchone()
                 
                 if row:
                     return (True, dict(row))
@@ -628,17 +623,14 @@ def record_imported_file(filepath, file_hash=None, file_size=None, book_id=None)
         if file_size is None and os.path.exists(filepath):
             file_size = os.path.getsize(filepath)
         
-        conn = get_folio_db_connection(readonly=False)
-        cursor = conn.cursor()
-        
-        # Use INSERT OR IGNORE to handle duplicates gracefully
-        cursor.execute("""
-            INSERT OR IGNORE INTO import_history (file_path, file_hash, file_size, book_id)
-            VALUES (?, ?, ?, ?)
-        """, (filepath, file_hash, file_size, book_id))
-        
-        conn.commit()
-        conn.close()
+        with get_folio_db_connection(readonly=False) as conn:
+            cursor = conn.cursor()
+            # Use INSERT OR IGNORE to handle duplicates gracefully
+            cursor.execute("""
+                INSERT OR IGNORE INTO import_history (file_path, file_hash, file_size, book_id)
+                VALUES (?, ?, ?, ?)
+            """, (filepath, file_hash, file_size, book_id))
+            conn.commit()
         return True
     except Exception as e:
         print(f"⚠️  Failed to record imported file: {e}")
@@ -661,35 +653,32 @@ def migrate_import_history_from_json():
         
         # Migrate to database
         migrated = 0
-        conn = get_folio_db_connection(readonly=False)
-        cursor = conn.cursor()
-        
-        for filepath in files:
-            if os.path.exists(filepath):
-                file_hash = compute_file_hash(filepath)
-                file_size = os.path.getsize(filepath)
-                
-                # Try to find book_id if this book exists in Calibre
-                book_id = None
-                try:
-                    with get_db_connection(readonly=True) as calibre_conn:
-                        calibre_cursor = calibre_conn.cursor()
-                        # This is a best-effort attempt - we don't have a reliable way to match
-                        # files to book_ids from just the filepath, so we'll leave book_id as NULL
-                except:
-                    pass
-                
-                try:
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO import_history (file_path, file_hash, file_size, book_id)
-                        VALUES (?, ?, ?, ?)
-                    """, (filepath, file_hash, file_size, book_id))
-                    migrated += 1
-                except:
-                    pass  # Skip duplicates
-        
-        conn.commit()
-        conn.close()
+        with get_folio_db_connection(readonly=False) as conn:
+            cursor = conn.cursor()
+            for filepath in files:
+                if os.path.exists(filepath):
+                    file_hash = compute_file_hash(filepath)
+                    file_size = os.path.getsize(filepath)
+                    
+                    # Try to find book_id if this book exists in Calibre
+                    book_id = None
+                    try:
+                        with get_db_connection(readonly=True) as calibre_conn:
+                            calibre_cursor = calibre_conn.cursor()
+                            # This is a best-effort attempt - we don't have a reliable way to match
+                            # files to book_ids from just the filepath, so we'll leave book_id as NULL
+                    except:
+                        pass
+                    
+                    try:
+                        cursor.execute("""
+                            INSERT OR IGNORE INTO import_history (file_path, file_hash, file_size, book_id)
+                            VALUES (?, ?, ?, ?)
+                        """, (filepath, file_hash, file_size, book_id))
+                        migrated += 1
+                    except:
+                        pass  # Skip duplicates
+            conn.commit()
         
         if migrated > 0:
             print(f"📦 Migrated {migrated} imported files from JSON to database")
@@ -703,11 +692,10 @@ def migrate_import_history_from_json():
 def get_import_history_count():
     """Get the count of files in import history"""
     try:
-        conn = get_folio_db_connection(readonly=True)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) as count FROM import_history")
-        row = cursor.fetchone()
-        conn.close()
+        with get_folio_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as count FROM import_history")
+            row = cursor.fetchone()
         return row['count'] if row else 0
     except Exception as e:
         print(f"⚠️  Failed to get import history count: {e}")
@@ -724,16 +712,15 @@ def get_all_requests():
     Returns list of request dicts.
     """
     try:
-        conn = get_folio_db_connection(readonly=True)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, external_id, title, author, year, description, image,
-                   requested_at, actioned_at
-            FROM requests
-            ORDER BY requested_at DESC
-        """)
-        rows = cursor.fetchall()
-        conn.close()
+        with get_folio_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, external_id, title, author, year, description, image,
+                       requested_at, actioned_at
+                FROM requests
+                ORDER BY requested_at DESC
+            """)
+            rows = cursor.fetchall()
 
         requests = []
         for row in rows:
@@ -760,27 +747,26 @@ def add_request(book):
     Returns True on success, False on failure.
     """
     try:
-        conn = get_folio_db_connection()
-        cursor = conn.cursor()
+        with get_folio_db_connection() as conn:
+            cursor = conn.cursor()
 
-        external_id = book.get('id')
-        title = book.get('title', '')
-        author = book.get('author', '')
-        year = book.get('year')
-        description = book.get('description', '')
-        image = book.get('image', '')
-        requested_at = int(time.time())
+            external_id = book.get('id')
+            title = book.get('title', '')
+            author = book.get('author', '')
+            year = book.get('year')
+            description = book.get('description', '')
+            image = book.get('image', '')
+            requested_at = int(time.time())
 
-        # Use INSERT OR REPLACE to update if exists
-        cursor.execute("""
-            INSERT INTO requests (external_id, title, author, year, description, image, requested_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(external_id) DO UPDATE SET
-                requested_at = excluded.requested_at
-        """, (external_id, title, author, year, description, image, requested_at))
+            # Use INSERT OR REPLACE to update if exists
+            cursor.execute("""
+                INSERT INTO requests (external_id, title, author, year, description, image, requested_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(external_id) DO UPDATE SET
+                    requested_at = excluded.requested_at
+            """, (external_id, title, author, year, description, image, requested_at))
 
-        conn.commit()
-        conn.close()
+            conn.commit()
         print(f"✅ Added request: {title}")
         return True
     except Exception as e:
@@ -795,22 +781,20 @@ def remove_request(request_id):
     Returns True on success, False on failure.
     """
     try:
-        conn = get_folio_db_connection()
-        cursor = conn.cursor()
+        with get_folio_db_connection() as conn:
+            cursor = conn.cursor()
+            # Try to delete by external_id first, then by internal id
+            cursor.execute("DELETE FROM requests WHERE external_id = ?", (request_id,))
+            if cursor.rowcount == 0:
+                # Try as internal id
+                try:
+                    internal_id = int(request_id)
+                    cursor.execute("DELETE FROM requests WHERE id = ?", (internal_id,))
+                except ValueError:
+                    pass
 
-        # Try to delete by external_id first, then by internal id
-        cursor.execute("DELETE FROM requests WHERE external_id = ?", (request_id,))
-        if cursor.rowcount == 0:
-            # Try as internal id
-            try:
-                internal_id = int(request_id)
-                cursor.execute("DELETE FROM requests WHERE id = ?", (internal_id,))
-            except ValueError:
-                pass
-
-        conn.commit()
-        deleted = cursor.rowcount > 0
-        conn.close()
+            conn.commit()
+            deleted = cursor.rowcount > 0
 
         if deleted:
             print(f"✅ Removed request: {request_id}")
@@ -826,30 +810,28 @@ def mark_request_actioned_db(book_title):
     Returns True if a request was marked, False otherwise.
     """
     try:
-        conn = get_folio_db_connection()
-        cursor = conn.cursor()
+        with get_folio_db_connection() as conn:
+            cursor = conn.cursor()
 
-        actioned_at = int(time.time())
-        title_lower = book_title.lower().strip()
+            actioned_at = int(time.time())
+            title_lower = book_title.lower().strip()
 
-        # Find and update matching request
-        cursor.execute("SELECT id, title FROM requests WHERE actioned_at IS NULL")
-        rows = cursor.fetchall()
+            # Find and update matching request
+            cursor.execute("SELECT id, title FROM requests WHERE actioned_at IS NULL")
+            rows = cursor.fetchall()
 
-        for row in rows:
-            req_title = row['title'].lower().strip()
-            if req_title == title_lower or title_lower in req_title or req_title in title_lower:
-                cursor.execute(
-                    "UPDATE requests SET actioned_at = ? WHERE id = ?",
-                    (actioned_at, row['id'])
-                )
-                conn.commit()
-                conn.close()
-                print(f"✅ Marked request as actioned: {row['title']}")
-                return True
+            for row in rows:
+                req_title = row['title'].lower().strip()
+                if req_title == title_lower or title_lower in req_title or req_title in title_lower:
+                    cursor.execute(
+                        "UPDATE requests SET actioned_at = ? WHERE id = ?",
+                        (actioned_at, row['id'])
+                    )
+                    conn.commit()
+                    print(f"✅ Marked request as actioned: {row['title']}")
+                    return True
 
-        conn.close()
-        return False
+            return False
     except Exception as e:
         print(f"⚠️ Failed to mark request as actioned: {e}")
         return False

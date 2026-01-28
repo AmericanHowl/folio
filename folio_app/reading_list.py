@@ -31,14 +31,13 @@ def get_user_from_headers(headers):
 def get_reading_list_ids_for_user(user='default'):
     """Get IDs of books on the reading list for a specific user."""
     try:
-        conn = get_folio_db_connection(readonly=True)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT book_id FROM reading_list WHERE user = ? ORDER BY added_at DESC",
-            (user,),
-        )
-        rows = cursor.fetchall()
-        conn.close()
+        with get_folio_db_connection(readonly=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT book_id FROM reading_list WHERE user = ? ORDER BY added_at DESC",
+                (user,),
+            )
+            rows = cursor.fetchall()
         return [row['book_id'] for row in rows]
     except Exception as e:
         print(f"⚠️ Failed to get reading list for user {user}: {e}")
@@ -48,14 +47,13 @@ def get_reading_list_ids_for_user(user='default'):
 def add_to_reading_list_for_user(book_id, user='default'):
     """Add a book to the reading list for a specific user."""
     try:
-        conn = get_folio_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR IGNORE INTO reading_list (user, book_id) VALUES (?, ?)",
-            (user, book_id),
-        )
-        conn.commit()
-        conn.close()
+        with get_folio_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR IGNORE INTO reading_list (user, book_id) VALUES (?, ?)",
+                (user, book_id),
+            )
+            conn.commit()
         print(f"✅ Added book {book_id} to reading list for user '{user}'")
         return True
     except Exception as e:
@@ -66,14 +64,13 @@ def add_to_reading_list_for_user(book_id, user='default'):
 def remove_from_reading_list_for_user(book_id, user='default'):
     """Remove a book from the reading list for a specific user."""
     try:
-        conn = get_folio_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM reading_list WHERE user = ? AND book_id = ?",
-            (user, book_id),
-        )
-        conn.commit()
-        conn.close()
+        with get_folio_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM reading_list WHERE user = ? AND book_id = ?",
+                (user, book_id),
+            )
+            conn.commit()
         print(f"✅ Removed book {book_id} from reading list for user '{user}'")
         return True
     except Exception as e:
