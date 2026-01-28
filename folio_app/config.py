@@ -6,6 +6,8 @@ import os
 import json
 import threading
 
+from .utils.text import sanitize_token
+
 # Configuration file paths
 CONFIG_FILE = "config.json"
 IMPORTED_FILES_FILE = "imported_files.json"
@@ -61,16 +63,6 @@ import_state_lock = threading.Lock()
 
 # Track watcher thread
 _import_watcher_thread = None
-
-
-def sanitize_token(token):
-    """Sanitize API token by removing whitespace, newlines, and 'Bearer ' prefix."""
-    if not token:
-        return ''
-    token = token.strip()
-    if token.startswith('Bearer '):
-        token = token[7:]
-    return token.strip()
 
 
 def load_config():

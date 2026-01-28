@@ -69,13 +69,3 @@ def is_file_mature(filepath, min_age_seconds=5):
     except Exception:
         return False
 
-
-def format_file_size(size_bytes):
-    """Format file size in human-readable format."""
-    if size_bytes is None:
-        return "Unknown"
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.1f} TB"
