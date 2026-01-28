@@ -29,6 +29,10 @@ import uuid
 from email.parser import BytesParser
 from email import message_from_bytes
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 from folio_app.cache import api_cache, cover_cache
 from folio_app.config import (
     PORT,
