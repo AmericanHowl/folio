@@ -1406,7 +1406,7 @@
                                         </div>
 
                         <!-- Description -->
-                        <div x-show="selectedBook?.comments" class="text-[15px] leading-relaxed text-ink-700" x-html="selectedBook?.comments"></div>
+                        <div x-show="selectedBook?.comments" class="text-[15px] leading-relaxed text-ink-700 whitespace-pre-wrap" x-text="selectedBook?.comments"></div>
 
                         <!-- Tags/Genres -->
                         <div x-show="selectedBook?.tags?.length" class="flex flex-wrap gap-1.5 pt-2">

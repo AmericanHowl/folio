@@ -3644,16 +3644,20 @@ def transform_itunes_books(results):
                 # Replace any dimension pattern (60x60, 100x100, 30x30, etc.) with 512x512
                 # This works because iTunes URLs have the pattern: .../artworkUrl60/60x60bb.jpg -> .../artworkUrl60/512x512bb.jpg
                 image = re.sub(r'\d+x\d+', '512x512', base_url)
-        # Clean description - remove bold tags but preserve paragraph layout and rich formatting
+        # Clean description - strip all HTML formatting and convert to plain text with newlines
         description = book.get('description', '')
         if description:
-            # Remove bold/strong tags but keep the text content and all other formatting
-            # This preserves italics, links, paragraph structure, and other rich formatting
-            description = re.sub(r'</?(?:b|strong)[^>]*>', '', description, flags=re.IGNORECASE)
-            
-            # Clean up any double spaces that might result from tag removal
-            # But preserve the HTML structure and paragraph layout
-            description = re.sub(r'  +', ' ', description)  # Multiple spaces to single space
+            # Convert <br> tags to newlines
+            description = re.sub(r'<br\s*/?>', '\n', description, flags=re.IGNORECASE)
+            # Convert </p><p> patterns to double newlines (paragraph breaks)
+            description = re.sub(r'</p>\s*<p[^>]*>', '\n\n', description, flags=re.IGNORECASE)
+            # Convert remaining <p> and </p> tags to newlines
+            description = re.sub(r'</?p[^>]*>', '\n', description, flags=re.IGNORECASE)
+            # Strip ALL remaining HTML tags (italic, bold, links, etc.)
+            description = re.sub(r'<[^>]+>', '', description)
+            # Clean up excessive whitespace (but preserve newlines)
+            description = re.sub(r'[^\S\n]+', ' ', description)  # Non-newline whitespace to single space
+            description = re.sub(r'\n{3,}', '\n\n', description)  # Max 2 consecutive newlines
             description = description.strip()
         
         books.append({
