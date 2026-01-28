@@ -1239,14 +1239,31 @@
                                         </span>
                                     </div>
                                     <!-- Kobo Sync Icon -->
-                                    <div x-show="book.isLibraryBook" class="absolute top-1.5 left-1.5 z-10">
+                                    <div
+                                        x-show="book.isLibraryBook"
+                                        x-data="{ koboSynced: isInKoboSync(book) }"
+                                        class="absolute -top-2 right-2 z-10"
+                                    >
                                         <button
-                                            @click.stop="toggleReadingList(book.id)"
-                                            class="w-6 h-6 rounded-full bg-white/90 text-ink-700 flex items-center justify-center shadow transition-colors hover:bg-white"
-                                            :title="isInKoboSync(book) ? 'Kobo Sync' : 'Add to Kobo Sync'"
-                                            :aria-label="isInKoboSync(book) ? 'Kobo Sync' : 'Add to Kobo Sync'"
+                                            @click.stop="koboSynced = !koboSynced; toggleReadingList(book.id)"
+                                            class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-full flex items-center justify-center shadow-[0_8px_14px_rgba(0,0,0,0.25)] transition-all duration-200 -translate-y-2"
+                                            :class="koboSynced ? 'bg-white/95' : 'bg-ink-900/70 hover:bg-ink-900/80'"
+                                            :title="koboSynced ? 'Kobo Sync' : 'Add to Kobo Sync'"
+                                            :aria-label="koboSynced ? 'Kobo Sync' : 'Add to Kobo Sync'"
+                                            :aria-pressed="koboSynced"
                                         >
-                                            <i :class="isInKoboSync(book) ? 'bi bi-bookmark-star-fill text-sage-600' : 'bi bi-bookmark-star'"></i>
+                                            <i
+                                                x-show="!koboSynced"
+                                                x-transition.opacity.scale.80.duration.150ms
+                                                class="bi bi-bookmark-plus text-white text-lg"
+                                                x-cloak
+                                            ></i>
+                                            <i
+                                                x-show="koboSynced"
+                                                x-transition.opacity.scale.80.duration.150ms
+                                                class="bi bi-bookmark-check-fill text-primary-500 text-lg"
+                                                x-cloak
+                                            ></i>
                                         </button>
                                     </div>
                                 </div>
