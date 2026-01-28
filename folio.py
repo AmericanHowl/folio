@@ -16,6 +16,7 @@ import sys
 import base64
 import tempfile
 import re
+import html
 import sqlite3
 from pathlib import Path
 import time
@@ -1758,6 +1759,8 @@ def fetch_and_apply_itunes_metadata(book_id):
             description = re.sub(r'</?p[^>]*>', '\n', description, flags=re.IGNORECASE)
             # Strip remaining HTML tags
             description = re.sub(r'<[^>]+>', '', description)
+            # Decode HTML entities and normalize non-breaking spaces
+            description = html.unescape(description).replace('\xa0', ' ')
             # Clean up excessive whitespace while preserving intentional newlines
             description = re.sub(r'[^\S\n]+', ' ', description)  # Collapse spaces/tabs but not newlines
             description = re.sub(r'\n{3,}', '\n\n', description)  # Max 2 consecutive newlines
